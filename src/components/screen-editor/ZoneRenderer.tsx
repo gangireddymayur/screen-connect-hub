@@ -1,10 +1,11 @@
-import { useState, useRef, type DragEvent } from "react";
+import { useState, useEffect, useCallback, type DragEvent } from "react";
 import { cn } from "@/lib/utils";
 import {
   ScreenZone,
   ContentWidget,
   ContentWidgetType,
-  TextAnimation,
+  SlideshowItem,
+  SlideTransition,
   splitZone,
   createWidget,
 } from "@/lib/screen-editor-types";
@@ -13,7 +14,6 @@ import {
   SplitSquareVertical,
   Trash2,
   GripVertical,
-  Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -25,7 +25,155 @@ interface ZoneRendererProps {
   depth?: number;
 }
 
+/* ── Transition CSS for slideshow ── */
+function getTransitionStyle(transition: SlideTransition, isActive: boolean): React.CSSProperties {
+  const base: React.CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    transition: 'all 0.8s ease-in-out',
+  };
+
+  if (isActive) {
+    return { ...base, opacity: 1, transform: 'translate(0,0) scale(1) rotateY(0deg)' };
+  }
+
+  switch (transition) {
+    case 'fade':
+      return { ...base, opacity: 0 };
+    case 'slide-left':
+      return { ...base, opacity: 0, transform: 'translateX(-100%)' };
+    case 'slide-right':
+      return { ...base, opacity: 0, transform: 'translateX(100%)' };
+    case 'slide-up':
+      return { ...base, opacity: 0, transform: 'translateY(-100%)' };
+    case 'slide-down':
+      return { ...base, opacity: 0, transform: 'translateY(100%)' };
+    case 'zoom-in':
+      return { ...base, opacity: 0, transform: 'scale(0.3)' };
+    case 'zoom-out':
+      return { ...base, opacity: 0, transform: 'scale(1.5)' };
+    case 'flip':
+      return { ...base, opacity: 0, transform: 'rotateY(90deg)' };
+    case 'none':
+      return { ...base, opacity: 0 };
+    default:
+      return { ...base, opacity: 0 };
+  }
+}
+
+/* ── Slideshow Player ── */
+function SlideshowPreview({ widget }: { widget: ContentWidget }) {
+  const slides = widget.slides || [];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (slides.length <= 1) return;
+    const currentSlide = slides[currentIndex];
+    const duration = (currentSlide?.duration || 5) * 1000;
+    const timer = setTimeout(() => {
+      setCurrentIndex((prev) => {
+        const next = prev + 1;
+        if (next >= slides.length) {
+          return widget.slideshowLoop ? 0 : prev;
+        }
+        return next;
+      });
+    }, duration);
+    return () => clearTimeout(timer);
+  }, [currentIndex, slides, widget.slideshowLoop]);
+
+  if (slides.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+        <div className="text-center">
+          <div className="text-2xl mb-1">🖼️</div>
+          <span className="text-xs">No slides added</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full overflow-hidden" style={{ perspective: '1000px' }}>
+      {slides.map((slide, index) => {
+        const isActive = index === currentIndex;
+        return (
+          <div key={slide.id} style={getTransitionStyle(slide.transition, isActive)}>
+            {slide.imageUrl ? (
+              <img
+                src={slide.imageUrl}
+                alt={slide.imageName}
+                className="w-full h-full"
+                style={{ objectFit: slide.objectFit || 'cover' }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-muted/20">
+                <div className="text-center text-muted-foreground">
+                  <div className="text-lg">🖼️</div>
+                  <span className="text-[10px]">{slide.imageName || `Slide ${index + 1}`}</span>
+                </div>
+              </div>
+            )}
+            {/* Overlay text */}
+            {slide.overlayText && (
+              <div className="absolute inset-0 flex items-end p-3">
+                <OverlayText slide={slide} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Slide indicator dots */}
+      {slides.length > 1 && (
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+          {slides.map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                "h-1.5 rounded-full transition-all duration-300",
+                i === currentIndex ? "w-4 bg-primary" : "w-1.5 bg-muted-foreground/40"
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OverlayText({ slide }: { slide: SlideshowItem }) {
+  const animClass = (() => {
+    switch (slide.overlayAnimation) {
+      case 'scroll-left': return 'animate-marquee';
+      case 'fade': return 'animate-pulse-glow';
+      case 'blink': return 'animate-blink';
+      case 'typewriter': return 'animate-typewriter overflow-hidden whitespace-nowrap';
+      default: return '';
+    }
+  })();
+
+  return (
+    <div
+      className={cn("whitespace-nowrap", animClass)}
+      style={{
+        fontSize: slide.overlayFontSize || 16,
+        color: slide.overlayColor || '#ffffff',
+        textShadow: '0 1px 4px rgba(0,0,0,0.7)',
+        fontWeight: 600,
+      }}
+    >
+      {slide.overlayText}
+    </div>
+  );
+}
+
+/* ── Standard Widget Preview ── */
 function WidgetPreview({ widget }: { widget: ContentWidget }) {
+  if (widget.type === 'slideshow') {
+    return <SlideshowPreview widget={widget} />;
+  }
+
   const animationClass = (() => {
     switch (widget.textAnimation) {
       case 'scroll-left':
@@ -125,10 +273,10 @@ function WidgetPreview({ widget }: { widget: ContentWidget }) {
 
 function ClockWidget({ fontSize, color, fontWeight }: { fontSize?: number; color?: string; fontWeight?: string }) {
   const [time, setTime] = useState(new Date().toLocaleTimeString());
-  useState(() => {
+  useEffect(() => {
     const interval = setInterval(() => setTime(new Date().toLocaleTimeString()), 1000);
     return () => clearInterval(interval);
-  });
+  }, []);
   return (
     <span style={{ fontSize: fontSize || 48, color: color || '#ffffff', fontWeight: fontWeight || '700' }}>
       {time}
@@ -136,11 +284,12 @@ function ClockWidget({ fontSize, color, fontWeight }: { fontSize?: number; color
   );
 }
 
+/* ── Zone Renderer ── */
 export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, depth = 0 }: ZoneRendererProps) {
   const isSelected = zone.id === selectedZoneId;
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const handleDrop = (e: DragEvent) => {
+  const handleDrop = useCallback((e: DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
@@ -150,13 +299,13 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
       const widget = createWidget(widgetType);
       onUpdate({ ...zone, content: widget });
     }
-  };
+  }, [zone, onUpdate]);
 
-  const handleDragOver = (e: DragEvent) => {
+  const handleDragOver = useCallback((e: DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (zone.split === 'none') setIsDragOver(true);
-  };
+  }, [zone.split]);
 
   const handleSplit = (direction: 'horizontal' | 'vertical') => {
     onUpdate(splitZone(zone, direction));
@@ -182,7 +331,6 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
             depth={depth + 1}
           />
         </div>
-        {/* Resize handle */}
         <div
           className={cn(
             "shrink-0 flex items-center justify-center cursor-col-resize bg-border/60 hover:bg-primary/40 transition-colors z-10",
@@ -248,38 +396,23 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
         </div>
       )}
 
-      {/* Zone toolbar */}
       <div className={cn(
         "absolute top-1 right-1 flex gap-1 opacity-0 transition-opacity z-20",
         (isSelected || isDragOver) && "opacity-100",
         "group-hover/zone:opacity-100"
       )}>
-        <Button
-          variant="secondary"
-          size="icon"
-          className="h-6 w-6 bg-card/90 backdrop-blur-sm hover:bg-card"
-          onClick={(e) => { e.stopPropagation(); handleSplit('horizontal'); }}
-          title="Split Horizontally"
-        >
+        <Button variant="secondary" size="icon" className="h-6 w-6 bg-card/90 backdrop-blur-sm hover:bg-card"
+          onClick={(e) => { e.stopPropagation(); handleSplit('horizontal'); }} title="Split Horizontally">
           <SplitSquareHorizontal className="h-3 w-3" />
         </Button>
-        <Button
-          variant="secondary"
-          size="icon"
-          className="h-6 w-6 bg-card/90 backdrop-blur-sm hover:bg-card"
-          onClick={(e) => { e.stopPropagation(); handleSplit('vertical'); }}
-          title="Split Vertically"
-        >
+        <Button variant="secondary" size="icon" className="h-6 w-6 bg-card/90 backdrop-blur-sm hover:bg-card"
+          onClick={(e) => { e.stopPropagation(); handleSplit('vertical'); }} title="Split Vertically">
           <SplitSquareVertical className="h-3 w-3" />
         </Button>
         {zone.content && (
-          <Button
-            variant="secondary"
-            size="icon"
+          <Button variant="secondary" size="icon"
             className="h-6 w-6 bg-card/90 backdrop-blur-sm hover:bg-destructive/90 hover:text-destructive-foreground"
-            onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-            title="Clear"
-          >
+            onClick={(e) => { e.stopPropagation(); handleDelete(); }} title="Clear">
             <Trash2 className="h-3 w-3" />
           </Button>
         )}
