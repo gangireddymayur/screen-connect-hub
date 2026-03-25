@@ -6,14 +6,18 @@ import {
   Clock,
   CloudSun,
   Rss,
+  Images,
 } from "lucide-react";
 import { ContentWidgetType } from "@/lib/screen-editor-types";
 
 const widgets: { type: ContentWidgetType; label: string; icon: React.ElementType; color: string }[] = [
   { type: 'text', label: 'Text', icon: Type, color: 'bg-warning/15 text-warning' },
   { type: 'image', label: 'Image', icon: Image, color: 'bg-info/15 text-info' },
+  { type: 'slideshow', label: 'Slideshow', icon: Images, color: 'bg-success/15 text-success' },
   { type: 'video', label: 'Video', icon: Video, color: 'bg-primary/15 text-primary' },
   { type: 'clock', label: 'Clock', icon: Clock, color: 'bg-success/15 text-success' },
+  { type: 'weather', label: 'Weather', icon: CloudSun, color: 'bg-warning/15 text-warning' },
+  { type: 'rss', label: 'RSS Ticker', icon: Rss, color: 'bg-destructive/15 text-destructive' },
   { type: 'weather', label: 'Weather', icon: CloudSun, color: 'bg-warning/15 text-warning' },
   { type: 'rss', label: 'RSS Ticker', icon: Rss, color: 'bg-destructive/15 text-destructive' },
 ];
