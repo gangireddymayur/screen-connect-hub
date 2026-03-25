@@ -91,9 +91,14 @@ export default function DevicesPage() {
                     <TableCell className="text-sm">{device.uptime}%</TableCell>
                     <TableCell><StatusBadge status={device.status} /></TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/editor/${device.id}`)} title="Edit Screen Layout">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <MoreVertical className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
