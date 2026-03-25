@@ -11,6 +11,7 @@ import SchedulePage from "./pages/SchedulePage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import CompaniesPage from "./pages/CompaniesPage";
 import SettingsPage from "./pages/SettingsPage";
+import ScreenEditorPage from "./pages/ScreenEditorPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/companies" element={<CompaniesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/editor/:deviceId" element={<ScreenEditorPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
