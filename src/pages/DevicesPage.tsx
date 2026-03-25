@@ -1,15 +1,17 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { mockDevices } from "@/lib/mock-data";
-import { Monitor, Plus, MoreVertical, Link2 } from "lucide-react";
+import { Monitor, Plus, MoreVertical, Link2, Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 
 export default function DevicesPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const filtered = mockDevices.filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -89,9 +91,14 @@ export default function DevicesPage() {
                     <TableCell className="text-sm">{device.uptime}%</TableCell>
                     <TableCell><StatusBadge status={device.status} /></TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/editor/${device.id}`)} title="Edit Screen Layout">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <MoreVertical className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
