@@ -2,7 +2,23 @@ export type ZoneSplit = 'none' | 'horizontal' | 'vertical';
 
 export type TextAnimation = 'none' | 'scroll-left' | 'scroll-right' | 'scroll-up' | 'scroll-down' | 'typewriter' | 'fade' | 'blink';
 
-export type ContentWidgetType = 'image' | 'video' | 'text' | 'clock' | 'weather' | 'rss' | 'empty';
+export type SlideTransition = 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'zoom-in' | 'zoom-out' | 'flip' | 'none';
+
+export type ContentWidgetType = 'image' | 'video' | 'text' | 'clock' | 'weather' | 'rss' | 'slideshow' | 'empty';
+
+export interface SlideshowItem {
+  id: string;
+  imageUrl: string;
+  imageName: string;
+  duration: number; // seconds
+  transition: SlideTransition;
+  objectFit: 'cover' | 'contain' | 'fill';
+  /** Optional overlay text */
+  overlayText?: string;
+  overlayFontSize?: number;
+  overlayColor?: string;
+  overlayAnimation?: TextAnimation;
+}
 
 export interface ContentWidget {
   id: string;
@@ -19,6 +35,9 @@ export interface ContentWidget {
   mediaUrl?: string;
   mediaName?: string;
   objectFit?: 'cover' | 'contain' | 'fill';
+  // slideshow props
+  slides?: SlideshowItem[];
+  slideshowLoop?: boolean;
   // styling
   backgroundColor?: string;
   padding?: number;
@@ -51,6 +70,17 @@ export function createZone(id?: string): ScreenZone {
     splitRatio: 50,
     content: null,
     children: null,
+  };
+}
+
+export function createSlide(): SlideshowItem {
+  return {
+    id: `slide-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    imageUrl: '',
+    imageName: '',
+    duration: 5,
+    transition: 'fade',
+    objectFit: 'cover',
   };
 }
 
@@ -93,6 +123,13 @@ export function createWidget(type: ContentWidgetType): ContentWidget {
       return { ...base, objectFit: 'cover' };
     case 'video':
       return { ...base, objectFit: 'contain' };
+    case 'slideshow':
+      return {
+        ...base,
+        label: 'Slideshow',
+        slides: [createSlide(), createSlide()],
+        slideshowLoop: true,
+      };
     default:
       return base;
   }

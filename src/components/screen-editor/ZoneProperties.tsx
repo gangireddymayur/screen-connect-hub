@@ -1,17 +1,22 @@
-import { ContentWidget, TextAnimation } from "@/lib/screen-editor-types";
+import { ContentWidget, TextAnimation, SlideshowItem, SlideTransition, createSlide } from "@/lib/screen-editor-types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Trash2, GripVertical, ChevronDown, ChevronUp, Image } from "lucide-react";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface ZonePropertiesProps {
   widget: ContentWidget;
   onUpdate: (widget: ContentWidget) => void;
 }
 
-const animations: { value: TextAnimation; label: string }[] = [
+const textAnimations: { value: TextAnimation; label: string }[] = [
   { value: 'none', label: 'None' },
   { value: 'scroll-left', label: 'Scroll Left (Marquee)' },
   { value: 'scroll-right', label: 'Scroll Right' },
@@ -21,8 +26,218 @@ const animations: { value: TextAnimation; label: string }[] = [
   { value: 'blink', label: 'Blink' },
 ];
 
+const slideTransitions: { value: SlideTransition; label: string }[] = [
+  { value: 'fade', label: 'Fade' },
+  { value: 'slide-left', label: 'Slide Left' },
+  { value: 'slide-right', label: 'Slide Right' },
+  { value: 'slide-up', label: 'Slide Up' },
+  { value: 'slide-down', label: 'Slide Down' },
+  { value: 'zoom-in', label: 'Zoom In' },
+  { value: 'zoom-out', label: 'Zoom Out' },
+  { value: 'flip', label: 'Flip' },
+  { value: 'none', label: 'Instant (No animation)' },
+];
+
+/* ── Single Slide Editor ── */
+function SlideEditor({
+  slide,
+  index,
+  total,
+  onUpdate,
+  onRemove,
+  onMoveUp,
+  onMoveDown,
+}: {
+  slide: SlideshowItem;
+  index: number;
+  total: number;
+  onUpdate: (s: SlideshowItem) => void;
+  onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 overflow-hidden">
+      {/* Header */}
+      <div
+        className="flex items-center gap-2 p-2 cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
+        <div className="h-8 w-8 rounded bg-muted flex items-center justify-center shrink-0">
+          {slide.imageUrl ? (
+            <img src={slide.imageUrl} alt="" className="h-full w-full rounded object-cover" />
+          ) : (
+            <Image className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium truncate">{slide.imageName || `Slide ${index + 1}`}</p>
+          <p className="text-[10px] text-muted-foreground">{slide.duration}s · {slide.transition}</p>
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {index > 0 && (
+            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => { e.stopPropagation(); onMoveUp(); }}>
+              <ChevronUp className="h-3 w-3" />
+            </Button>
+          )}
+          {index < total - 1 && (
+            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => { e.stopPropagation(); onMoveDown(); }}>
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" className="h-5 w-5 hover:text-destructive" onClick={(e) => { e.stopPropagation(); onRemove(); }}>
+            <Trash2 className="h-3 w-3" />
+          </Button>
+          {expanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+        </div>
+      </div>
+
+      {/* Expanded */}
+      {expanded && (
+        <div className="p-2.5 pt-0 space-y-3 border-t border-border/50">
+          <div className="space-y-1 pt-2">
+            <Label className="text-[10px]">Image Name / URL</Label>
+            <Input
+              value={slide.imageName}
+              onChange={(e) => onUpdate({ ...slide, imageName: e.target.value })}
+              placeholder="promo-banner.jpg"
+              className="h-7 text-xs"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-[10px]">Duration ({slide.duration}s)</Label>
+            <Slider
+              value={[slide.duration]}
+              onValueChange={([v]) => onUpdate({ ...slide, duration: v })}
+              min={1}
+              max={60}
+              step={1}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-[10px]">Transition</Label>
+            <Select value={slide.transition} onValueChange={(v) => onUpdate({ ...slide, transition: v as SlideTransition })}>
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {slideTransitions.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-[10px]">Fit Mode</Label>
+            <Select value={slide.objectFit} onValueChange={(v) => onUpdate({ ...slide, objectFit: v as 'cover' | 'contain' | 'fill' })}>
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cover">Cover</SelectItem>
+                <SelectItem value="contain">Contain</SelectItem>
+                <SelectItem value="fill">Fill</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
+          {/* Overlay text */}
+          <div className="space-y-1">
+            <Label className="text-[10px]">Overlay Text (optional)</Label>
+            <Input
+              value={slide.overlayText || ''}
+              onChange={(e) => onUpdate({ ...slide, overlayText: e.target.value })}
+              placeholder="Sale 50% Off!"
+              className="h-7 text-xs"
+            />
+          </div>
+
+          {slide.overlayText && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[10px]">Font Size</Label>
+                  <Input
+                    type="number"
+                    value={slide.overlayFontSize || 16}
+                    onChange={(e) => onUpdate({ ...slide, overlayFontSize: parseInt(e.target.value) || 16 })}
+                    className="h-7 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px]">Color</Label>
+                  <div className="flex gap-1">
+                    <input
+                      type="color"
+                      value={slide.overlayColor || '#ffffff'}
+                      onChange={(e) => onUpdate({ ...slide, overlayColor: e.target.value })}
+                      className="h-7 w-7 rounded cursor-pointer border-none"
+                    />
+                    <Input
+                      value={slide.overlayColor || '#ffffff'}
+                      onChange={(e) => onUpdate({ ...slide, overlayColor: e.target.value })}
+                      className="h-7 text-[10px] font-mono flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px]">Text Animation</Label>
+                <Select
+                  value={slide.overlayAnimation || 'none'}
+                  onValueChange={(v) => onUpdate({ ...slide, overlayAnimation: v as TextAnimation })}
+                >
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {textAnimations.map((a) => (
+                      <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Main Properties Panel ── */
 export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
   const update = (partial: Partial<ContentWidget>) => onUpdate({ ...widget, ...partial });
+
+  const updateSlide = (index: number, slide: SlideshowItem) => {
+    const slides = [...(widget.slides || [])];
+    slides[index] = slide;
+    update({ slides });
+  };
+
+  const removeSlide = (index: number) => {
+    const slides = (widget.slides || []).filter((_, i) => i !== index);
+    update({ slides });
+  };
+
+  const moveSlide = (from: number, to: number) => {
+    const slides = [...(widget.slides || [])];
+    const [item] = slides.splice(from, 1);
+    slides.splice(to, 0, item);
+    update({ slides });
+  };
+
+  const addSlide = () => {
+    update({ slides: [...(widget.slides || []), createSlide()] });
+  };
 
   return (
     <div className="space-y-4">
@@ -30,7 +245,45 @@ export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
         Properties — {widget.label}
       </h3>
 
-      {/* Text Content */}
+      {/* ── SLIDESHOW ── */}
+      {widget.type === 'slideshow' && (
+        <>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Loop</Label>
+            <Switch
+              checked={widget.slideshowLoop !== false}
+              onCheckedChange={(v) => update({ slideshowLoop: v })}
+            />
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium">{(widget.slides || []).length} Slides</span>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addSlide}>
+              <Plus className="h-3 w-3 mr-1" />
+              Add Slide
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            {(widget.slides || []).map((slide, i) => (
+              <SlideEditor
+                key={slide.id}
+                slide={slide}
+                index={i}
+                total={(widget.slides || []).length}
+                onUpdate={(s) => updateSlide(i, s)}
+                onRemove={() => removeSlide(i)}
+                onMoveUp={() => moveSlide(i, i - 1)}
+                onMoveDown={() => moveSlide(i, i + 1)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── TEXT / RSS ── */}
       {(widget.type === 'text' || widget.type === 'rss') && (
         <>
           <div className="space-y-1.5">
@@ -57,9 +310,7 @@ export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Font Weight</Label>
             <Select value={widget.fontWeight || '400'} onValueChange={(v) => update({ fontWeight: v })}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="300">Light</SelectItem>
                 <SelectItem value="400">Normal</SelectItem>
@@ -73,17 +324,8 @@ export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Text Color</Label>
             <div className="flex gap-2">
-              <input
-                type="color"
-                value={widget.textColor || '#ffffff'}
-                onChange={(e) => update({ textColor: e.target.value })}
-                className="h-8 w-8 rounded cursor-pointer border-none"
-              />
-              <Input
-                value={widget.textColor || '#ffffff'}
-                onChange={(e) => update({ textColor: e.target.value })}
-                className="h-8 text-xs font-mono flex-1"
-              />
+              <input type="color" value={widget.textColor || '#ffffff'} onChange={(e) => update({ textColor: e.target.value })} className="h-8 w-8 rounded cursor-pointer border-none" />
+              <Input value={widget.textColor || '#ffffff'} onChange={(e) => update({ textColor: e.target.value })} className="h-8 text-xs font-mono flex-1" />
             </div>
           </div>
 
@@ -92,11 +334,9 @@ export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Text Animation</Label>
             <Select value={widget.textAnimation || 'none'} onValueChange={(v) => update({ textAnimation: v as TextAnimation })}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {animations.map((a) => (
+                {textAnimations.map((a) => (
                   <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -107,9 +347,7 @@ export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
             <div className="space-y-1.5">
               <Label className="text-xs">Scroll Speed</Label>
               <Select value={widget.scrollSpeed || 'normal'} onValueChange={(v) => update({ scrollSpeed: v as 'slow' | 'normal' | 'fast' })}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="slow">Slow</SelectItem>
                   <SelectItem value="normal">Normal</SelectItem>
@@ -121,56 +359,34 @@ export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
         </>
       )}
 
-      {/* Clock */}
+      {/* ── CLOCK ── */}
       {widget.type === 'clock' && (
         <>
           <div className="space-y-1.5">
             <Label className="text-xs">Font Size ({widget.fontSize}px)</Label>
-            <Slider
-              value={[widget.fontSize || 48]}
-              onValueChange={([v]) => update({ fontSize: v })}
-              min={16}
-              max={120}
-              step={1}
-            />
+            <Slider value={[widget.fontSize || 48]} onValueChange={([v]) => update({ fontSize: v })} min={16} max={120} step={1} />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Color</Label>
             <div className="flex gap-2">
-              <input
-                type="color"
-                value={widget.textColor || '#ffffff'}
-                onChange={(e) => update({ textColor: e.target.value })}
-                className="h-8 w-8 rounded cursor-pointer border-none"
-              />
-              <Input
-                value={widget.textColor || '#ffffff'}
-                onChange={(e) => update({ textColor: e.target.value })}
-                className="h-8 text-xs font-mono flex-1"
-              />
+              <input type="color" value={widget.textColor || '#ffffff'} onChange={(e) => update({ textColor: e.target.value })} className="h-8 w-8 rounded cursor-pointer border-none" />
+              <Input value={widget.textColor || '#ffffff'} onChange={(e) => update({ textColor: e.target.value })} className="h-8 text-xs font-mono flex-1" />
             </div>
           </div>
         </>
       )}
 
-      {/* Image / Video */}
+      {/* ── IMAGE / VIDEO ── */}
       {(widget.type === 'image' || widget.type === 'video') && (
         <>
           <div className="space-y-1.5">
             <Label className="text-xs">Media Name</Label>
-            <Input
-              value={widget.mediaName || ''}
-              onChange={(e) => update({ mediaName: e.target.value })}
-              placeholder="e.g. promo-banner.jpg"
-              className="h-8 text-xs"
-            />
+            <Input value={widget.mediaName || ''} onChange={(e) => update({ mediaName: e.target.value })} placeholder="e.g. promo-banner.jpg" className="h-8 text-xs" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Fit Mode</Label>
             <Select value={widget.objectFit || 'cover'} onValueChange={(v) => update({ objectFit: v as 'cover' | 'contain' | 'fill' })}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="cover">Cover</SelectItem>
                 <SelectItem value="contain">Contain</SelectItem>
@@ -183,55 +399,28 @@ export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
 
       <Separator />
 
-      {/* Universal styling */}
+      {/* ── Universal styling ── */}
       <div className="space-y-1.5">
         <Label className="text-xs">Background Color</Label>
         <div className="flex gap-2">
-          <input
-            type="color"
-            value={widget.backgroundColor || '#000000'}
-            onChange={(e) => update({ backgroundColor: e.target.value })}
-            className="h-8 w-8 rounded cursor-pointer border-none"
-          />
-          <Input
-            value={widget.backgroundColor || 'transparent'}
-            onChange={(e) => update({ backgroundColor: e.target.value })}
-            className="h-8 text-xs font-mono flex-1"
-          />
+          <input type="color" value={widget.backgroundColor || '#000000'} onChange={(e) => update({ backgroundColor: e.target.value })} className="h-8 w-8 rounded cursor-pointer border-none" />
+          <Input value={widget.backgroundColor || 'transparent'} onChange={(e) => update({ backgroundColor: e.target.value })} className="h-8 text-xs font-mono flex-1" />
         </div>
       </div>
 
       <div className="space-y-1.5">
         <Label className="text-xs">Padding ({widget.padding}px)</Label>
-        <Slider
-          value={[widget.padding || 0]}
-          onValueChange={([v]) => update({ padding: v })}
-          min={0}
-          max={60}
-          step={2}
-        />
+        <Slider value={[widget.padding || 0]} onValueChange={([v]) => update({ padding: v })} min={0} max={60} step={2} />
       </div>
 
       <div className="space-y-1.5">
         <Label className="text-xs">Border Radius ({widget.borderRadius}px)</Label>
-        <Slider
-          value={[widget.borderRadius || 0]}
-          onValueChange={([v]) => update({ borderRadius: v })}
-          min={0}
-          max={50}
-          step={1}
-        />
+        <Slider value={[widget.borderRadius || 0]} onValueChange={([v]) => update({ borderRadius: v })} min={0} max={50} step={1} />
       </div>
 
       <div className="space-y-1.5">
         <Label className="text-xs">Opacity ({widget.opacity}%)</Label>
-        <Slider
-          value={[widget.opacity ?? 100]}
-          onValueChange={([v]) => update({ opacity: v })}
-          min={10}
-          max={100}
-          step={5}
-        />
+        <Slider value={[widget.opacity ?? 100]} onValueChange={([v]) => update({ opacity: v })} min={10} max={100} step={5} />
       </div>
     </div>
   );
