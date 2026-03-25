@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 
 export default function DevicesPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const filtered = mockDevices.filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase()) ||
