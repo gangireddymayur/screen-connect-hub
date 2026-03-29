@@ -1,16 +1,14 @@
 import {
   LayoutDashboard,
-  Monitor,
-  FolderOpen,
-  ListVideo,
-  CalendarClock,
-  BarChart3,
   Building2,
+  Users,
   Settings,
   Tv,
+  LogOut,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Sidebar,
   SidebarContent,
@@ -24,18 +22,12 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 
-const mainNav = [
+const superAdminNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Devices", url: "/devices", icon: Monitor },
-  { title: "Content", url: "/content", icon: FolderOpen },
-  { title: "Playlists", url: "/playlists", icon: ListVideo },
-  { title: "Schedule", url: "/schedule", icon: CalendarClock },
-  { title: "Analytics", url: "/analytics", icon: BarChart3 },
-];
-
-const adminNav = [
   { title: "Companies", url: "/companies", icon: Building2 },
+  { title: "Users", url: "/users", icon: Users },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
@@ -43,6 +35,8 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { user, signOut } = useAuth();
+
   const isActive = (path: string) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
@@ -59,7 +53,7 @@ export function AppSidebar() {
                 SignageHub
               </span>
               <span className="text-[10px] text-sidebar-foreground/50 uppercase tracking-widest">
-                Digital Signage
+                Super Admin
               </span>
             </div>
           )}
@@ -73,7 +67,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => (
+              {superAdminNav.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <NavLink to={item.url} end={item.url === "/"}>
@@ -86,35 +80,24 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40">
-            Administration
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="p-4 space-y-2">
         {!collapsed && (
           <div className="rounded-lg bg-sidebar-accent p-3">
             <p className="text-xs font-medium text-sidebar-accent-foreground">Super Admin</p>
-            <p className="text-[10px] text-sidebar-foreground/50">admin@signagehub.com</p>
+            <p className="text-[10px] text-sidebar-foreground/50 truncate">{user?.email}</p>
           </div>
         )}
+        <Button
+          variant="ghost"
+          size={collapsed ? "icon" : "sm"}
+          className="w-full text-sidebar-foreground/60 hover:text-sidebar-foreground"
+          onClick={signOut}
+        >
+          <LogOut className="h-4 w-4" />
+          {!collapsed && <span className="ml-2">Sign Out</span>}
+        </Button>
       </SidebarFooter>
     </Sidebar>
   );
