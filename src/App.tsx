@@ -6,14 +6,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import DashboardPage from "./pages/DashboardPage";
-import DevicesPage from "./pages/DevicesPage";
-import ContentPage from "./pages/ContentPage";
-import PlaylistsPage from "./pages/PlaylistsPage";
-import SchedulePage from "./pages/SchedulePage";
-import AnalyticsPage from "./pages/AnalyticsPage";
 import CompaniesPage from "./pages/CompaniesPage";
+import UsersPage from "./pages/UsersPage";
 import SettingsPage from "./pages/SettingsPage";
-import ScreenEditorPage from "./pages/ScreenEditorPage";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
@@ -28,15 +23,10 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-            <Route path="/devices" element={<ProtectedRoute><DevicesPage /></ProtectedRoute>} />
-            <Route path="/content" element={<ProtectedRoute><ContentPage /></ProtectedRoute>} />
-            <Route path="/playlists" element={<ProtectedRoute><PlaylistsPage /></ProtectedRoute>} />
-            <Route path="/schedule" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
-            <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
+            <Route path="/" element={<ProtectedRoute requiredRole="super_admin"><DashboardPage /></ProtectedRoute>} />
             <Route path="/companies" element={<ProtectedRoute requiredRole="super_admin"><CompaniesPage /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-            <Route path="/editor/:deviceId" element={<ProtectedRoute><ScreenEditorPage /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute requiredRole="super_admin"><UsersPage /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute requiredRole="super_admin"><SettingsPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
