@@ -81,7 +81,7 @@ export default function UsersPage() {
         last_sign_in_at: authUser?.last_sign_in_at ?? null,
         email_confirmed: !!authUser?.email_confirmed_at,
       };
-    });
+    }).filter((u) => u.role !== "super_admin");
 
     setUsers(merged);
     setLoading(false);
