@@ -163,14 +163,14 @@ export default function CompaniesPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell><StatusBadge status={company.plan} /></TableCell>
+                      <TableCell><StatusBadge status={company.plan as any} /></TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
                           <span className="text-sm">{company.max_screens}</span>
                         </div>
                       </TableCell>
-                      <TableCell><StatusBadge status={company.status} /></TableCell>
+                      <TableCell><StatusBadge status={company.status as any} /></TableCell>
                       <TableCell className="text-sm text-muted-foreground">{formatDate(company.created_at)}</TableCell>
                     </TableRow>
                   ))}
