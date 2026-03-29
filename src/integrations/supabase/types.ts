@@ -49,24 +49,35 @@ export type Database = {
       }
       profiles: {
         Row: {
+          company_id: string | null
           created_at: string
           email: string | null
           full_name: string | null
           id: string
         }
         Insert: {
+          company_id?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
           id: string
         }
         Update: {
+          company_id?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
           id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
