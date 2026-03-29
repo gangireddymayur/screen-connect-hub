@@ -1,78 +1,182 @@
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
-import { mockCompanies } from "@/lib/mock-data";
+import { supabase } from "@/integrations/supabase/client";
 import { Plus, Building2, MoreVertical, Monitor } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+
+interface Company {
+  id: string;
+  name: string;
+  contact_email: string;
+  plan: string;
+  max_screens: number;
+  status: string;
+  created_at: string;
+}
 
 export default function CompaniesPage() {
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [plan, setPlan] = useState("starter");
+  const [maxScreens, setMaxScreens] = useState("10");
+  const [submitting, setSubmitting] = useState(false);
+  const { user } = useAuth();
+
+  const fetchCompanies = async () => {
+    const { data, error } = await supabase.from("companies").select("*").order("created_at", { ascending: false });
+    if (error) {
+      toast.error("Failed to load companies");
+    } else {
+      setCompanies(data ?? []);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const { error } = await supabase.from("companies").insert({
+      name,
+      contact_email: contactEmail,
+      plan,
+      max_screens: parseInt(maxScreens),
+      created_by: user?.id,
+    });
+    setSubmitting(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Company added!");
+      setOpen(false);
+      setName("");
+      setContactEmail("");
+      setPlan("starter");
+      setMaxScreens("10");
+      fetchCompanies();
+    }
+  };
+
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Companies</h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage Master Admin accounts</p>
+            <p className="text-sm text-muted-foreground mt-1">Manage company accounts</p>
           </div>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Company
-          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Company
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Company</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAdd} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Company Name</Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contact Email</Label>
+                  <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Plan</Label>
+                  <Select value={plan} onValueChange={setPlan}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="starter">Starter</SelectItem>
+                      <SelectItem value="professional">Professional</SelectItem>
+                      <SelectItem value="enterprise">Enterprise</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Screens</Label>
+                  <Input type="number" value={maxScreens} onChange={(e) => setMaxScreens(e.target.value)} min="1" required />
+                </div>
+                <Button type="submit" className="w-full" disabled={submitting}>
+                  {submitting ? "Adding..." : "Add Company"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <Card>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Screens</TableHead>
-                  <TableHead>Usage</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="w-10"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mockCompanies.map((company) => (
-                  <TableRow key={company.id} className="group">
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Building2 className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{company.name}</p>
-                          <p className="text-xs text-muted-foreground">{company.contactEmail}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell><StatusBadge status={company.plan} /></TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-sm">{company.screens}/{company.maxScreens}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="w-24">
-                        <Progress value={(company.screens / company.maxScreens) * 100} className="h-1.5" />
-                      </div>
-                    </TableCell>
-                    <TableCell><StatusBadge status={company.status} /></TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{company.createdAt}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full" />
+              </div>
+            ) : companies.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Building2 className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                <p className="text-sm">No companies yet. Add your first company.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead>Max Screens</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {companies.map((company) => (
+                    <TableRow key={company.id} className="group">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Building2 className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{company.name}</p>
+                            <p className="text-xs text-muted-foreground">{company.contact_email}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell><StatusBadge status={company.plan as any} /></TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm">{company.max_screens}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell><StatusBadge status={company.status as any} /></TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{formatDate(company.created_at)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
