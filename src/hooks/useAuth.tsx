@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
 
 type AppRole = "super_admin" | "admin";
 
@@ -26,31 +25,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const initialized = useRef(false);
 
-  const fetchRole = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .single();
-    return (data?.role as AppRole) ?? null;
+  const fetchRole = async (userId: string): Promise<AppRole | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .single();
+      if (error) {
+        console.error("Failed to fetch role:", error.message);
+        return null;
+      }
+      return (data?.role as AppRole) ?? null;
+    } catch {
+      return null;
+    }
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          const userRole = await fetchRole(session.user.id);
-          setRole(userRole);
-        } else {
-          setRole(null);
-        }
-        setLoading(false);
-      }
-    );
-
+    // Get initial session first
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -59,7 +54,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(userRole);
       }
       setLoading(false);
+      initialized.current = true;
     });
+
+    // Then listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        // Skip if this fires before getSession completes
+        if (!initialized.current) return;
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          const userRole = await fetchRole(session.user.id);
+          setRole(userRole);
+        } else {
+          setRole(null);
+        }
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, []);

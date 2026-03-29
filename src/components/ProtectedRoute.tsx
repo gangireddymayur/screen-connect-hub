@@ -22,7 +22,14 @@ export function ProtectedRoute({ children, requiredRole }: Props) {
   }
 
   if (requiredRole && role !== requiredRole) {
-    return <Navigate to="/" replace />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-bold">Access Denied</h1>
+          <p className="text-muted-foreground">You don't have permission to view this page.</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;
