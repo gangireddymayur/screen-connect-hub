@@ -2,27 +2,31 @@ import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCard } from "@/components/StatCard";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, Users, Monitor } from "lucide-react";
+import { Building2, Users, Monitor, UserCheck, UserX } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState({ companies: 0, users: 0, totalScreens: 0 });
+  const [stats, setStats] = useState({ companies: 0, users: 0, totalScreens: 0, activeCompanies: 0 });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       const [companiesRes, usersRes] = await Promise.all([
-        supabase.from("companies").select("*"),
-        supabase.from("profiles").select("*"),
+        supabase.from("companies").select("id, max_screens, status"),
+        supabase.from("profiles").select("id", { count: "exact", head: true }),
       ]);
 
       const companies = companiesRes.data ?? [];
       const totalScreens = companies.reduce((sum, c) => sum + (c.max_screens || 0), 0);
+      const activeCompanies = companies.filter(c => c.status === "active").length;
 
       setStats({
         companies: companies.length,
-        users: (usersRes.data ?? []).length,
+        users: usersRes.count ?? 0,
         totalScreens,
+        activeCompanies,
       });
+      setLoading(false);
     };
     fetchStats();
   }, []);
@@ -35,25 +39,11 @@ export default function DashboardPage() {
           <p className="text-sm text-muted-foreground mt-1">Super Admin overview</p>
         </div>
 
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <StatCard
-            title="Total Companies"
-            value={stats.companies}
-            icon={Building2}
-            change="all time"
-          />
-          <StatCard
-            title="Total Users"
-            value={stats.users}
-            icon={Users}
-            change="all time"
-          />
-          <StatCard
-            title="Screen Capacity"
-            value={stats.totalScreens}
-            icon={Monitor}
-            change="across companies"
-          />
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Companies" value={loading ? "—" : stats.companies} icon={Building2} change={`${stats.activeCompanies} active`} changeType="positive" />
+          <StatCard title="Users" value={loading ? "—" : stats.users} icon={Users} change="all admins" />
+          <StatCard title="Screen Capacity" value={loading ? "—" : stats.totalScreens} icon={Monitor} change="across companies" />
+          <StatCard title="Active Companies" value={loading ? "—" : stats.activeCompanies} icon={UserCheck} change={stats.companies > 0 ? `${Math.round((stats.activeCompanies / stats.companies) * 100)}%` : "0%"} changeType="positive" />
         </div>
 
         <Card>
