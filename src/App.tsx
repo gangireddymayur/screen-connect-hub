@@ -3,6 +3,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import DashboardPage from "./pages/DashboardPage";
 import DevicesPage from "./pages/DevicesPage";
 import ContentPage from "./pages/ContentPage";
@@ -12,6 +14,7 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import CompaniesPage from "./pages/CompaniesPage";
 import SettingsPage from "./pages/SettingsPage";
 import ScreenEditorPage from "./pages/ScreenEditorPage";
+import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,18 +25,21 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/devices" element={<DevicesPage />} />
-          <Route path="/content" element={<ContentPage />} />
-          <Route path="/playlists" element={<PlaylistsPage />} />
-          <Route path="/schedule" element={<SchedulePage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/companies" element={<CompaniesPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/editor/:deviceId" element={<ScreenEditorPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+            <Route path="/devices" element={<ProtectedRoute><DevicesPage /></ProtectedRoute>} />
+            <Route path="/content" element={<ProtectedRoute><ContentPage /></ProtectedRoute>} />
+            <Route path="/playlists" element={<ProtectedRoute><PlaylistsPage /></ProtectedRoute>} />
+            <Route path="/schedule" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
+            <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
+            <Route path="/companies" element={<ProtectedRoute requiredRole="super_admin"><CompaniesPage /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+            <Route path="/editor/:deviceId" element={<ProtectedRoute><ScreenEditorPage /></ProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
