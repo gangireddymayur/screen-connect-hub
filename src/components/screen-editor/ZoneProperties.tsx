@@ -11,9 +11,17 @@ import { Plus, Trash2, GripVertical, ChevronDown, ChevronUp, Image } from "lucid
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
+export interface MediaContentItem {
+  id: string;
+  name: string;
+  type: string;
+  file_url: string | null;
+}
+
 interface ZonePropertiesProps {
   widget: ContentWidget;
   onUpdate: (widget: ContentWidget) => void;
+  contentItems?: MediaContentItem[];
 }
 
 const textAnimations: { value: TextAnimation; label: string }[] = [
@@ -214,8 +222,10 @@ function SlideEditor({
 }
 
 /* ── Main Properties Panel ── */
-export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
+export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZonePropertiesProps) {
   const update = (partial: Partial<ContentWidget>) => onUpdate({ ...widget, ...partial });
+  const images = contentItems.filter((c) => c.type === "image" && c.file_url);
+  const videos = contentItems.filter((c) => c.type === "video" && c.file_url);
 
   const updateSlide = (index: number, slide: SlideshowItem) => {
     const slides = [...(widget.slides || [])];
