@@ -145,8 +145,15 @@ export default function AdminContentPage() {
                 <div className="aspect-video bg-muted relative flex items-center justify-center">
                   {item.file_url && item.type === "image" ? (
                     <img src={item.file_url} alt={item.name} className="w-full h-full object-cover" />
-                  ) : item.type === "video" ? (
-                    <Video className="h-8 w-8 text-muted-foreground" />
+                  ) : item.file_url && item.type === "video" ? (
+                    <video
+                      src={item.file_url}
+                      className="w-full h-full object-cover"
+                      muted
+                      preload="metadata"
+                      onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
+                      onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
+                    />
                   ) : (
                     <ImageIcon className="h-8 w-8 text-muted-foreground" />
                   )}
