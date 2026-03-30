@@ -312,6 +312,7 @@ export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZoneProp
                 onRemove={() => removeSlide(i)}
                 onMoveUp={() => moveSlide(i, i - 1)}
                 onMoveDown={() => moveSlide(i, i + 1)}
+                images={images}
               />
             ))}
           </div>
