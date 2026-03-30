@@ -105,11 +105,11 @@ export default {
           "100%": { transform: "scale(1)", opacity: "1" },
         },
         "marquee": {
-          "0%": { transform: "translateX(100%)" },
+          "0%": { transform: "translateX(0%)" },
           "100%": { transform: "translateX(-100%)" },
         },
         "marquee-vertical": {
-          "0%": { transform: "translateY(100%)" },
+          "0%": { transform: "translateY(0%)" },
           "100%": { transform: "translateY(-100%)" },
         },
         "typewriter": {
