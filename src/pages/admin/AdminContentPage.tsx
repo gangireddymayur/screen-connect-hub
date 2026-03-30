@@ -32,6 +32,7 @@ export default function AdminContentPage() {
   const [deleteItem, setDeleteItem] = useState<ContentItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [previewItem, setPreviewItem] = useState<ContentItem | null>(null);
 
   useEffect(() => {
     if (!user) return;
