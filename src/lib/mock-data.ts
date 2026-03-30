@@ -22,16 +22,6 @@ export interface ContentItem {
   usedIn: number;
 }
 
-export interface Playlist {
-  id: string;
-  name: string;
-  itemCount: number;
-  duration: string;
-  assignedScreens: number;
-  lastModified: string;
-  status: 'active' | 'draft' | 'scheduled';
-}
-
 export interface Company {
   id: string;
   name: string;
@@ -45,7 +35,6 @@ export interface Company {
 
 export interface ScheduleEvent {
   id: string;
-  playlistName: string;
   screenGroup: string;
   startTime: string;
   endTime: string;
@@ -71,15 +60,6 @@ export const mockContent: ContentItem[] = [
   { id: 'cnt-006', name: 'Brand Guidelines', type: 'image', thumbnail: '', size: '3.1 MB', uploadedAt: '2 weeks ago', usedIn: 2 },
 ];
 
-export const mockPlaylists: Playlist[] = [
-  { id: 'pl-001', name: 'Welcome Loop', itemCount: 5, duration: '5:00', assignedScreens: 2, lastModified: '1 day ago', status: 'active' },
-  { id: 'pl-002', name: 'Menu Board', itemCount: 8, duration: '8:00', assignedScreens: 1, lastModified: '3 days ago', status: 'active' },
-  { id: 'pl-003', name: 'Promo Reel', itemCount: 4, duration: '3:00', assignedScreens: 1, lastModified: '1 week ago', status: 'active' },
-  { id: 'pl-004', name: 'Company News', itemCount: 6, duration: '6:00', assignedScreens: 1, lastModified: '2 hrs ago', status: 'active' },
-  { id: 'pl-005', name: 'Holiday Special', itemCount: 3, duration: '2:00', assignedScreens: 0, lastModified: '5 days ago', status: 'draft' },
-  { id: 'pl-006', name: 'Emergency Alert', itemCount: 1, duration: '0:30', assignedScreens: 0, lastModified: '2 weeks ago', status: 'scheduled' },
-];
-
 export const mockCompanies: Company[] = [
   { id: 'comp-001', name: 'TechCorp Inc.', plan: 'enterprise', screens: 24, maxScreens: 50, status: 'active', createdAt: 'Jan 15, 2024', contactEmail: 'admin@techcorp.com' },
   { id: 'comp-002', name: 'RetailMax', plan: 'professional', screens: 12, maxScreens: 20, status: 'active', createdAt: 'Mar 22, 2024', contactEmail: 'it@retailmax.com' },
@@ -89,8 +69,8 @@ export const mockCompanies: Company[] = [
 ];
 
 export const mockSchedule: ScheduleEvent[] = [
-  { id: 'sch-001', playlistName: 'Welcome Loop', screenGroup: 'Lobby', startTime: '08:00', endTime: '18:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], priority: 'normal' },
-  { id: 'sch-002', playlistName: 'Menu Board', screenGroup: 'Food Court', startTime: '06:00', endTime: '22:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], priority: 'normal' },
-  { id: 'sch-003', playlistName: 'Promo Reel', screenGroup: 'Retail', startTime: '10:00', endTime: '20:00', days: ['Sat', 'Sun'], priority: 'high' },
-  { id: 'sch-004', playlistName: 'Company News', screenGroup: 'Lobby', startTime: '18:00', endTime: '08:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], priority: 'normal' },
+  { id: 'sch-001', screenGroup: 'Lobby', startTime: '08:00', endTime: '18:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], priority: 'normal' },
+  { id: 'sch-002', screenGroup: 'Food Court', startTime: '06:00', endTime: '22:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], priority: 'normal' },
+  { id: 'sch-003', screenGroup: 'Retail', startTime: '10:00', endTime: '20:00', days: ['Sat', 'Sun'], priority: 'high' },
+  { id: 'sch-004', screenGroup: 'Lobby', startTime: '18:00', endTime: '08:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], priority: 'normal' },
 ];

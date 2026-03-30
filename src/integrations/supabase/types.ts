@@ -138,80 +138,6 @@ export type Database = {
           },
         ]
       }
-      playlist_items: {
-        Row: {
-          content_id: string
-          created_at: string
-          duration: number | null
-          id: string
-          playlist_id: string
-          position: number
-        }
-        Insert: {
-          content_id: string
-          created_at?: string
-          duration?: number | null
-          id?: string
-          playlist_id: string
-          position?: number
-        }
-        Update: {
-          content_id?: string
-          created_at?: string
-          duration?: number | null
-          id?: string
-          playlist_id?: string
-          position?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "playlist_items_content_id_fkey"
-            columns: ["content_id"]
-            isOneToOne: false
-            referencedRelation: "content"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "playlist_items_playlist_id_fkey"
-            columns: ["playlist_id"]
-            isOneToOne: false
-            referencedRelation: "playlists"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      playlists: {
-        Row: {
-          company_id: string
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          company_id: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          company_id?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "playlists_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           company_id: string | null
@@ -253,7 +179,6 @@ export type Database = {
           end_time: string
           id: string
           is_active: boolean
-          playlist_id: string
           start_time: string
         }
         Insert: {
@@ -264,7 +189,6 @@ export type Database = {
           end_time?: string
           id?: string
           is_active?: boolean
-          playlist_id: string
           start_time?: string
         }
         Update: {
@@ -275,7 +199,6 @@ export type Database = {
           end_time?: string
           id?: string
           is_active?: boolean
-          playlist_id?: string
           start_time?: string
         }
         Relationships: [
@@ -291,13 +214,6 @@ export type Database = {
             columns: ["device_id"]
             isOneToOne: false
             referencedRelation: "devices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "schedules_playlist_id_fkey"
-            columns: ["playlist_id"]
-            isOneToOne: false
-            referencedRelation: "playlists"
             referencedColumns: ["id"]
           },
         ]
