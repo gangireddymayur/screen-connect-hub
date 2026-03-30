@@ -389,6 +389,38 @@ export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZoneProp
       {/* ── IMAGE / VIDEO ── */}
       {(widget.type === 'image' || widget.type === 'video') && (
         <>
+          {/* Content Library Picker */}
+          {(widget.type === 'image' ? images : videos).length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-xs">Select from Library</Label>
+              <div className="grid grid-cols-2 gap-1.5 max-h-[180px] overflow-y-auto">
+                {(widget.type === 'image' ? images : videos).map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => update({ mediaUrl: item.file_url!, mediaName: item.name })}
+                    className={cn(
+                      "relative rounded-md overflow-hidden border transition-all aspect-video",
+                      widget.mediaUrl === item.file_url
+                        ? "border-primary ring-1 ring-primary"
+                        : "border-border hover:border-primary/40"
+                    )}
+                  >
+                    {item.type === 'image' ? (
+                      <img src={item.file_url!} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-muted">
+                        <span className="text-[10px] text-muted-foreground">🎬</span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5">
+                      <p className="text-[9px] text-white truncate">{item.name}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="text-xs">Media Name</Label>
             <Input value={widget.mediaName || ''} onChange={(e) => update({ mediaName: e.target.value })} placeholder="e.g. promo-banner.jpg" className="h-8 text-xs" />
