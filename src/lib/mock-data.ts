@@ -22,16 +22,6 @@ export interface ContentItem {
   usedIn: number;
 }
 
-export interface Playlist {
-  id: string;
-  name: string;
-  itemCount: number;
-  duration: string;
-  assignedScreens: number;
-  lastModified: string;
-  status: 'active' | 'draft' | 'scheduled';
-}
-
 export interface Company {
   id: string;
   name: string;
@@ -69,15 +59,6 @@ export const mockContent: ContentItem[] = [
   { id: 'cnt-004', name: 'Menu Board', type: 'image', thumbnail: '', size: '1.8 MB', uploadedAt: '5 days ago', usedIn: 1 },
   { id: 'cnt-005', name: 'Breaking News Ticker', type: 'text', thumbnail: '', size: '12 KB', uploadedAt: '1 day ago', usedIn: 4 },
   { id: 'cnt-006', name: 'Brand Guidelines', type: 'image', thumbnail: '', size: '3.1 MB', uploadedAt: '2 weeks ago', usedIn: 2 },
-];
-
-export const mockPlaylists: Playlist[] = [
-  { id: 'pl-001', name: 'Welcome Loop', itemCount: 5, duration: '5:00', assignedScreens: 2, lastModified: '1 day ago', status: 'active' },
-  { id: 'pl-002', name: 'Menu Board', itemCount: 8, duration: '8:00', assignedScreens: 1, lastModified: '3 days ago', status: 'active' },
-  { id: 'pl-003', name: 'Promo Reel', itemCount: 4, duration: '3:00', assignedScreens: 1, lastModified: '1 week ago', status: 'active' },
-  { id: 'pl-004', name: 'Company News', itemCount: 6, duration: '6:00', assignedScreens: 1, lastModified: '2 hrs ago', status: 'active' },
-  { id: 'pl-005', name: 'Holiday Special', itemCount: 3, duration: '2:00', assignedScreens: 0, lastModified: '5 days ago', status: 'draft' },
-  { id: 'pl-006', name: 'Emergency Alert', itemCount: 1, duration: '0:30', assignedScreens: 0, lastModified: '2 weeks ago', status: 'scheduled' },
 ];
 
 export const mockCompanies: Company[] = [
