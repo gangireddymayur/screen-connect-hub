@@ -70,17 +70,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       initialized.current = true;
     });
 
-    // Then listen for changes
+    // Then listen for changes — non-blocking to avoid deadlocks
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         // Skip if this fires before getSession completes
         if (!initialized.current) return;
         
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          const userRole = await fetchRole(session.user.id);
-          setRole(userRole);
+          // Fire and forget — don't await inside onAuthStateChange
+          fetchRole(session.user.id).then((userRole) => setRole(userRole));
         } else {
           setRole(null);
         }
