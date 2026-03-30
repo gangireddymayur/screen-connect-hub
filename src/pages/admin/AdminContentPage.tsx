@@ -142,7 +142,7 @@ export default function AdminContentPage() {
         ) : (
           <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {content.map((item) => (
-              <Card key={item.id} className="overflow-hidden group">
+              <Card key={item.id} className="overflow-hidden group cursor-pointer" onClick={() => setPreviewItem(item)}>
                 <div className="aspect-video bg-muted relative flex items-center justify-center">
                   {item.file_url && item.type === "image" ? (
                     <img src={item.file_url} alt={item.name} className="w-full h-full object-cover" />
