@@ -52,7 +52,7 @@ export default function SchedulePage() {
                       return (
                         <div key={`${day}-${hour}`} className={`bg-card p-1 min-h-[32px] ${event ? 'bg-primary/10' : ''}`}>
                           {event && hour === parseInt(event.startTime) && (
-                            <span className="text-[10px] font-medium text-primary truncate block">{event.playlistName}</span>
+                            <span className="text-[10px] font-medium text-primary truncate block">{event.screenGroup}</span>
                           )}
                         </div>
                       );
@@ -73,7 +73,7 @@ export default function SchedulePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Playlist</TableHead>
+                  <TableHead>Schedule</TableHead>
                   <TableHead>Screen Group</TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead>Days</TableHead>
@@ -86,7 +86,7 @@ export default function SchedulePage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">{event.playlistName}</span>
+                        <span className="text-sm font-medium">{event.screenGroup}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">{event.screenGroup}</TableCell>
