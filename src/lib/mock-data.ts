@@ -35,7 +35,6 @@ export interface Company {
 
 export interface ScheduleEvent {
   id: string;
-  playlistName: string;
   screenGroup: string;
   startTime: string;
   endTime: string;
@@ -70,8 +69,8 @@ export const mockCompanies: Company[] = [
 ];
 
 export const mockSchedule: ScheduleEvent[] = [
-  { id: 'sch-001', playlistName: 'Welcome Loop', screenGroup: 'Lobby', startTime: '08:00', endTime: '18:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], priority: 'normal' },
-  { id: 'sch-002', playlistName: 'Menu Board', screenGroup: 'Food Court', startTime: '06:00', endTime: '22:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], priority: 'normal' },
-  { id: 'sch-003', playlistName: 'Promo Reel', screenGroup: 'Retail', startTime: '10:00', endTime: '20:00', days: ['Sat', 'Sun'], priority: 'high' },
-  { id: 'sch-004', playlistName: 'Company News', screenGroup: 'Lobby', startTime: '18:00', endTime: '08:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], priority: 'normal' },
+  { id: 'sch-001', screenGroup: 'Lobby', startTime: '08:00', endTime: '18:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], priority: 'normal' },
+  { id: 'sch-002', screenGroup: 'Food Court', startTime: '06:00', endTime: '22:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], priority: 'normal' },
+  { id: 'sch-003', screenGroup: 'Retail', startTime: '10:00', endTime: '20:00', days: ['Sat', 'Sun'], priority: 'high' },
+  { id: 'sch-004', screenGroup: 'Lobby', startTime: '18:00', endTime: '08:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], priority: 'normal' },
 ];
