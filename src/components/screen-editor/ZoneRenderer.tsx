@@ -217,6 +217,30 @@ function WidgetPreview({ widget }: { widget: ContentWidget }) {
   };
 
   if (widget.type === 'text' || widget.type === 'rss') {
+    const isScrolling = widget.textAnimation === 'scroll-left' || widget.textAnimation === 'scroll-right';
+    const spacer = '\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0';
+    const textContent = widget.text || 'Text';
+
+    if (isScrolling) {
+      const duration = hasCustomDuration ? scrollDuration : widget.scrollSpeed === 'slow' ? 20 : widget.scrollSpeed === 'fast' ? 5 : 10;
+      return (
+        <div style={{ ...style, overflow: 'hidden' }}>
+          <div
+            className="whitespace-nowrap flex"
+            style={{
+              fontSize: widget.fontSize,
+              fontWeight: widget.fontWeight || '400',
+              color: widget.textColor || '#ffffff',
+              animation: `marquee-loop ${duration}s linear infinite`,
+            }}
+          >
+            <span>{textContent}{spacer}</span>
+            <span>{textContent}{spacer}</span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div style={style}>
         <div className={cn("whitespace-nowrap", animationClass)} style={{
@@ -225,7 +249,7 @@ function WidgetPreview({ widget }: { widget: ContentWidget }) {
           color: widget.textColor || '#ffffff',
           ...customAnimStyle,
         }}>
-          {widget.text || 'Text'}
+          {textContent}
         </div>
       </div>
     );
