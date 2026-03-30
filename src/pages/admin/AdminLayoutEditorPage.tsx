@@ -153,6 +153,7 @@ export default function AdminLayoutEditorPage() {
             onUpdate={() => {}}
             onSelectZone={() => {}}
             selectedZoneId={null}
+            previewMode
           />
         </div>
         <div className="absolute top-4 right-4">

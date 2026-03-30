@@ -23,6 +23,7 @@ interface ZoneRendererProps {
   onSelectZone: (zoneId: string) => void;
   selectedZoneId: string | null;
   depth?: number;
+  previewMode?: boolean;
 }
 
 /* ── Transition CSS for slideshow ── */
@@ -334,7 +335,7 @@ function ClockWidget({ fontSize, color, fontWeight }: { fontSize?: number; color
 }
 
 /* ── Zone Renderer ── */
-export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, depth = 0 }: ZoneRendererProps) {
+export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, depth = 0, previewMode = false }: ZoneRendererProps) {
   const isSelected = zone.id === selectedZoneId;
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -367,7 +368,7 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
   if (zone.split !== 'none' && zone.children) {
     const isH = zone.split === 'horizontal';
     return (
-      <div className={cn("flex w-full h-full", isH ? "flex-row" : "flex-col")} style={{ gap: 2 }}>
+      <div className={cn("flex w-full h-full", isH ? "flex-row" : "flex-col")} style={previewMode ? undefined : { gap: 2 }}>
         <div style={{ [isH ? 'width' : 'height']: `${zone.splitRatio}%`, [isH ? 'height' : 'width']: '100%' }}>
           <ZoneRenderer
             zone={zone.children[0]}
@@ -378,33 +379,36 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
             onSelectZone={onSelectZone}
             selectedZoneId={selectedZoneId}
             depth={depth + 1}
+            previewMode={previewMode}
           />
         </div>
-        <div
-          className={cn(
-            "shrink-0 flex items-center justify-center cursor-col-resize bg-border/60 hover:bg-primary/40 transition-colors z-10",
-            isH ? "w-1.5 h-full" : "h-1.5 w-full cursor-row-resize"
-          )}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            const parent = (e.target as HTMLElement).parentElement!;
-            const rect = parent.getBoundingClientRect();
-            const handleMove = (me: MouseEvent) => {
-              const ratio = isH
-                ? ((me.clientX - rect.left) / rect.width) * 100
-                : ((me.clientY - rect.top) / rect.height) * 100;
-              onUpdate({ ...zone, splitRatio: Math.max(10, Math.min(90, ratio)) });
-            };
-            const handleUp = () => {
-              window.removeEventListener('mousemove', handleMove);
-              window.removeEventListener('mouseup', handleUp);
-            };
-            window.addEventListener('mousemove', handleMove);
-            window.addEventListener('mouseup', handleUp);
-          }}
-        >
-          <GripVertical className={cn("h-3 w-3 text-muted-foreground", !isH && "rotate-90")} />
-        </div>
+        {!previewMode && (
+          <div
+            className={cn(
+              "shrink-0 flex items-center justify-center cursor-col-resize bg-border/60 hover:bg-primary/40 transition-colors z-10",
+              isH ? "w-1.5 h-full" : "h-1.5 w-full cursor-row-resize"
+            )}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const parent = (e.target as HTMLElement).parentElement!;
+              const rect = parent.getBoundingClientRect();
+              const handleMove = (me: MouseEvent) => {
+                const ratio = isH
+                  ? ((me.clientX - rect.left) / rect.width) * 100
+                  : ((me.clientY - rect.top) / rect.height) * 100;
+                onUpdate({ ...zone, splitRatio: Math.max(10, Math.min(90, ratio)) });
+              };
+              const handleUp = () => {
+                window.removeEventListener('mousemove', handleMove);
+                window.removeEventListener('mouseup', handleUp);
+              };
+              window.addEventListener('mousemove', handleMove);
+              window.addEventListener('mouseup', handleUp);
+            }}
+          >
+            <GripVertical className={cn("h-3 w-3 text-muted-foreground", !isH && "rotate-90")} />
+          </div>
+        )}
         <div style={{ [isH ? 'width' : 'height']: `${100 - zone.splitRatio}%`, [isH ? 'height' : 'width']: '100%' }}>
           <ZoneRenderer
             zone={zone.children[1]}
@@ -415,8 +419,17 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
             onSelectZone={onSelectZone}
             selectedZoneId={selectedZoneId}
             depth={depth + 1}
+            previewMode={previewMode}
           />
         </div>
+      </div>
+    );
+  }
+
+  if (previewMode) {
+    return (
+      <div className="relative w-full h-full">
+        {zone.content ? <WidgetPreview widget={zone.content} /> : null}
       </div>
     );
   }
