@@ -335,7 +335,7 @@ function ClockWidget({ fontSize, color, fontWeight }: { fontSize?: number; color
 }
 
 /* ── Zone Renderer ── */
-export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, depth = 0 }: ZoneRendererProps) {
+export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, depth = 0, previewMode = false }: ZoneRendererProps) {
   const isSelected = zone.id === selectedZoneId;
   const [isDragOver, setIsDragOver] = useState(false);
 
