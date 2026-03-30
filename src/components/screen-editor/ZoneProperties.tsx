@@ -434,9 +434,14 @@ export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZoneProp
                     {item.type === 'image' ? (
                       <img src={item.file_url!} alt={item.name} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-muted">
-                        <span className="text-[10px] text-muted-foreground">🎬</span>
-                      </div>
+                      <video
+                        src={item.file_url!}
+                        className="w-full h-full object-cover"
+                        muted
+                        preload="metadata"
+                        onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
+                        onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
+                      />
                     )}
                     <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5">
                       <p className="text-[9px] text-white truncate">{item.name}</p>
