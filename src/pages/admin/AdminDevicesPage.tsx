@@ -161,6 +161,15 @@ export default function AdminDevicesPage() {
     }
   };
 
+  const handleAssignLayout = async (deviceId: string, layoutId: string | null) => {
+    const { error } = await supabase.from("devices").update({ layout_id: layoutId } as any).eq("id", deviceId);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Layout assigned!");
+      if (companyId) fetchDevices(companyId);
+    }
+  };
+
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   return (
