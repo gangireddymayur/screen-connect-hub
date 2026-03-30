@@ -47,6 +47,165 @@ export type Database = {
         }
         Relationships: []
       }
+      content: {
+        Row: {
+          company_id: string
+          created_at: string
+          duration: number | null
+          file_size: number | null
+          file_url: string | null
+          id: string
+          name: string
+          type: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          duration?: number | null
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          name: string
+          type?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          duration?: number | null
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          name?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      devices: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          last_seen_at: string | null
+          location: string | null
+          name: string
+          orientation: string | null
+          resolution: string | null
+          status: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          last_seen_at?: string | null
+          location?: string | null
+          name: string
+          orientation?: string | null
+          resolution?: string | null
+          status?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          last_seen_at?: string | null
+          location?: string | null
+          name?: string
+          orientation?: string | null
+          resolution?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_items: {
+        Row: {
+          content_id: string
+          created_at: string
+          duration: number | null
+          id: string
+          playlist_id: string
+          position: number
+        }
+        Insert: {
+          content_id: string
+          created_at?: string
+          duration?: number | null
+          id?: string
+          playlist_id: string
+          position?: number
+        }
+        Update: {
+          content_id?: string
+          created_at?: string
+          duration?: number | null
+          id?: string
+          playlist_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_items_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "content"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playlist_items_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlists: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlists_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_id: string | null
@@ -75,6 +234,64 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedules: {
+        Row: {
+          company_id: string
+          created_at: string
+          days_of_week: number[]
+          device_id: string
+          end_time: string
+          id: string
+          is_active: boolean
+          playlist_id: string
+          start_time: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          days_of_week?: number[]
+          device_id: string
+          end_time?: string
+          id?: string
+          is_active?: boolean
+          playlist_id: string
+          start_time?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          days_of_week?: number[]
+          device_id?: string
+          end_time?: string
+          id?: string
+          is_active?: boolean
+          playlist_id?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedules_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedules_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
             referencedColumns: ["id"]
           },
         ]
