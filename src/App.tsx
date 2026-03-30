@@ -14,7 +14,6 @@ import NotFound from "./pages/NotFound";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminDevicesPage from "./pages/admin/AdminDevicesPage";
 import AdminContentPage from "./pages/admin/AdminContentPage";
-import AdminPlaylistsPage from "./pages/admin/AdminPlaylistsPage";
 import AdminSchedulePage from "./pages/admin/AdminSchedulePage";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
 
@@ -38,7 +37,6 @@ const App = () => (
             <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboardPage /></ProtectedRoute>} />
             <Route path="/admin/devices" element={<ProtectedRoute requiredRole="admin"><AdminDevicesPage /></ProtectedRoute>} />
             <Route path="/admin/content" element={<ProtectedRoute requiredRole="admin"><AdminContentPage /></ProtectedRoute>} />
-            <Route path="/admin/playlists" element={<ProtectedRoute requiredRole="admin"><AdminPlaylistsPage /></ProtectedRoute>} />
             <Route path="/admin/schedule" element={<ProtectedRoute requiredRole="admin"><AdminSchedulePage /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute requiredRole="admin"><AdminSettingsPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />

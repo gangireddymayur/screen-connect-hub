@@ -2,7 +2,6 @@ import {
   LayoutDashboard,
   Monitor,
   Image,
-  ListVideo,
   CalendarClock,
   Settings,
   Tv,
@@ -30,7 +29,6 @@ const adminNav = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
   { title: "Devices", url: "/admin/devices", icon: Monitor },
   { title: "Content", url: "/admin/content", icon: Image },
-  { title: "Playlists", url: "/admin/playlists", icon: ListVideo },
   { title: "Schedule", url: "/admin/schedule", icon: CalendarClock },
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
