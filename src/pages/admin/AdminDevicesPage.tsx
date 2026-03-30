@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Monitor, Pencil, Trash2, MapPin, Wifi, WifiOff, Copy, Check, Link2 } from "lucide-react";
+import { Plus, Monitor, Pencil, Trash2, MapPin, Wifi, WifiOff, Copy, Check, Link2, LayoutGrid } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
