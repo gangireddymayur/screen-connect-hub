@@ -219,6 +219,43 @@ export default function AdminContentPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Preview Modal */}
+      {previewItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setPreviewItem(null)}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
+            onClick={() => setPreviewItem(null)}
+          >
+            <X className="h-6 w-6" />
+          </Button>
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white text-sm bg-black/60 px-4 py-2 rounded-lg">
+            {previewItem.name}
+          </div>
+          <div className="max-w-[90vw] max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
+            {previewItem.type === "video" && previewItem.file_url ? (
+              <video
+                src={previewItem.file_url}
+                className="max-w-[90vw] max-h-[85vh] rounded-lg"
+                controls
+                autoPlay
+                playsInline
+              />
+            ) : previewItem.file_url ? (
+              <img
+                src={previewItem.file_url}
+                alt={previewItem.name}
+                className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg"
+              />
+            ) : null}
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
