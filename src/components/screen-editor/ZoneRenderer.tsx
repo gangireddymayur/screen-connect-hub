@@ -174,12 +174,17 @@ function WidgetPreview({ widget }: { widget: ContentWidget }) {
     return <SlideshowPreview widget={widget} />;
   }
 
+  // Determine animation class & custom duration
+  const scrollDuration = widget.scrollDuration;
+  const hasCustomDuration = scrollDuration && scrollDuration > 0;
+
   const animationClass = (() => {
     switch (widget.textAnimation) {
       case 'scroll-left':
+        if (hasCustomDuration) return ''; // use inline style instead
         return widget.scrollSpeed === 'slow' ? 'animate-marquee-slow' : widget.scrollSpeed === 'fast' ? 'animate-marquee-fast' : 'animate-marquee';
       case 'scroll-up':
-        return 'animate-marquee-vertical';
+        return hasCustomDuration ? '' : 'animate-marquee-vertical';
       case 'typewriter':
         return 'animate-typewriter overflow-hidden whitespace-nowrap';
       case 'fade':
@@ -190,6 +195,13 @@ function WidgetPreview({ widget }: { widget: ContentWidget }) {
         return '';
     }
   })();
+
+  const customAnimStyle: React.CSSProperties = {};
+  if (hasCustomDuration && widget.textAnimation === 'scroll-left') {
+    customAnimStyle.animation = `marquee ${scrollDuration}s linear infinite`;
+  } else if (hasCustomDuration && widget.textAnimation === 'scroll-up') {
+    customAnimStyle.animation = `marquee-vertical ${scrollDuration}s linear infinite`;
+  }
 
   const style: React.CSSProperties = {
     backgroundColor: widget.backgroundColor || 'transparent',
@@ -211,6 +223,7 @@ function WidgetPreview({ widget }: { widget: ContentWidget }) {
           fontSize: widget.fontSize,
           fontWeight: widget.fontWeight || '400',
           color: widget.textColor || '#ffffff',
+          ...customAnimStyle,
         }}>
           {widget.text || 'Text'}
         </div>
