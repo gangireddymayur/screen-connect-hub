@@ -23,6 +23,7 @@ interface ZoneRendererProps {
   onSelectZone: (zoneId: string) => void;
   selectedZoneId: string | null;
   depth?: number;
+  previewMode?: boolean;
 }
 
 /* ── Transition CSS for slideshow ── */
