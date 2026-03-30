@@ -159,7 +159,7 @@ export default function AdminContentPage() {
                     <ImageIcon className="h-8 w-8 text-muted-foreground" />
                   )}
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="destructive" size="icon" className="h-7 w-7" onClick={() => { setDeleteItem(item); setDeleteOpen(true); }}>
+                    <Button variant="destructive" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setDeleteItem(item); setDeleteOpen(true); }}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
