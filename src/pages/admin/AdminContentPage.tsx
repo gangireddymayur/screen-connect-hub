@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Image as ImageIcon, Video, Trash2, Upload, FileImage } from "lucide-react";
+import { Plus, Image as ImageIcon, Video, Trash2, Upload, FileImage, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -32,6 +32,7 @@ export default function AdminContentPage() {
   const [deleteItem, setDeleteItem] = useState<ContentItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [previewItem, setPreviewItem] = useState<ContentItem | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -141,7 +142,7 @@ export default function AdminContentPage() {
         ) : (
           <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {content.map((item) => (
-              <Card key={item.id} className="overflow-hidden group">
+              <Card key={item.id} className="overflow-hidden group cursor-pointer" onClick={() => setPreviewItem(item)}>
                 <div className="aspect-video bg-muted relative flex items-center justify-center">
                   {item.file_url && item.type === "image" ? (
                     <img src={item.file_url} alt={item.name} className="w-full h-full object-cover" />
@@ -158,7 +159,7 @@ export default function AdminContentPage() {
                     <ImageIcon className="h-8 w-8 text-muted-foreground" />
                   )}
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="destructive" size="icon" className="h-7 w-7" onClick={() => { setDeleteItem(item); setDeleteOpen(true); }}>
+                    <Button variant="destructive" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setDeleteItem(item); setDeleteOpen(true); }}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -218,6 +219,43 @@ export default function AdminContentPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Preview Modal */}
+      {previewItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setPreviewItem(null)}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
+            onClick={() => setPreviewItem(null)}
+          >
+            <X className="h-6 w-6" />
+          </Button>
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white text-sm bg-black/60 px-4 py-2 rounded-lg">
+            {previewItem.name}
+          </div>
+          <div className="max-w-[90vw] max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
+            {previewItem.type === "video" && previewItem.file_url ? (
+              <video
+                src={previewItem.file_url}
+                className="max-w-[90vw] max-h-[85vh] rounded-lg"
+                controls
+                autoPlay
+                playsInline
+              />
+            ) : previewItem.file_url ? (
+              <img
+                src={previewItem.file_url}
+                alt={previewItem.name}
+                className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg"
+              />
+            ) : null}
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
