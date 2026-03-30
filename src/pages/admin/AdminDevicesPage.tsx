@@ -269,6 +269,22 @@ export default function AdminDevicesPage() {
                           <div className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-sm">{d.location}</span></div>
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>
+                      <TableCell>
+                        <Select
+                          value={d.layout_id || "none"}
+                          onValueChange={(v) => handleAssignLayout(d.id, v === "none" ? null : v)}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-36">
+                            <SelectValue placeholder="No layout" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No layout</SelectItem>
+                            {layouts.map((l) => (
+                              <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{formatDate(d.created_at)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
