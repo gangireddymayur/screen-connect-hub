@@ -11,9 +11,17 @@ import { Plus, Trash2, GripVertical, ChevronDown, ChevronUp, Image } from "lucid
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
+export interface MediaContentItem {
+  id: string;
+  name: string;
+  type: string;
+  file_url: string | null;
+}
+
 interface ZonePropertiesProps {
   widget: ContentWidget;
   onUpdate: (widget: ContentWidget) => void;
+  contentItems?: MediaContentItem[];
 }
 
 const textAnimations: { value: TextAnimation; label: string }[] = [
@@ -47,6 +55,7 @@ function SlideEditor({
   onRemove,
   onMoveUp,
   onMoveDown,
+  images = [],
 }: {
   slide: SlideshowItem;
   index: number;
@@ -55,6 +64,7 @@ function SlideEditor({
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  images?: MediaContentItem[];
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -98,6 +108,29 @@ function SlideEditor({
       {/* Expanded */}
       {expanded && (
         <div className="p-2.5 pt-0 space-y-3 border-t border-border/50">
+          {/* Image picker from library */}
+          {images.length > 0 && (
+            <div className="space-y-1 pt-2">
+              <Label className="text-[10px]">Select from Library</Label>
+              <div className="grid grid-cols-3 gap-1">
+                {images.map((img) => (
+                  <button
+                    key={img.id}
+                    onClick={() => onUpdate({ ...slide, imageUrl: img.file_url!, imageName: img.name })}
+                    className={cn(
+                      "relative rounded overflow-hidden border aspect-square transition-all",
+                      slide.imageUrl === img.file_url
+                        ? "border-primary ring-1 ring-primary"
+                        : "border-border hover:border-primary/40"
+                    )}
+                  >
+                    <img src={img.file_url!} alt={img.name} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1 pt-2">
             <Label className="text-[10px]">Image Name / URL</Label>
             <Input
@@ -214,8 +247,10 @@ function SlideEditor({
 }
 
 /* ── Main Properties Panel ── */
-export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
+export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZonePropertiesProps) {
   const update = (partial: Partial<ContentWidget>) => onUpdate({ ...widget, ...partial });
+  const images = contentItems.filter((c) => c.type === "image" && c.file_url);
+  const videos = contentItems.filter((c) => c.type === "video" && c.file_url);
 
   const updateSlide = (index: number, slide: SlideshowItem) => {
     const slides = [...(widget.slides || [])];
@@ -277,6 +312,7 @@ export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
                 onRemove={() => removeSlide(i)}
                 onMoveUp={() => moveSlide(i, i - 1)}
                 onMoveDown={() => moveSlide(i, i + 1)}
+                images={images}
               />
             ))}
           </div>
@@ -379,6 +415,38 @@ export function ZoneProperties({ widget, onUpdate }: ZonePropertiesProps) {
       {/* ── IMAGE / VIDEO ── */}
       {(widget.type === 'image' || widget.type === 'video') && (
         <>
+          {/* Content Library Picker */}
+          {(widget.type === 'image' ? images : videos).length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-xs">Select from Library</Label>
+              <div className="grid grid-cols-2 gap-1.5 max-h-[180px] overflow-y-auto">
+                {(widget.type === 'image' ? images : videos).map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => update({ mediaUrl: item.file_url!, mediaName: item.name })}
+                    className={cn(
+                      "relative rounded-md overflow-hidden border transition-all aspect-video",
+                      widget.mediaUrl === item.file_url
+                        ? "border-primary ring-1 ring-primary"
+                        : "border-border hover:border-primary/40"
+                    )}
+                  >
+                    {item.type === 'image' ? (
+                      <img src={item.file_url!} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-muted">
+                        <span className="text-[10px] text-muted-foreground">🎬</span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5">
+                      <p className="text-[9px] text-white truncate">{item.name}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label className="text-xs">Media Name</Label>
             <Input value={widget.mediaName || ''} onChange={(e) => update({ mediaName: e.target.value })} placeholder="e.g. promo-banner.jpg" className="h-8 text-xs" />
