@@ -201,9 +201,9 @@ export default function AdminDevicesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Device</TableHead>
+                    <TableHead>Pairing Code</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Location</TableHead>
-                    <TableHead>Resolution</TableHead>
                     <TableHead>Added</TableHead>
                     <TableHead className="w-24">Actions</TableHead>
                   </TableRow>
@@ -218,14 +218,31 @@ export default function AdminDevicesPage() {
                           </div>
                           <div>
                             <p className="font-medium text-sm">{d.name}</p>
-                            <p className="text-xs text-muted-foreground capitalize">{d.orientation}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{d.orientation} · {d.resolution}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
+                        {d.pairing_code ? (
+                          <div className="flex items-center gap-1.5">
+                            <code className="text-xs font-mono bg-muted px-2 py-1 rounded tracking-widest">{d.pairing_code}</code>
+                            {d.is_paired ? (
+                              <Link2 className="h-3.5 w-3.5 text-primary" />
+                            ) : (
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyCode(d.pairing_code!)}>
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-1.5">
-                          {d.status === "online" ? <Wifi className="h-3.5 w-3.5 text-emerald-500" /> : <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />}
-                          <StatusBadge status={d.status === "online" ? "active" : "offline"} />
+                          {d.is_paired ? (
+                            <StatusBadge status="active" />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Unpaired</span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -233,7 +250,6 @@ export default function AdminDevicesPage() {
                           <div className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-sm">{d.location}</span></div>
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{d.resolution}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{formatDate(d.created_at)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
