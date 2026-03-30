@@ -21,7 +21,17 @@ export function ProtectedRoute({ children, requiredRole }: Props) {
     return <Navigate to="/login" replace />;
   }
 
+  // Redirect based on role if accessing wrong area
   if (requiredRole && role !== requiredRole) {
+    // If admin trying to access super_admin pages, redirect to admin dashboard
+    if (role === "admin") {
+      return <Navigate to="/admin" replace />;
+    }
+    // If super_admin trying to access admin pages, redirect to super admin dashboard
+    if (role === "super_admin") {
+      return <Navigate to="/" replace />;
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-2">
