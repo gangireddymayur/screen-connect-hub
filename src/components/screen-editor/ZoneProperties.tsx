@@ -380,17 +380,30 @@ export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZoneProp
           </div>
 
           {widget.textAnimation && widget.textAnimation !== 'none' && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Scroll Speed</Label>
-              <Select value={widget.scrollSpeed || 'normal'} onValueChange={(v) => update({ scrollSpeed: v as 'slow' | 'normal' | 'fast' })}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="slow">Slow</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="fast">Fast</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Scroll Speed</Label>
+                <Select value={widget.scrollSpeed || 'normal'} onValueChange={(v) => update({ scrollSpeed: v as 'slow' | 'normal' | 'fast', scrollDuration: undefined })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="slow">Slow</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="fast">Fast</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Custom Duration ({widget.scrollDuration || 10}s)</Label>
+                <Slider
+                  value={[widget.scrollDuration || 10]}
+                  onValueChange={([v]) => update({ scrollDuration: v })}
+                  min={2}
+                  max={60}
+                  step={1}
+                />
+                <p className="text-[10px] text-muted-foreground">Lower = faster scroll</p>
+              </div>
+            </>
           )}
         </>
       )}
