@@ -45,14 +45,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Safety timeout — stop loading after 3s even if Supabase is unreachable
+    const timeout = setTimeout(() => {
+      if (loading) {
+        setLoading(false);
+        initialized.current = true;
+      }
+    }, 3000);
+
     // Get initial session first
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(timeout);
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         const userRole = await fetchRole(session.user.id);
         setRole(userRole);
       }
+      setLoading(false);
+      initialized.current = true;
+    }).catch(() => {
+      clearTimeout(timeout);
       setLoading(false);
       initialized.current = true;
     });
