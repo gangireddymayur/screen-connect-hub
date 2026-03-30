@@ -15,6 +15,8 @@ import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminDevicesPage from "./pages/admin/AdminDevicesPage";
 import AdminContentPage from "./pages/admin/AdminContentPage";
 import AdminSchedulePage from "./pages/admin/AdminSchedulePage";
+import AdminLayoutsPage from "./pages/admin/AdminLayoutsPage";
+import AdminLayoutEditorPage from "./pages/admin/AdminLayoutEditorPage";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
 
 const queryClient = new QueryClient();
@@ -38,6 +40,8 @@ const App = () => (
             <Route path="/admin/devices" element={<ProtectedRoute requiredRole="admin"><AdminDevicesPage /></ProtectedRoute>} />
             <Route path="/admin/content" element={<ProtectedRoute requiredRole="admin"><AdminContentPage /></ProtectedRoute>} />
             <Route path="/admin/schedule" element={<ProtectedRoute requiredRole="admin"><AdminSchedulePage /></ProtectedRoute>} />
+            <Route path="/admin/layouts" element={<ProtectedRoute requiredRole="admin"><AdminLayoutsPage /></ProtectedRoute>} />
+            <Route path="/admin/layouts/:layoutId" element={<ProtectedRoute requiredRole="admin"><AdminLayoutEditorPage /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute requiredRole="admin"><AdminSettingsPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
