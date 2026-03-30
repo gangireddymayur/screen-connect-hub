@@ -14,14 +14,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { session, loading: authLoading } = useAuth();
+  const { session, role, loading: authLoading } = useAuth();
 
   // Auto-redirect if already logged in
   useEffect(() => {
     if (!authLoading && session) {
-      navigate("/", { replace: true });
+      navigate(role === "admin" ? "/admin" : "/", { replace: true });
     }
-  }, [session, authLoading, navigate]);
+  }, [session, authLoading, role, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,9 +30,8 @@ export default function LoginPage() {
     setLoading(false);
     if (error) {
       toast.error(error.message);
-    } else {
-      navigate("/");
     }
+    // Navigation will happen via the useEffect above once session/role updates
   };
 
   if (authLoading) {
