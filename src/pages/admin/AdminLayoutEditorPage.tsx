@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { AdminLayout } from "@/components/AdminLayout";
 import { ZoneRenderer } from "@/components/screen-editor/ZoneRenderer";
 import { WidgetPalette } from "@/components/screen-editor/WidgetPalette";
-import { ZoneProperties } from "@/components/screen-editor/ZoneProperties";
+import { ZoneProperties, type MediaContentItem } from "@/components/screen-editor/ZoneProperties";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +59,7 @@ export default function AdminLayoutEditorPage() {
   const [isFullPreview, setIsFullPreview] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [contentItems, setContentItems] = useState<MediaContentItem[]>([]);
 
   const selectedZone = selectedZoneId ? findZone(rootZone, selectedZoneId) : null;
   const selectedWidget = selectedZone?.content || null;
@@ -80,12 +81,20 @@ export default function AdminLayoutEditorPage() {
       setBackgroundColor(data.background_color);
       setResWidth(data.resolution_width);
       setResHeight(data.resolution_height);
-      // Load saved zone data or create fresh
       if (data.layout_data && typeof data.layout_data === "object" && (data.layout_data as any).id) {
         setRootZone(data.layout_data as unknown as ScreenZone);
       } else {
         setRootZone(createZone("root"));
       }
+
+      // Fetch content items for this company
+      const { data: contentData } = await supabase
+        .from("content")
+        .select("id, name, type, file_url")
+        .eq("company_id", data.company_id)
+        .order("created_at", { ascending: false });
+      setContentItems(contentData ?? []);
+
       setLoading(false);
     };
     fetchLayout();
@@ -244,7 +253,7 @@ export default function AdminLayoutEditorPage() {
             <ScrollArea className="h-full">
               <div className="pl-2">
                 {selectedWidget ? (
-                  <ZoneProperties widget={selectedWidget} onUpdate={handleWidgetUpdate} />
+                  <ZoneProperties widget={selectedWidget} onUpdate={handleWidgetUpdate} contentItems={contentItems} />
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
                     <p className="text-sm font-medium">No zone selected</p>
