@@ -149,3 +149,8 @@
     @apply bg-destructive text-destructive-foreground;
   }
 }
+
+@keyframes marquee-loop {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
