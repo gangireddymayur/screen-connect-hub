@@ -43,6 +43,7 @@ const generatePairingCode = () => {
 export default function AdminDevicesPage() {
   const { user } = useAuth();
   const [devices, setDevices] = useState<Device[]>([]);
+  const [layouts, setLayouts] = useState<LayoutOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
