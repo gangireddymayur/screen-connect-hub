@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Monitor, Image, ListVideo, CalendarClock } from "lucide-react";
+import { Monitor, Image, CalendarClock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
-  const [stats, setStats] = useState({ devices: 0, content: 0, playlists: 0, schedules: 0 });
+  const [stats, setStats] = useState({ devices: 0, content: 0, schedules: 0 });
   const [companyName, setCompanyName] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -15,7 +15,6 @@ export default function AdminDashboardPage() {
     if (!user) return;
 
     const fetchStats = async () => {
-      // Get user's company
       const { data: profile } = await supabase
         .from("profiles")
         .select("company_id")
@@ -26,11 +25,10 @@ export default function AdminDashboardPage() {
 
       const companyId = profile.company_id;
 
-      const [companyRes, devicesRes, contentRes, playlistsRes, schedulesRes] = await Promise.all([
+      const [companyRes, devicesRes, contentRes, schedulesRes] = await Promise.all([
         supabase.from("companies").select("name").eq("id", companyId).single(),
         supabase.from("devices").select("id", { count: "exact", head: true }).eq("company_id", companyId),
         supabase.from("content").select("id", { count: "exact", head: true }).eq("company_id", companyId),
-        supabase.from("playlists").select("id", { count: "exact", head: true }).eq("company_id", companyId),
         supabase.from("schedules").select("id", { count: "exact", head: true }).eq("company_id", companyId),
       ]);
 
@@ -38,7 +36,6 @@ export default function AdminDashboardPage() {
       setStats({
         devices: devicesRes.count ?? 0,
         content: contentRes.count ?? 0,
-        playlists: playlistsRes.count ?? 0,
         schedules: schedulesRes.count ?? 0,
       });
       setLoading(false);
@@ -50,8 +47,7 @@ export default function AdminDashboardPage() {
   const statCards = [
     { title: "Devices", value: stats.devices, icon: Monitor, color: "bg-primary/10", iconColor: "text-primary" },
     { title: "Content", value: stats.content, icon: Image, color: "bg-accent/50", iconColor: "text-accent-foreground" },
-    { title: "Playlists", value: stats.playlists, icon: ListVideo, color: "bg-primary/10", iconColor: "text-primary" },
-    { title: "Schedules", value: stats.schedules, icon: CalendarClock, color: "bg-accent/50", iconColor: "text-accent-foreground" },
+    { title: "Schedules", value: stats.schedules, icon: CalendarClock, color: "bg-primary/10", iconColor: "text-primary" },
   ];
 
   return (
@@ -64,7 +60,7 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-3">
           {statCards.map((s) => (
             <Card key={s.title}>
               <CardContent className="p-5">
@@ -92,9 +88,6 @@ export default function AdminDashboardPage() {
             </a>
             <a href="/admin/content" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors">
               <Image className="h-4 w-4" /> Upload Content
-            </a>
-            <a href="/admin/playlists" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors">
-              <ListVideo className="h-4 w-4" /> Create Playlist
             </a>
           </CardContent>
         </Card>
