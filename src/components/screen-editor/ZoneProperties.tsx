@@ -55,6 +55,7 @@ function SlideEditor({
   onRemove,
   onMoveUp,
   onMoveDown,
+  images = [],
 }: {
   slide: SlideshowItem;
   index: number;
@@ -63,6 +64,7 @@ function SlideEditor({
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  images?: MediaContentItem[];
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -106,6 +108,29 @@ function SlideEditor({
       {/* Expanded */}
       {expanded && (
         <div className="p-2.5 pt-0 space-y-3 border-t border-border/50">
+          {/* Image picker from library */}
+          {images.length > 0 && (
+            <div className="space-y-1 pt-2">
+              <Label className="text-[10px]">Select from Library</Label>
+              <div className="grid grid-cols-3 gap-1">
+                {images.map((img) => (
+                  <button
+                    key={img.id}
+                    onClick={() => onUpdate({ ...slide, imageUrl: img.file_url!, imageName: img.name })}
+                    className={cn(
+                      "relative rounded overflow-hidden border aspect-square transition-all",
+                      slide.imageUrl === img.file_url
+                        ? "border-primary ring-1 ring-primary"
+                        : "border-border hover:border-primary/40"
+                    )}
+                  >
+                    <img src={img.file_url!} alt={img.name} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1 pt-2">
             <Label className="text-[10px]">Image Name / URL</Label>
             <Input
