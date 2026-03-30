@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Monitor, Pencil, Trash2, MapPin, Wifi, WifiOff } from "lucide-react";
+import { Plus, Monitor, Pencil, Trash2, MapPin, Wifi, WifiOff, Copy, Check, Link2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,10 +19,19 @@ interface Device {
   location: string | null;
   resolution: string | null;
   orientation: string | null;
+  pairing_code: string | null;
+  is_paired: boolean;
   last_seen_at: string | null;
   created_at: string;
   company_id: string;
 }
+
+const generatePairingCode = () => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+};
 
 export default function AdminDevicesPage() {
   const { user } = useAuth();
@@ -70,22 +79,34 @@ export default function AdminDevicesPage() {
     setLoading(false);
   };
 
+  // Pairing code result
+  const [newPairingCode, setNewPairingCode] = useState<string | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyId) return;
     setSubmitting(true);
+    const pairingCode = generatePairingCode();
     const { error } = await supabase.from("devices").insert({
       company_id: companyId, name, location: location || null,
-      resolution, orientation,
+      resolution, orientation, pairing_code: pairingCode,
     });
     setSubmitting(false);
     if (error) toast.error(error.message);
     else {
-      toast.success("Device added!");
       setAddOpen(false);
       setName(""); setLocation(""); setResolution("1920x1080"); setOrientation("landscape");
+      setNewPairingCode(pairingCode);
       fetchDevices(companyId);
     }
+  };
+
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCodeCopied(true);
+    toast.success("Pairing code copied!");
+    setTimeout(() => setCodeCopied(false), 2000);
   };
 
   const openEdit = (device: Device) => {
