@@ -93,10 +93,12 @@ export type Database = {
           company_id: string
           created_at: string
           id: string
+          is_paired: boolean
           last_seen_at: string | null
           location: string | null
           name: string
           orientation: string | null
+          pairing_code: string | null
           resolution: string | null
           status: string
         }
@@ -104,10 +106,12 @@ export type Database = {
           company_id: string
           created_at?: string
           id?: string
+          is_paired?: boolean
           last_seen_at?: string | null
           location?: string | null
           name: string
           orientation?: string | null
+          pairing_code?: string | null
           resolution?: string | null
           status?: string
         }
@@ -115,10 +119,12 @@ export type Database = {
           company_id?: string
           created_at?: string
           id?: string
+          is_paired?: boolean
           last_seen_at?: string | null
           location?: string | null
           name?: string
           orientation?: string | null
+          pairing_code?: string | null
           resolution?: string | null
           status?: string
         }
