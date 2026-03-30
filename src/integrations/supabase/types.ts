@@ -138,6 +138,53 @@ export type Database = {
           },
         ]
       }
+      layouts: {
+        Row: {
+          background_color: string
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          layout_data: Json
+          name: string
+          resolution_height: number
+          resolution_width: number
+          updated_at: string
+        }
+        Insert: {
+          background_color?: string
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          layout_data?: Json
+          name: string
+          resolution_height?: number
+          resolution_width?: number
+          updated_at?: string
+        }
+        Update: {
+          background_color?: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          layout_data?: Json
+          name?: string
+          resolution_height?: number
+          resolution_width?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "layouts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_id: string | null
