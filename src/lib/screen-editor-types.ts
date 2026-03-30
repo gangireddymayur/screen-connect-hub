@@ -31,6 +31,7 @@ export interface ContentWidget {
   textColor?: string;
   textAnimation?: TextAnimation;
   scrollSpeed?: 'slow' | 'normal' | 'fast';
+  scrollDuration?: number; // seconds for one full scroll cycle
   // media props
   mediaUrl?: string;
   mediaName?: string;
