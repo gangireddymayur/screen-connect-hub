@@ -256,10 +256,22 @@ function WidgetPreview({ widget }: { widget: ContentWidget }) {
   if (widget.type === 'video') {
     return (
       <div style={style}>
-        <div className="flex flex-col items-center gap-1 text-muted-foreground">
-          <div className="text-2xl">🎬</div>
-          <span className="text-xs">{widget.mediaName || 'No video'}</span>
-        </div>
+        {widget.mediaUrl ? (
+          <video
+            src={widget.mediaUrl}
+            className="w-full h-full"
+            style={{ objectFit: widget.objectFit || 'contain' }}
+            autoPlay
+            muted
+            loop
+            playsInline
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-1 text-muted-foreground">
+            <div className="text-2xl">🎬</div>
+            <span className="text-xs">{widget.mediaName || 'No video'}</span>
+          </div>
+        )}
       </div>
     );
   }
