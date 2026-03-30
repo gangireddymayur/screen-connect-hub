@@ -17,6 +17,7 @@ import AdminContentPage from "./pages/admin/AdminContentPage";
 import AdminSchedulePage from "./pages/admin/AdminSchedulePage";
 import AdminLayoutsPage from "./pages/admin/AdminLayoutsPage";
 import AdminLayoutEditorPage from "./pages/admin/AdminLayoutEditorPage";
+import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
 
 const queryClient = new QueryClient();
 
