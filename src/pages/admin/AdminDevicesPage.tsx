@@ -80,6 +80,11 @@ export default function AdminDevicesPage() {
       });
   }, [user]);
 
+  const fetchLayouts = async (cId: string) => {
+    const { data } = await supabase.from("layouts").select("id, name").eq("company_id", cId).order("name");
+    setLayouts(data ?? []);
+  };
+
   const fetchDevices = async (cId: string) => {
     const { data, error } = await supabase.from("devices").select("*").eq("company_id", cId).order("created_at", { ascending: false });
     if (error) toast.error("Failed to load devices");
