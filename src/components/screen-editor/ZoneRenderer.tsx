@@ -223,6 +223,7 @@ function WidgetPreview({ widget }: { widget: ContentWidget }) {
           fontSize: widget.fontSize,
           fontWeight: widget.fontWeight || '400',
           color: widget.textColor || '#ffffff',
+          ...customAnimStyle,
         }}>
           {widget.text || 'Text'}
         </div>
