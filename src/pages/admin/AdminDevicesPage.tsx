@@ -73,6 +73,7 @@ export default function AdminDevicesPage() {
         if (data?.company_id) {
           setCompanyId(data.company_id);
           fetchDevices(data.company_id);
+          fetchLayouts(data.company_id);
         } else {
           setLoading(false);
         }
