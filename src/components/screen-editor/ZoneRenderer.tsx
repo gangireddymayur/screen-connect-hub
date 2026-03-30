@@ -426,6 +426,14 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
     );
   }
 
+  if (previewMode) {
+    return (
+      <div className="relative w-full h-full">
+        {zone.content ? <WidgetPreview widget={zone.content} /> : null}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
