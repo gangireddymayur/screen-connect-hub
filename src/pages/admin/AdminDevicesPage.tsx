@@ -222,6 +222,7 @@ export default function AdminDevicesPage() {
                     <TableHead>Pairing Code</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Location</TableHead>
+                    <TableHead>Layout</TableHead>
                     <TableHead>Added</TableHead>
                     <TableHead className="w-24">Actions</TableHead>
                   </TableRow>
