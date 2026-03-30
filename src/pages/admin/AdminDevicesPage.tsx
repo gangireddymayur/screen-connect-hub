@@ -43,7 +43,7 @@ export default function AdminDevicesPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
-  const [resolution, setResolution] = useState("1920x1080");
+  
   const [orientation, setOrientation] = useState("landscape");
   const [submitting, setSubmitting] = useState(false);
 
@@ -52,7 +52,6 @@ export default function AdminDevicesPage() {
   const [editDevice, setEditDevice] = useState<Device | null>(null);
   const [editName, setEditName] = useState("");
   const [editLocation, setEditLocation] = useState("");
-  const [editResolution, setEditResolution] = useState("");
   const [editOrientation, setEditOrientation] = useState("");
 
   // Delete
@@ -90,13 +89,13 @@ export default function AdminDevicesPage() {
     const pairingCode = generatePairingCode();
     const { error } = await supabase.from("devices").insert({
       company_id: companyId, name, location: location || null,
-      resolution, orientation, pairing_code: pairingCode,
+      orientation, pairing_code: pairingCode,
     });
     setSubmitting(false);
     if (error) toast.error(error.message);
     else {
       setAddOpen(false);
-      setName(""); setLocation(""); setResolution("1920x1080"); setOrientation("landscape");
+      setName(""); setLocation(""); setOrientation("landscape");
       setNewPairingCode(pairingCode);
       fetchDevices(companyId);
     }
@@ -113,7 +112,6 @@ export default function AdminDevicesPage() {
     setEditDevice(device);
     setEditName(device.name);
     setEditLocation(device.location ?? "");
-    setEditResolution(device.resolution ?? "1920x1080");
     setEditOrientation(device.orientation ?? "landscape");
     setEditOpen(true);
   };
@@ -124,7 +122,7 @@ export default function AdminDevicesPage() {
     setSubmitting(true);
     const { error } = await supabase.from("devices").update({
       name: editName, location: editLocation || null,
-      resolution: editResolution, orientation: editOrientation,
+      orientation: editOrientation,
     }).eq("id", editDevice.id);
     setSubmitting(false);
     if (error) toast.error(error.message);
@@ -168,15 +166,12 @@ export default function AdminDevicesPage() {
               <form onSubmit={handleAdd} className="space-y-4">
                 <div className="space-y-2"><Label>Device Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Lobby Screen" /></div>
                 <div className="space-y-2"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Main Lobby" /></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Resolution</Label><Input value={resolution} onChange={(e) => setResolution(e.target.value)} /></div>
-                  <div className="space-y-2">
-                    <Label>Orientation</Label>
-                    <div className="flex gap-2">
-                      {["landscape", "portrait"].map((o) => (
-                        <Button key={o} type="button" variant={orientation === o ? "default" : "outline"} size="sm" onClick={() => setOrientation(o)} className="capitalize flex-1">{o}</Button>
-                      ))}
-                    </div>
+                <div className="space-y-2">
+                  <Label>Orientation</Label>
+                  <div className="flex gap-2">
+                    {["landscape", "portrait"].map((o) => (
+                      <Button key={o} type="button" variant={orientation === o ? "default" : "outline"} size="sm" onClick={() => setOrientation(o)} className="capitalize flex-1">{o}</Button>
+                    ))}
                   </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={submitting}>{submitting ? "Adding..." : "Add Device"}</Button>
@@ -218,7 +213,7 @@ export default function AdminDevicesPage() {
                           </div>
                           <div>
                             <p className="font-medium text-sm">{d.name}</p>
-                            <p className="text-xs text-muted-foreground capitalize">{d.orientation} · {d.resolution}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{d.orientation}{d.resolution ? ` · ${d.resolution}` : ''}</p>
                           </div>
                         </div>
                       </TableCell>
@@ -273,15 +268,12 @@ export default function AdminDevicesPage() {
           <form onSubmit={handleEdit} className="space-y-4">
             <div className="space-y-2"><Label>Device Name</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} required /></div>
             <div className="space-y-2"><Label>Location</Label><Input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Resolution</Label><Input value={editResolution} onChange={(e) => setEditResolution(e.target.value)} /></div>
-              <div className="space-y-2">
-                <Label>Orientation</Label>
-                <div className="flex gap-2">
-                  {["landscape", "portrait"].map((o) => (
-                    <Button key={o} type="button" variant={editOrientation === o ? "default" : "outline"} size="sm" onClick={() => setEditOrientation(o)} className="capitalize flex-1">{o}</Button>
-                  ))}
-                </div>
+            <div className="space-y-2">
+              <Label>Orientation</Label>
+              <div className="flex gap-2">
+                {["landscape", "portrait"].map((o) => (
+                  <Button key={o} type="button" variant={editOrientation === o ? "default" : "outline"} size="sm" onClick={() => setEditOrientation(o)} className="capitalize flex-1">{o}</Button>
+                ))}
               </div>
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>{submitting ? "Saving..." : "Save Changes"}</Button>
