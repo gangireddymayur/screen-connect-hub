@@ -95,6 +95,7 @@ export type Database = {
           id: string
           is_paired: boolean
           last_seen_at: string | null
+          layout_id: string | null
           location: string | null
           name: string
           orientation: string | null
@@ -108,6 +109,7 @@ export type Database = {
           id?: string
           is_paired?: boolean
           last_seen_at?: string | null
+          layout_id?: string | null
           location?: string | null
           name: string
           orientation?: string | null
@@ -121,6 +123,7 @@ export type Database = {
           id?: string
           is_paired?: boolean
           last_seen_at?: string | null
+          layout_id?: string | null
           location?: string | null
           name?: string
           orientation?: string | null
@@ -134,6 +137,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devices_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "layouts"
             referencedColumns: ["id"]
           },
         ]

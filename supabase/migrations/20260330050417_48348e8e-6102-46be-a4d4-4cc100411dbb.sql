@@ -1,0 +1,1 @@
+ALTER TABLE public.devices ADD COLUMN layout_id uuid REFERENCES public.layouts(id) ON DELETE SET NULL DEFAULT NULL;

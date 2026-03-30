@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Monitor, Pencil, Trash2, MapPin, Wifi, WifiOff, Copy, Check, Link2 } from "lucide-react";
+import { Plus, Monitor, Pencil, Trash2, MapPin, Wifi, WifiOff, Copy, Check, Link2, LayoutGrid } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
 interface Device {
@@ -24,6 +25,12 @@ interface Device {
   last_seen_at: string | null;
   created_at: string;
   company_id: string;
+  layout_id: string | null;
+}
+
+interface LayoutOption {
+  id: string;
+  name: string;
 }
 
 const generatePairingCode = () => {
@@ -36,6 +43,7 @@ const generatePairingCode = () => {
 export default function AdminDevicesPage() {
   const { user } = useAuth();
   const [devices, setDevices] = useState<Device[]>([]);
+  const [layouts, setLayouts] = useState<LayoutOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
@@ -65,11 +73,17 @@ export default function AdminDevicesPage() {
         if (data?.company_id) {
           setCompanyId(data.company_id);
           fetchDevices(data.company_id);
+          fetchLayouts(data.company_id);
         } else {
           setLoading(false);
         }
       });
   }, [user]);
+
+  const fetchLayouts = async (cId: string) => {
+    const { data } = await supabase.from("layouts").select("id, name").eq("company_id", cId).order("name");
+    setLayouts(data ?? []);
+  };
 
   const fetchDevices = async (cId: string) => {
     const { data, error } = await supabase.from("devices").select("*").eq("company_id", cId).order("created_at", { ascending: false });
@@ -147,6 +161,15 @@ export default function AdminDevicesPage() {
     }
   };
 
+  const handleAssignLayout = async (deviceId: string, layoutId: string | null) => {
+    const { error } = await supabase.from("devices").update({ layout_id: layoutId } as any).eq("id", deviceId);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Layout assigned!");
+      if (companyId) fetchDevices(companyId);
+    }
+  };
+
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   return (
@@ -199,6 +222,7 @@ export default function AdminDevicesPage() {
                     <TableHead>Pairing Code</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Location</TableHead>
+                    <TableHead>Layout</TableHead>
                     <TableHead>Added</TableHead>
                     <TableHead className="w-24">Actions</TableHead>
                   </TableRow>
@@ -244,6 +268,22 @@ export default function AdminDevicesPage() {
                         {d.location ? (
                           <div className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-sm">{d.location}</span></div>
                         ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={d.layout_id || "none"}
+                          onValueChange={(v) => handleAssignLayout(d.id, v === "none" ? null : v)}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-36">
+                            <SelectValue placeholder="No layout" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No layout</SelectItem>
+                            {layouts.map((l) => (
+                              <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{formatDate(d.created_at)}</TableCell>
                       <TableCell>
