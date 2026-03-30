@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Image as ImageIcon, Video, Trash2, Upload, FileImage } from "lucide-react";
+import { Plus, Image as ImageIcon, Video, Trash2, Upload, FileImage, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
