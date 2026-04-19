@@ -22,6 +22,7 @@ export type Database = {
           id: string
           max_screens: number
           name: string
+          notes: string | null
           plan: string
           status: string
         }
@@ -32,6 +33,7 @@ export type Database = {
           id?: string
           max_screens?: number
           name: string
+          notes?: string | null
           plan?: string
           status?: string
         }
@@ -42,6 +44,7 @@ export type Database = {
           id?: string
           max_screens?: number
           name?: string
+          notes?: string | null
           plan?: string
           status?: string
         }
