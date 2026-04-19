@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Building2, Monitor, Eye, EyeOff, Pencil, Trash2, Mail, Calendar, Shield, X } from "lucide-react";
+import { Plus, Building2, Monitor, Eye, EyeOff, Pencil, Trash2, Mail, Calendar, Shield, X, KeyRound } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -61,6 +61,38 @@ export default function CompaniesPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteCompany, setDeleteCompany] = useState<Company | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Reset password
+  const [pwdOpen, setPwdOpen] = useState(false);
+  const [pwdCompany, setPwdCompany] = useState<Company | null>(null);
+  const [pwdValue, setPwdValue] = useState("");
+  const [pwdShow, setPwdShow] = useState(false);
+  const [pwdSubmitting, setPwdSubmitting] = useState(false);
+
+  const openResetPwd = (company: Company, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setPwdCompany(company);
+    setPwdValue("");
+    setPwdShow(false);
+    setPwdOpen(true);
+  };
+
+  const handleResetPwd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pwdCompany) return;
+    setPwdSubmitting(true);
+    const { data, error } = await supabase.functions.invoke("reset-company-admin-password", {
+      body: { company_id: pwdCompany.id, new_password: pwdValue },
+    });
+    setPwdSubmitting(false);
+    if (error || data?.error) {
+      toast.error(data?.error || error?.message || "Failed to reset password");
+    } else {
+      toast.success(`Password updated for ${pwdCompany.name}`);
+      setPwdOpen(false);
+      setPwdCompany(null);
+    }
+  };
 
   const fetchCompanies = async () => {
     const { data, error } = await supabase.from("companies").select("*").order("created_at", { ascending: false });
@@ -253,6 +285,9 @@ export default function CompaniesPage() {
                       <TableCell className="text-sm text-muted-foreground">{formatDate(company.created_at)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" title="Reset password" onClick={(e) => openResetPwd(company, e)}>
+                            <KeyRound className="h-3.5 w-3.5" />
+                          </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => openEdit(company, e)}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -382,18 +417,50 @@ export default function CompaniesPage() {
 
               <Separator />
 
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={(e) => { setSelectedCompany(null); openEdit(selectedCompany, e as any); }}>
-                  <Pencil className="h-4 w-4 mr-2" /> Edit
+              <div className="space-y-2">
+                <Button variant="outline" className="w-full" onClick={(e) => { const c = selectedCompany; setSelectedCompany(null); openResetPwd(c, e as any); }}>
+                  <KeyRound className="h-4 w-4 mr-2" /> Reset Admin Password
                 </Button>
-                <Button variant="destructive" className="flex-1" onClick={(e) => { setSelectedCompany(null); openDelete(selectedCompany, e as any); }}>
-                  <Trash2 className="h-4 w-4 mr-2" /> Delete
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={(e) => { setSelectedCompany(null); openEdit(selectedCompany, e as any); }}>
+                    <Pencil className="h-4 w-4 mr-2" /> Edit
+                  </Button>
+                  <Button variant="destructive" className="flex-1" onClick={(e) => { setSelectedCompany(null); openDelete(selectedCompany, e as any); }}>
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                  </Button>
+                </div>
               </div>
             </div>
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Reset Admin Password</DialogTitle></DialogHeader>
+          <form onSubmit={handleResetPwd} className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Set a new password for <strong>{pwdCompany?.name}</strong>'s admin account ({pwdCompany?.contact_email}).
+            </p>
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <div className="relative">
+                <Input type={pwdShow ? "text" : "password"} value={pwdValue} onChange={(e) => setPwdValue(e.target.value)} required minLength={6} placeholder="At least 6 characters" />
+                <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 hover:bg-transparent" onClick={() => setPwdShow(!pwdShow)}>
+                  {pwdShow ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                </Button>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={() => setPwdOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={pwdSubmitting || pwdValue.length < 6}>
+                {pwdSubmitting ? "Updating..." : "Update Password"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
