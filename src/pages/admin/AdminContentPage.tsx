@@ -9,7 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { getStorageQuota, formatBytes, PLAN_LABELS } from "@/lib/plan-quotas";
 
 interface ContentItem {
   id: string;
@@ -22,14 +24,7 @@ interface ContentItem {
   company_id: string;
 }
 
-const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB
-
-const formatSize = (bytes: number | null) => {
-  if (!bytes) return "—";
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-};
+const formatSize = (bytes: number | null) => bytes ? formatBytes(bytes) : "—";
 
 export default function AdminContentPage() {
   const { user } = useAuth();
