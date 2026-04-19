@@ -80,6 +80,12 @@ export default function AdminContentPage() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !companyId) return;
+    const incomingSize = Array.from(files).reduce((s, f) => s + f.size, 0);
+    if (totalStorage + incomingSize > storageQuota) {
+      toast.error(`Upload would exceed your ${PLAN_LABELS[plan] ?? plan} plan quota of ${formatBytes(storageQuota)}. Upgrade or free up space.`);
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
     setUploading(true);
     for (const file of Array.from(files)) {
       const ext = file.name.split(".").pop();
