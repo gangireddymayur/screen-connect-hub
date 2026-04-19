@@ -164,7 +164,7 @@ export default function AdminDashboardPage() {
               <div className="mt-3">
                 <Progress value={storagePct} className="h-1.5" />
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <HardDrive className="h-3 w-3" /> {formatBytes(storageBytes)} used
+                  <HardDrive className="h-3 w-3" /> {formatBytes(storageBytes)} of {formatBytes(storageQuota)}
                 </p>
               </div>
             </CardContent>
