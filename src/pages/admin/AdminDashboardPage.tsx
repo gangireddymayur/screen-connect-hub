@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
-import { getStorageQuota, formatBytes } from "@/lib/plan-quotas";
+import { getStorageQuota, formatBytes, PLAN_LABELS } from "@/lib/plan-quotas";
+import { Sparkles } from "lucide-react";
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
