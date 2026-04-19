@@ -212,6 +212,31 @@ export default function AdminDevicesPage() {
         </div>
 
         <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or location..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+                <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="offline">Offline</SelectItem>
+                  <SelectItem value="unpaired">Unpaired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardContent className="p-0">
             {loading ? (
               <div className="flex items-center justify-center py-12">
@@ -222,7 +247,23 @@ export default function AdminDevicesPage() {
                 <Monitor className="h-10 w-10 mx-auto mb-3 opacity-40" />
                 <p className="text-sm">No devices yet. Add your first screen.</p>
               </div>
-            ) : (
+            ) : (() => {
+              const filtered = devices.filter((d) => {
+                const matchesSearch = !searchQuery ||
+                  d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (d.location ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+                const online = d.is_paired && isOnline(d.last_seen_at);
+                const matchesStatus =
+                  statusFilter === "all" ||
+                  (statusFilter === "online" && online) ||
+                  (statusFilter === "offline" && d.is_paired && !online) ||
+                  (statusFilter === "unpaired" && !d.is_paired);
+                return matchesSearch && matchesStatus;
+              });
+              if (filtered.length === 0) {
+                return <div className="text-center py-12 text-sm text-muted-foreground">No devices match your filters.</div>;
+              }
+              return (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -236,7 +277,7 @@ export default function AdminDevicesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {devices.map((d) => (
+                  {filtered.map((d) => (
                     <TableRow key={d.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
