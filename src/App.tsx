@@ -18,6 +18,7 @@ import AdminSchedulePage from "./pages/admin/AdminSchedulePage";
 import AdminLayoutsPage from "./pages/admin/AdminLayoutsPage";
 import AdminLayoutEditorPage from "./pages/admin/AdminLayoutEditorPage";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
+import TVPage from "./pages/TVPage";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,8 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            {/* Public TV route — no auth, used by the TV app to pair itself */}
+            <Route path="/tv" element={<TVPage />} />
             {/* Super Admin Routes */}
             <Route path="/" element={<ProtectedRoute requiredRole="super_admin"><DashboardPage /></ProtectedRoute>} />
             <Route path="/companies" element={<ProtectedRoute requiredRole="super_admin"><CompaniesPage /></ProtectedRoute>} />
