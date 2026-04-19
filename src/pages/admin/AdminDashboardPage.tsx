@@ -52,7 +52,7 @@ export default function AdminDashboardPage() {
       const companyId = profile.company_id;
 
       const [companyRes, devicesRes, contentRes, layoutsRes, schedulesRes] = await Promise.all([
-        supabase.from("companies").select("name, max_screens").eq("id", companyId).single(),
+        supabase.from("companies").select("name, max_screens, plan").eq("id", companyId).single(),
         supabase.from("devices").select("id, name, location, is_paired, last_seen_at").eq("company_id", companyId),
         supabase.from("content").select("id, file_size").eq("company_id", companyId),
         supabase.from("layouts").select("id", { count: "exact", head: true }).eq("company_id", companyId),
@@ -60,6 +60,7 @@ export default function AdminDashboardPage() {
       ]);
 
       setCompanyName(companyRes.data?.name ?? "");
+      setPlan(companyRes.data?.plan ?? "starter");
       setMaxScreens(companyRes.data?.max_screens ?? 0);
       setDevices(devicesRes.data ?? []);
       setContentCount(contentRes.data?.length ?? 0);
@@ -75,7 +76,8 @@ export default function AdminDashboardPage() {
 
   const onlineDevices = devices.filter((d) => d.is_paired && isOnline(d.last_seen_at)).length;
   const totalDevices = devices.length;
-  const storagePct = Math.min(100, (storageBytes / STORAGE_QUOTA_BYTES) * 100);
+  const storageQuota = getStorageQuota(plan);
+  const storagePct = Math.min(100, (storageBytes / storageQuota) * 100);
   const screenPct = maxScreens > 0 ? Math.min(100, (totalDevices / maxScreens) * 100) : 0;
 
   const checklist = [
