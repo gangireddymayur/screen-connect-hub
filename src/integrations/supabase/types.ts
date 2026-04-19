@@ -99,7 +99,7 @@ export type Database = {
       }
       devices: {
         Row: {
-          company_id: string
+          company_id: string | null
           created_at: string
           id: string
           is_paired: boolean
@@ -113,7 +113,7 @@ export type Database = {
           status: string
         }
         Insert: {
-          company_id: string
+          company_id?: string | null
           created_at?: string
           id?: string
           is_paired?: boolean
@@ -127,7 +127,7 @@ export type Database = {
           status?: string
         }
         Update: {
-          company_id?: string
+          company_id?: string | null
           created_at?: string
           id?: string
           is_paired?: boolean

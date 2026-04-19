@@ -3,8 +3,8 @@ project_id = "csbnpjmrazizohmezbox"
 [functions.tts-vo]
 verify_jwt = false
 
-[functions.claim-device-code]
+[functions.generate-tv-code]
 verify_jwt = false
 
-[functions.device-heartbeat]
+[functions.tv-poll-status]
 verify_jwt = false

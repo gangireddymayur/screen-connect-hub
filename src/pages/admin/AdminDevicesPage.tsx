@@ -37,12 +37,7 @@ interface LayoutOption {
   name: string;
 }
 
-const generatePairingCode = () => {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  return code;
-};
+// Pairing flow: TV generates the code, admin enters it here.
 
 export default function AdminDevicesPage() {
   const { user } = useAuth();
@@ -55,11 +50,11 @@ export default function AdminDevicesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "online" | "offline" | "unpaired">("all");
 
-  // Add dialog
+  // Pair dialog
   const [addOpen, setAddOpen] = useState(false);
+  const [pairCode, setPairCode] = useState("");
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
-  
   const [orientation, setOrientation] = useState("landscape");
   const [submitting, setSubmitting] = useState(false);
 
@@ -107,20 +102,24 @@ export default function AdminDevicesPage() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyId) return;
+    const cleanCode = pairCode.trim().toUpperCase();
+    if (!/^[A-Z0-9]{6}$/.test(cleanCode)) {
+      toast.error("Code must be 6 letters/numbers");
+      return;
+    }
     setSubmitting(true);
-    const pairingCode = generatePairingCode();
-    const { error } = await supabase.from("devices").insert({
-      company_id: companyId, name, location: location || null,
-      orientation, pairing_code: pairingCode,
+    const { data, error } = await supabase.functions.invoke("claim-tv-code", {
+      body: { code: cleanCode, name, location: location || null, orientation },
     });
     setSubmitting(false);
-    if (error) toast.error(error.message);
-    else {
-      setAddOpen(false);
-      setName(""); setLocation(""); setOrientation("landscape");
-      setNewPairingCode(pairingCode);
-      fetchDevices(companyId);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || "Pairing failed");
+      return;
     }
+    toast.success(`${name} paired successfully!`);
+    setAddOpen(false);
+    setName(""); setLocation(""); setOrientation("landscape"); setPairCode("");
+    fetchDevices(companyId);
   };
 
   const copyCode = (code: string) => {
@@ -190,13 +189,29 @@ export default function AdminDevicesPage() {
           </div>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" /> Add Device</Button>
+              <Button><Plus className="h-4 w-4 mr-2" /> Pair Device</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Add Device</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>Pair a TV</DialogTitle>
+              </DialogHeader>
+              <div className="text-sm text-muted-foreground -mt-2 mb-1">
+                Open <a href="/tv" target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">SignageHub on the TV</a> — it will display a 6-character code. Enter it below.
+              </div>
               <form onSubmit={handleAdd} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Pairing code (from TV)</Label>
+                  <Input
+                    value={pairCode}
+                    onChange={(e) => setPairCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
+                    required
+                    placeholder="ABC123"
+                    maxLength={6}
+                    className="font-mono text-center text-lg tracking-[0.4em] uppercase"
+                  />
+                </div>
                 <div className="space-y-2"><Label>Device Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Lobby Screen" /></div>
-                <div className="space-y-2"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Main Lobby" /></div>
+                <div className="space-y-2"><Label>Location <span className="text-muted-foreground text-xs">(optional)</span></Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Main Lobby" /></div>
                 <div className="space-y-2">
                   <Label>Orientation</Label>
                   <div className="flex gap-2">
@@ -205,7 +220,9 @@ export default function AdminDevicesPage() {
                     ))}
                   </div>
                 </div>
-                <Button type="submit" className="w-full" disabled={submitting}>{submitting ? "Adding..." : "Add Device"}</Button>
+                <Button type="submit" className="w-full" disabled={submitting || pairCode.length !== 6}>
+                  {submitting ? "Pairing..." : "Pair Device"}
+                </Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -391,28 +408,6 @@ export default function AdminDevicesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Pairing Code Result */}
-      <Dialog open={!!newPairingCode} onOpenChange={(open) => !open && setNewPairingCode(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Device Created!</DialogTitle></DialogHeader>
-          <div className="text-center space-y-4 py-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-              <Monitor className="h-8 w-8 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Use this pairing code on your TV to connect:</p>
-              <div className="flex items-center justify-center gap-3">
-                <code className="text-3xl font-mono font-bold tracking-[0.3em] bg-muted px-6 py-3 rounded-lg">{newPairingCode}</code>
-              </div>
-            </div>
-            <Button variant="outline" className="gap-2" onClick={() => copyCode(newPairingCode!)}>
-              {codeCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {codeCopied ? "Copied!" : "Copy Code"}
-            </Button>
-            <p className="text-xs text-muted-foreground">Enter this code on your TV app to pair it with your account.</p>
-          </div>
-        </DialogContent>
-      </Dialog>
     </AdminLayout>
   );
 }
