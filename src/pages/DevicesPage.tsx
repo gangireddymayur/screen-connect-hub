@@ -47,26 +47,68 @@ export default function DevicesPage() {
             <h1 className="text-2xl font-bold tracking-tight">Devices</h1>
             <p className="text-sm text-muted-foreground mt-1">Manage your display screens</p>
           </div>
-          <Dialog>
+          <Dialog open={pairOpen} onOpenChange={(o) => { setPairOpen(o); if (!o) { setCode(''); setPaired(false); } }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
                 Pair Device
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Pair New Device</DialogTitle>
-                <DialogDescription>Enter the pairing code shown on your TV screen</DialogDescription>
+                <DialogTitle className="text-xl">Pair a new TV</DialogTitle>
+                <DialogDescription>
+                  Open SignageHub on your TV — it will display a 6-character pairing code. Enter it below to link the screen to your account.
+                </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div className="flex items-center gap-2">
-                  <Link2 className="h-5 w-5 text-primary" />
-                  <span className="text-sm text-muted-foreground">Device Pairing Code</span>
+
+              <div className="flex items-center justify-center gap-3 py-4">
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="h-12 w-16 rounded-md border-2 border-primary/40 bg-primary/5 flex items-center justify-center">
+                    <Tv className="h-6 w-6 text-primary" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">TV shows code</span>
                 </div>
-                <Input placeholder="XXXX-XXXX" className="text-center text-2xl tracking-[0.5em] font-mono" />
-                <Button className="w-full">Link Device</Button>
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="h-12 w-16 rounded-md border-2 border-primary bg-primary/10 flex items-center justify-center">
+                    <Monitor className="h-6 w-6 text-primary" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider text-primary font-medium">You enter here</span>
+                </div>
               </div>
+
+              <div className="space-y-3">
+                <label className="text-sm font-medium block text-center">Pairing code</label>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={code}
+                    onChange={(v) => setCode(v.toUpperCase())}
+                    pattern="^[A-Za-z0-9]+$"
+                    disabled={pairing || paired}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} className="h-12 w-11 text-lg font-mono" />
+                      <InputOTPSlot index={1} className="h-12 w-11 text-lg font-mono" />
+                      <InputOTPSlot index={2} className="h-12 w-11 text-lg font-mono" />
+                      <InputOTPSlot index={3} className="h-12 w-11 text-lg font-mono" />
+                      <InputOTPSlot index={4} className="h-12 w-11 text-lg font-mono" />
+                      <InputOTPSlot index={5} className="h-12 w-11 text-lg font-mono" />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  Code is case-insensitive · Expires in 10 minutes
+                </p>
+              </div>
+
+              <DialogFooter className="sm:justify-between gap-2 pt-2">
+                <Button variant="ghost" onClick={() => setPairOpen(false)} disabled={pairing}>Cancel</Button>
+                <Button onClick={handlePair} disabled={code.length !== 6 || pairing || paired} className="min-w-[130px]">
+                  {paired ? (<><CheckCircle2 className="h-4 w-4 mr-2" />Paired</>) : pairing ? "Pairing..." : "Pair device"}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
