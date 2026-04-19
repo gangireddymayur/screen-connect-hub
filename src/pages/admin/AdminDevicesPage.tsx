@@ -408,28 +408,6 @@ export default function AdminDevicesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Pairing Code Result */}
-      <Dialog open={!!newPairingCode} onOpenChange={(open) => !open && setNewPairingCode(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Device Created!</DialogTitle></DialogHeader>
-          <div className="text-center space-y-4 py-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-              <Monitor className="h-8 w-8 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Use this pairing code on your TV to connect:</p>
-              <div className="flex items-center justify-center gap-3">
-                <code className="text-3xl font-mono font-bold tracking-[0.3em] bg-muted px-6 py-3 rounded-lg">{newPairingCode}</code>
-              </div>
-            </div>
-            <Button variant="outline" className="gap-2" onClick={() => copyCode(newPairingCode!)}>
-              {codeCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {codeCopied ? "Copied!" : "Copy Code"}
-            </Button>
-            <p className="text-xs text-muted-foreground">Enter this code on your TV app to pair it with your account.</p>
-          </div>
-        </DialogContent>
-      </Dialog>
     </AdminLayout>
   );
 }
