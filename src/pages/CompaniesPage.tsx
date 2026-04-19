@@ -417,18 +417,50 @@ export default function CompaniesPage() {
 
               <Separator />
 
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={(e) => { setSelectedCompany(null); openEdit(selectedCompany, e as any); }}>
-                  <Pencil className="h-4 w-4 mr-2" /> Edit
+              <div className="space-y-2">
+                <Button variant="outline" className="w-full" onClick={(e) => { const c = selectedCompany; setSelectedCompany(null); openResetPwd(c, e as any); }}>
+                  <KeyRound className="h-4 w-4 mr-2" /> Reset Admin Password
                 </Button>
-                <Button variant="destructive" className="flex-1" onClick={(e) => { setSelectedCompany(null); openDelete(selectedCompany, e as any); }}>
-                  <Trash2 className="h-4 w-4 mr-2" /> Delete
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={(e) => { setSelectedCompany(null); openEdit(selectedCompany, e as any); }}>
+                    <Pencil className="h-4 w-4 mr-2" /> Edit
+                  </Button>
+                  <Button variant="destructive" className="flex-1" onClick={(e) => { setSelectedCompany(null); openDelete(selectedCompany, e as any); }}>
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                  </Button>
+                </div>
               </div>
             </div>
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Reset Admin Password</DialogTitle></DialogHeader>
+          <form onSubmit={handleResetPwd} className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Set a new password for <strong>{pwdCompany?.name}</strong>'s admin account ({pwdCompany?.contact_email}).
+            </p>
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <div className="relative">
+                <Input type={pwdShow ? "text" : "password"} value={pwdValue} onChange={(e) => setPwdValue(e.target.value)} required minLength={6} placeholder="At least 6 characters" />
+                <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 hover:bg-transparent" onClick={() => setPwdShow(!pwdShow)}>
+                  {pwdShow ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                </Button>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={() => setPwdOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={pwdSubmitting || pwdValue.length < 6}>
+                {pwdSubmitting ? "Updating..." : "Update Password"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
