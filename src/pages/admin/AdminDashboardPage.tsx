@@ -93,11 +93,24 @@ export default function AdminDashboardPage() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {companyName ? `Welcome back, ${companyName}` : "Company overview"}
-          </p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {companyName ? `Welcome back, ${companyName}` : "Company overview"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <div className="text-xs">
+              <span className="text-muted-foreground">Current plan</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm">{PLAN_LABELS[plan] ?? plan}</span>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground">{formatBytes(storageQuota)} · {maxScreens} screens</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {showOnboarding && (
