@@ -163,17 +163,23 @@ export default function AdminContentPage() {
           </Button>
         </div>
 
-        <Card>
+        <Card className={isOverQuota ? "border-destructive/50" : ""}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 text-sm">
                 <HardDrive className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">{formatSize(totalStorage)}</span>
-                <span className="text-muted-foreground">of {formatSize(STORAGE_QUOTA_BYTES)} used</span>
+                <span className="text-muted-foreground">of {formatBytes(storageQuota)} used</span>
+                <Badge variant="secondary" className="ml-1 text-xs">{PLAN_LABELS[plan] ?? plan} plan</Badge>
               </div>
               <span className="text-xs text-muted-foreground">{content.length} files</span>
             </div>
             <Progress value={storagePct} className="h-2" />
+            {isOverQuota && (
+              <p className="text-xs text-destructive mt-2">
+                Storage quota reached. Delete files or upgrade your plan to upload more.
+              </p>
+            )}
           </CardContent>
         </Card>
 
