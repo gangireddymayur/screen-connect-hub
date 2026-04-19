@@ -15,6 +15,29 @@ export default function AdminSettingsPage() {
   const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    setChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setChangingPassword(false);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Password updated!");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -71,6 +94,25 @@ export default function AdminSettingsPage() {
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save Changes"}</Button>
         </div>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Change Password</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 6 characters" />
+            </div>
+            <div className="space-y-2">
+              <Label>Confirm New Password</Label>
+              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter new password" />
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={handleChangePassword} disabled={changingPassword || !newPassword}>
+                {changingPassword ? "Updating..." : "Update Password"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </AdminLayout>
   );
