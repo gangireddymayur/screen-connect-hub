@@ -25,19 +25,10 @@ const isOnline = (lastSeen: string | null) => {
   return Date.now() - new Date(lastSeen).getTime() < ONLINE_THRESHOLD_MS;
 };
 
-const formatBytes = (bytes: number) => {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-};
-
-const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB default quota
-
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const [companyName, setCompanyName] = useState("");
+  const [plan, setPlan] = useState<string>("starter");
   const [maxScreens, setMaxScreens] = useState(0);
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [contentCount, setContentCount] = useState(0);
