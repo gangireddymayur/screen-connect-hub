@@ -26,7 +26,7 @@ export const Scene6CTA: React.FC = () => {
       </div>
       <div
         style={{
-          fontSize: 92,
+          fontSize: 86,
           fontWeight: 800,
           letterSpacing: -3,
           opacity: headOp,
@@ -36,11 +36,11 @@ export const Scene6CTA: React.FC = () => {
           lineHeight: 1.05,
         }}
       >
-        Start with <span style={{ color: C.primaryGlow }}>2 GB free.</span>
+        Launch your signage business <span style={{ color: C.primaryGlow }}>today.</span>
       </div>
       <div
         style={{
-          fontSize: 30,
+          fontSize: 28,
           color: C.textMuted,
           opacity: subOp,
           marginTop: 24,
@@ -49,8 +49,8 @@ export const Scene6CTA: React.FC = () => {
           lineHeight: 1.4,
         }}
       >
-        No credit card. Add screens, brand it your way,<br />
-        upgrade clients to Pro or Enterprise on demand.
+        Plans from <span style={{ color: C.primaryGlow, fontWeight: 700 }}>$9/mo</span> · 2 GB storage included<br />
+        Add screens, brand it your way, upgrade clients on demand.
       </div>
       <div
         style={{
