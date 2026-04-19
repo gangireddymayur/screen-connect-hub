@@ -2,3 +2,9 @@ project_id = "csbnpjmrazizohmezbox"
 
 [functions.tts-vo]
 verify_jwt = false
+
+[functions.claim-device-code]
+verify_jwt = false
+
+[functions.device-heartbeat]
+verify_jwt = false
