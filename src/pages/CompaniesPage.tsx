@@ -62,6 +62,38 @@ export default function CompaniesPage() {
   const [deleteCompany, setDeleteCompany] = useState<Company | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Reset password
+  const [pwdOpen, setPwdOpen] = useState(false);
+  const [pwdCompany, setPwdCompany] = useState<Company | null>(null);
+  const [pwdValue, setPwdValue] = useState("");
+  const [pwdShow, setPwdShow] = useState(false);
+  const [pwdSubmitting, setPwdSubmitting] = useState(false);
+
+  const openResetPwd = (company: Company, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setPwdCompany(company);
+    setPwdValue("");
+    setPwdShow(false);
+    setPwdOpen(true);
+  };
+
+  const handleResetPwd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pwdCompany) return;
+    setPwdSubmitting(true);
+    const { data, error } = await supabase.functions.invoke("reset-company-admin-password", {
+      body: { company_id: pwdCompany.id, new_password: pwdValue },
+    });
+    setPwdSubmitting(false);
+    if (error || data?.error) {
+      toast.error(data?.error || error?.message || "Failed to reset password");
+    } else {
+      toast.success(`Password updated for ${pwdCompany.name}`);
+      setPwdOpen(false);
+      setPwdCompany(null);
+    }
+  };
+
   const fetchCompanies = async () => {
     const { data, error } = await supabase.from("companies").select("*").order("created_at", { ascending: false });
     if (error) {
