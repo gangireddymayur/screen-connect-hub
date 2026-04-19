@@ -31,6 +31,7 @@ export default function AdminContentPage() {
   const [content, setContent] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [plan, setPlan] = useState<string>("starter");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -47,9 +48,11 @@ export default function AdminContentPage() {
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("company_id").eq("id", user.id).single()
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         if (data?.company_id) {
           setCompanyId(data.company_id);
+          const { data: company } = await supabase.from("companies").select("plan").eq("id", data.company_id).single();
+          if (company) setPlan(company.plan ?? "starter");
           fetchContent(data.company_id);
         } else setLoading(false);
       });
@@ -64,7 +67,9 @@ export default function AdminContentPage() {
   };
 
   const totalStorage = useMemo(() => content.reduce((s, c) => s + (c.file_size || 0), 0), [content]);
-  const storagePct = Math.min(100, (totalStorage / STORAGE_QUOTA_BYTES) * 100);
+  const storageQuota = getStorageQuota(plan);
+  const storagePct = Math.min(100, (totalStorage / storageQuota) * 100);
+  const isOverQuota = totalStorage >= storageQuota;
 
   const filtered = useMemo(() => content.filter((c) => {
     const matchesSearch = !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase());
