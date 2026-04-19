@@ -2,16 +2,20 @@ import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Monitor, Pencil, Trash2, MapPin, Wifi, WifiOff, Copy, Check, Link2, LayoutGrid } from "lucide-react";
+import { Plus, Monitor, Pencil, Trash2, MapPin, Copy, Check, Link2, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { StatusBadge } from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
+
+const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
+const isOnline = (lastSeen: string | null) => !!lastSeen && Date.now() - new Date(lastSeen).getTime() < ONLINE_THRESHOLD_MS;
 
 interface Device {
   id: string;
@@ -46,6 +50,10 @@ export default function AdminDevicesPage() {
   const [layouts, setLayouts] = useState<LayoutOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
+
+  // Filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "online" | "offline" | "unpaired">("all");
 
   // Add dialog
   const [addOpen, setAddOpen] = useState(false);
@@ -204,6 +212,31 @@ export default function AdminDevicesPage() {
         </div>
 
         <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or location..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+                <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="offline">Offline</SelectItem>
+                  <SelectItem value="unpaired">Unpaired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardContent className="p-0">
             {loading ? (
               <div className="flex items-center justify-center py-12">
@@ -214,7 +247,23 @@ export default function AdminDevicesPage() {
                 <Monitor className="h-10 w-10 mx-auto mb-3 opacity-40" />
                 <p className="text-sm">No devices yet. Add your first screen.</p>
               </div>
-            ) : (
+            ) : (() => {
+              const filtered = devices.filter((d) => {
+                const matchesSearch = !searchQuery ||
+                  d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (d.location ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+                const online = d.is_paired && isOnline(d.last_seen_at);
+                const matchesStatus =
+                  statusFilter === "all" ||
+                  (statusFilter === "online" && online) ||
+                  (statusFilter === "offline" && d.is_paired && !online) ||
+                  (statusFilter === "unpaired" && !d.is_paired);
+                return matchesSearch && matchesStatus;
+              });
+              if (filtered.length === 0) {
+                return <div className="text-center py-12 text-sm text-muted-foreground">No devices match your filters.</div>;
+              }
+              return (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -228,7 +277,7 @@ export default function AdminDevicesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {devices.map((d) => (
+                  {filtered.map((d) => (
                     <TableRow key={d.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -256,13 +305,21 @@ export default function AdminDevicesPage() {
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          {d.is_paired ? (
-                            <StatusBadge status="active" />
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Unpaired</span>
-                          )}
-                        </div>
+                        {!d.is_paired ? (
+                          <Badge variant="outline" className="text-xs">Unpaired</Badge>
+                        ) : isOnline(d.last_seen_at) ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Online</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                            <span className="text-xs text-muted-foreground">
+                              {d.last_seen_at ? formatDistanceToNow(new Date(d.last_seen_at), { addSuffix: true }) : "Never seen"}
+                            </span>
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         {d.location ? (
@@ -296,7 +353,8 @@ export default function AdminDevicesPage() {
                   ))}
                 </TableBody>
               </Table>
-            )}
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
