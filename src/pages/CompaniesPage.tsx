@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Building2, Monitor, Eye, EyeOff, Pencil, Trash2, Mail, Calendar, Shield, X } from "lucide-react";
+import { Plus, Building2, Monitor, Eye, EyeOff, Pencil, Trash2, Mail, Calendar, Shield, X, KeyRound } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
