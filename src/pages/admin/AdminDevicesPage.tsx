@@ -196,7 +196,7 @@ export default function AdminDevicesPage() {
                 <DialogTitle>Pair a TV</DialogTitle>
               </DialogHeader>
               <div className="text-sm text-muted-foreground -mt-2 mb-1">
-                Open <a href="/tv" target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">SignageHub on the TV</a> — it will display a 6-character code. Enter it below.
+                Open the SignageHub app on your TV — it will display a 6-character code. Enter it below.
               </div>
               <form onSubmit={handleAdd} className="space-y-4">
                 <div className="space-y-2">
