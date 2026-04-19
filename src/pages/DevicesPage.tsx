@@ -15,10 +15,29 @@ import { toast } from "@/hooks/use-toast";
 export default function DevicesPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [pairOpen, setPairOpen] = useState(false);
+  const [code, setCode] = useState('');
+  const [pairing, setPairing] = useState(false);
+  const [paired, setPaired] = useState(false);
+
   const filtered = mockDevices.filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase()) ||
     d.location.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handlePair = async () => {
+    if (code.length !== 6) return;
+    setPairing(true);
+    await new Promise(r => setTimeout(r, 900));
+    setPairing(false);
+    setPaired(true);
+    toast({ title: "Device paired", description: `Code ${code.toUpperCase()} linked successfully.` });
+    setTimeout(() => {
+      setPairOpen(false);
+      setPaired(false);
+      setCode('');
+    }, 1200);
+  };
 
   return (
     <DashboardLayout>
