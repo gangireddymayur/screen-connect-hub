@@ -48,16 +48,17 @@ export const Scene3bLayout: React.FC = () => {
   const headOp = interpolate(frame, [5, 25], [0, 1], { extrapolateRight: "clamp" });
 
   // Stage detection
-  const slideshowDropFrame = 60;
-  const splitVerticalFrame = 180;
-  const weatherDropFrame = 220;
-  const splitHorizFrame = 330;
-  const tickerDropFrame = 380;
-  const propsOpenFrame = 480;
-  const typingFrame = 510;
-  const bgChangeFrame = 660;
-  const saveFrame = 780;
-  const previewFrame = 840;
+  // Stage detection — 40s scene = 1200 frames
+  const slideshowDropFrame = 90;
+  const splitVerticalFrame = 240;
+  const weatherDropFrame = 290;
+  const splitHorizFrame = 440;
+  const tickerDropFrame = 500;
+  const propsOpenFrame = 640;
+  const typingFrame = 680;
+  const bgChangeFrame = 880;
+  const saveFrame = 1030;
+  const previewFrame = 1110;
 
   // Slideshow widget — drag from palette into root zone
   const slideDrag = interpolate(frame, [slideshowDropFrame - 30, slideshowDropFrame], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
