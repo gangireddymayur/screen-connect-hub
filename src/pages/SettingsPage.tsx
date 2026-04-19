@@ -92,6 +92,25 @@ export default function SettingsPage() {
         <div className="flex justify-end">
           <Button>Save Changes</Button>
         </div>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Change Password</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 6 characters" />
+            </div>
+            <div className="space-y-2">
+              <Label>Confirm New Password</Label>
+              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter new password" />
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={handleChangePassword} disabled={changingPassword || !newPassword}>
+                {changingPassword ? "Updating..." : "Update Password"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );
