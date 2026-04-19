@@ -16,17 +16,17 @@ import { Scene6CTA } from "./scenes/Scene6CTA";
 import { FPS } from "./theme";
 
 // 90-second video, 8 scenes
-// Scene durations (frames @ 30fps)
+// Scene durations (frames @ 30fps) — sized to comfortably contain narration
 const D = {
-  hook: 5 * FPS,        // 150 — 0-5s
-  pain: 6 * FPS,        // 180 — 5-11s
-  dash: 8 * FPS,        // 240 — 11-19s
-  content: 8 * FPS,     // 240 — 19-27s
-  layout: 30 * FPS,     // 900 — 27-57s  (BIG 30s scene)
-  devices: 9 * FPS,     // 270 — 57-66s
-  schedule: 7 * FPS,    // 210 — 66-73s
-  features: 7 * FPS,    // 210 — 73-80s
-  cta: 10 * FPS,        // 300 — 80-90s
+  hook: 6 * FPS,        // VO 5.2s
+  pain: 7 * FPS,        // VO 6.6s
+  dash: 8 * FPS,        // VO 7.1s
+  content: 9 * FPS,     // VO 8.1s
+  layout: 40 * FPS,     // VO 39s — 30s feels too tight, give it room
+  devices: 9 * FPS,     // VO 8.0s
+  schedule: 9 * FPS,    // VO 7.8s
+  features: 8 * FPS,    // VO 7.4s
+  cta: 13 * FPS,        // VO 12.4s
   transition: 15,       // 0.5s overlap
 };
 
