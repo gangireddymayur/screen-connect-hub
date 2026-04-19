@@ -51,6 +51,10 @@ export default function AdminDevicesPage() {
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
+  // Filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "online" | "offline" | "unpaired">("all");
+
   // Add dialog
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState("");
@@ -260,13 +264,21 @@ export default function AdminDevicesPage() {
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          {d.is_paired ? (
-                            <StatusBadge status="active" />
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Unpaired</span>
-                          )}
-                        </div>
+                        {!d.is_paired ? (
+                          <Badge variant="outline" className="text-xs">Unpaired</Badge>
+                        ) : isOnline(d.last_seen_at) ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Online</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                            <span className="text-xs text-muted-foreground">
+                              {d.last_seen_at ? formatDistanceToNow(new Date(d.last_seen_at), { addSuffix: true }) : "Never seen"}
+                            </span>
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         {d.location ? (
