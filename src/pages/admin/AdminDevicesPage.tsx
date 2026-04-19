@@ -353,7 +353,8 @@ export default function AdminDevicesPage() {
                   ))}
                 </TableBody>
               </Table>
-            )}
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
