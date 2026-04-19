@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
+import { getStorageQuota, formatBytes } from "@/lib/plan-quotas";
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -24,19 +25,10 @@ const isOnline = (lastSeen: string | null) => {
   return Date.now() - new Date(lastSeen).getTime() < ONLINE_THRESHOLD_MS;
 };
 
-const formatBytes = (bytes: number) => {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-};
-
-const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB default quota
-
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const [companyName, setCompanyName] = useState("");
+  const [plan, setPlan] = useState<string>("starter");
   const [maxScreens, setMaxScreens] = useState(0);
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [contentCount, setContentCount] = useState(0);
@@ -60,7 +52,7 @@ export default function AdminDashboardPage() {
       const companyId = profile.company_id;
 
       const [companyRes, devicesRes, contentRes, layoutsRes, schedulesRes] = await Promise.all([
-        supabase.from("companies").select("name, max_screens").eq("id", companyId).single(),
+        supabase.from("companies").select("name, max_screens, plan").eq("id", companyId).single(),
         supabase.from("devices").select("id, name, location, is_paired, last_seen_at").eq("company_id", companyId),
         supabase.from("content").select("id, file_size").eq("company_id", companyId),
         supabase.from("layouts").select("id", { count: "exact", head: true }).eq("company_id", companyId),
@@ -68,6 +60,7 @@ export default function AdminDashboardPage() {
       ]);
 
       setCompanyName(companyRes.data?.name ?? "");
+      setPlan(companyRes.data?.plan ?? "starter");
       setMaxScreens(companyRes.data?.max_screens ?? 0);
       setDevices(devicesRes.data ?? []);
       setContentCount(contentRes.data?.length ?? 0);
@@ -83,7 +76,8 @@ export default function AdminDashboardPage() {
 
   const onlineDevices = devices.filter((d) => d.is_paired && isOnline(d.last_seen_at)).length;
   const totalDevices = devices.length;
-  const storagePct = Math.min(100, (storageBytes / STORAGE_QUOTA_BYTES) * 100);
+  const storageQuota = getStorageQuota(plan);
+  const storagePct = Math.min(100, (storageBytes / storageQuota) * 100);
   const screenPct = maxScreens > 0 ? Math.min(100, (totalDevices / maxScreens) * 100) : 0;
 
   const checklist = [
@@ -170,7 +164,7 @@ export default function AdminDashboardPage() {
               <div className="mt-3">
                 <Progress value={storagePct} className="h-1.5" />
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <HardDrive className="h-3 w-3" /> {formatBytes(storageBytes)} used
+                  <HardDrive className="h-3 w-3" /> {formatBytes(storageBytes)} of {formatBytes(storageQuota)}
                 </p>
               </div>
             </CardContent>

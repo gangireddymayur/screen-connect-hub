@@ -9,7 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { getStorageQuota, formatBytes, PLAN_LABELS } from "@/lib/plan-quotas";
 
 interface ContentItem {
   id: string;
@@ -22,20 +24,14 @@ interface ContentItem {
   company_id: string;
 }
 
-const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB
-
-const formatSize = (bytes: number | null) => {
-  if (!bytes) return "—";
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-};
+const formatSize = (bytes: number | null) => bytes ? formatBytes(bytes) : "—";
 
 export default function AdminContentPage() {
   const { user } = useAuth();
   const [content, setContent] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [plan, setPlan] = useState<string>("starter");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -52,9 +48,11 @@ export default function AdminContentPage() {
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("company_id").eq("id", user.id).single()
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         if (data?.company_id) {
           setCompanyId(data.company_id);
+          const { data: company } = await supabase.from("companies").select("plan").eq("id", data.company_id).single();
+          if (company) setPlan(company.plan ?? "starter");
           fetchContent(data.company_id);
         } else setLoading(false);
       });
@@ -69,7 +67,9 @@ export default function AdminContentPage() {
   };
 
   const totalStorage = useMemo(() => content.reduce((s, c) => s + (c.file_size || 0), 0), [content]);
-  const storagePct = Math.min(100, (totalStorage / STORAGE_QUOTA_BYTES) * 100);
+  const storageQuota = getStorageQuota(plan);
+  const storagePct = Math.min(100, (totalStorage / storageQuota) * 100);
+  const isOverQuota = totalStorage >= storageQuota;
 
   const filtered = useMemo(() => content.filter((c) => {
     const matchesSearch = !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -80,6 +80,12 @@ export default function AdminContentPage() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !companyId) return;
+    const incomingSize = Array.from(files).reduce((s, f) => s + f.size, 0);
+    if (totalStorage + incomingSize > storageQuota) {
+      toast.error(`Upload would exceed your ${PLAN_LABELS[plan] ?? plan} plan quota of ${formatBytes(storageQuota)}. Upgrade or free up space.`);
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
     setUploading(true);
     for (const file of Array.from(files)) {
       const ext = file.name.split(".").pop();
@@ -163,17 +169,23 @@ export default function AdminContentPage() {
           </Button>
         </div>
 
-        <Card>
+        <Card className={isOverQuota ? "border-destructive/50" : ""}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 text-sm">
                 <HardDrive className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">{formatSize(totalStorage)}</span>
-                <span className="text-muted-foreground">of {formatSize(STORAGE_QUOTA_BYTES)} used</span>
+                <span className="text-muted-foreground">of {formatBytes(storageQuota)} used</span>
+                <Badge variant="secondary" className="ml-1 text-xs">{PLAN_LABELS[plan] ?? plan} plan</Badge>
               </div>
               <span className="text-xs text-muted-foreground">{content.length} files</span>
             </div>
             <Progress value={storagePct} className="h-2" />
+            {isOverQuota && (
+              <p className="text-xs text-destructive mt-2">
+                Storage quota reached. Delete files or upgrade your plan to upload more.
+              </p>
+            )}
           </CardContent>
         </Card>
 
