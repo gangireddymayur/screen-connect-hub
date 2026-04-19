@@ -15,6 +15,29 @@ export default function AdminSettingsPage() {
   const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    setChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setChangingPassword(false);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Password updated!");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
