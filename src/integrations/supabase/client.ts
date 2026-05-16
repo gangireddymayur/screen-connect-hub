@@ -128,8 +128,8 @@ const saveSession = (s: any) => {
   else localStorage.removeItem(SESSION_KEY);
 };
 
-let currentSession: any = loadSession() ?? makeSession(SUPER_USER);
-saveSession(currentSession);
+// No auto-login — user picks role on the login page.
+let currentSession: any = loadSession();
 
 // ---------- Query Builder ----------
 type Filter = { type: string; col: string; val: any };
