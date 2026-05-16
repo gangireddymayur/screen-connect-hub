@@ -87,11 +87,18 @@ export default function AdminLayoutEditorPage() {
       setBackgroundColor(data.background_color);
       setResWidth(data.resolution_width);
       setResHeight(data.resolution_height);
+      const nextSnapshot: EditorSnapshot = {
+        rootZone: createZone("root"),
+        backgroundColor: data.background_color,
+      };
       if (data.layout_data && typeof data.layout_data === "object" && (data.layout_data as any).id) {
-        setRootZone(data.layout_data as unknown as ScreenZone);
+        nextSnapshot.rootZone = data.layout_data as unknown as ScreenZone;
       } else {
-        setRootZone(createZone("root"));
+        nextSnapshot.rootZone = createZone("root");
       }
+      snapshotRef.current = nextSnapshot;
+      setRootZone(nextSnapshot.rootZone);
+      setHistory({ past: [], future: [] });
 
       // Fetch content items for this company
       const { data: contentData } = await supabase
@@ -106,20 +113,55 @@ export default function AdminLayoutEditorPage() {
     fetchLayout();
   }, [layoutId, navigate]);
 
-  const handleZoneUpdate = useCallback((updatedRoot: ScreenZone) => {
-    setRootZone(updatedRoot);
+  const commitSnapshot = useCallback((updater: (current: EditorSnapshot) => EditorSnapshot) => {
+    const current = snapshotRef.current;
+    const next = updater(current);
+    snapshotRef.current = next;
+    setHistory((prev) => ({ past: [...prev.past, current].slice(-50), future: [] }));
+    setRootZone(next.rootZone);
+    setBackgroundColor(next.backgroundColor);
   }, []);
+
+  const handleZoneUpdate = useCallback((updatedRoot: ScreenZone) => {
+    commitSnapshot((prev) => ({ ...prev, rootZone: updatedRoot }));
+  }, [commitSnapshot]);
 
   const handleWidgetUpdate = useCallback(
     (widget: ContentWidget) => {
       if (!selectedZoneId) return;
-      setRootZone((prev) => updateZoneContent(prev, selectedZoneId, widget));
+      commitSnapshot((prev) => ({ ...prev, rootZone: updateZoneContent(prev.rootZone, selectedZoneId, widget) }));
     },
-    [selectedZoneId]
+    [commitSnapshot, selectedZoneId]
   );
 
+  const handleUndo = () => {
+    setHistory((prev) => {
+      if (prev.past.length === 0) return prev;
+      const previous = prev.past[prev.past.length - 1];
+      const current = snapshotRef.current;
+      snapshotRef.current = previous;
+      setRootZone(previous.rootZone);
+      setBackgroundColor(previous.backgroundColor);
+      setSelectedZoneId(null);
+      return { past: prev.past.slice(0, -1), future: [current, ...prev.future].slice(0, 50) };
+    });
+  };
+
+  const handleRedo = () => {
+    setHistory((prev) => {
+      if (prev.future.length === 0) return prev;
+      const next = prev.future[0];
+      const current = snapshotRef.current;
+      snapshotRef.current = next;
+      setRootZone(next.rootZone);
+      setBackgroundColor(next.backgroundColor);
+      setSelectedZoneId(null);
+      return { past: [...prev.past, current].slice(-50), future: prev.future.slice(1) };
+    });
+  };
+
   const handleReset = () => {
-    setRootZone(createZone("root"));
+    commitSnapshot((prev) => ({ ...prev, rootZone: createZone("root") }));
     setSelectedZoneId(null);
   };
 
