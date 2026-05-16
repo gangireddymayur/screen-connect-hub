@@ -233,7 +233,10 @@ function OverlayText({ slide }: { slide: SlideshowItem }) {
 }
 
 /* ── Standard Widget Preview ── */
-function WidgetPreview({ widget }: { widget: ContentWidget }) {
+function WidgetPreview({ widget, previewMode = false }: { widget: ContentWidget; previewMode?: boolean }) {
+  if (widget.type === 'links') {
+    return <LinksWidget widget={widget} interactive={previewMode} />;
+  }
   if (widget.type === 'slideshow') {
     return <SlideshowPreview widget={widget} />;
   }
