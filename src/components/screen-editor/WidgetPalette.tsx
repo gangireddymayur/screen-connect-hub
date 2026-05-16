@@ -7,6 +7,7 @@ import {
   CloudSun,
   Rss,
   Images,
+  Link2,
 } from "lucide-react";
 import { ContentWidgetType } from "@/lib/screen-editor-types";
 
@@ -18,6 +19,7 @@ const widgets: { type: ContentWidgetType; label: string; icon: React.ElementType
   { type: 'clock', label: 'Clock', icon: Clock, color: 'bg-success/15 text-success' },
   { type: 'weather', label: 'Weather', icon: CloudSun, color: 'bg-warning/15 text-warning' },
   { type: 'rss', label: 'RSS Ticker', icon: Rss, color: 'bg-destructive/15 text-destructive' },
+  { type: 'links', label: 'Quick Links', icon: Link2, color: 'bg-primary/15 text-primary' },
 ];
 
 export function WidgetPalette() {
