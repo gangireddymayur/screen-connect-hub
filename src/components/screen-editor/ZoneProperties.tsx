@@ -1,4 +1,4 @@
-import { ContentWidget, TextAnimation, SlideshowItem, SlideTransition, createSlide } from "@/lib/screen-editor-types";
+import { ContentWidget, TextAnimation, SlideshowItem, SlideTransition, LinkItem, LinkPlatform, MAX_LINKS, createSlide, detectPlatform } from "@/lib/screen-editor-types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
