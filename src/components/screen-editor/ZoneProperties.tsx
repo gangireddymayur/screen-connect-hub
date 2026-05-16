@@ -319,6 +319,129 @@ export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZoneProp
         </>
       )}
 
+      {/* ── LINKS ── */}
+      {widget.type === 'links' && (() => {
+        const links = widget.links || [];
+        const setLinks = (next: LinkItem[]) => update({ links: next });
+        const updateLink = (i: number, patch: Partial<LinkItem>) => {
+          const next = [...links];
+          next[i] = { ...next[i], ...patch };
+          setLinks(next);
+        };
+        const addLink = () => {
+          if (links.length >= MAX_LINKS) return;
+          setLinks([...links, { id: `link-${Date.now()}`, url: '', label: 'New Link', platform: 'website' }]);
+        };
+        const removeLink = (i: number) => setLinks(links.filter((_, idx) => idx !== i));
+
+        return (
+          <>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Orientation</Label>
+              <Select
+                value={widget.linksOrientation || 'horizontal'}
+                onValueChange={(v) => update({ linksOrientation: v as 'horizontal' | 'vertical' })}
+              >
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="horizontal">Horizontal Bar</SelectItem>
+                  <SelectItem value="vertical">Vertical Bar</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">
+                Drop this widget in a thin zone (split a section, then resize the divider).
+              </p>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium">{links.length} / {MAX_LINKS} Links</span>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addLink} disabled={links.length >= MAX_LINKS}>
+                <Plus className="h-3 w-3 mr-1" /> Add Link
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {links.map((link, i) => (
+                <div key={link.id} className="rounded-lg border border-border bg-muted/30 p-2.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Link {i + 1}</span>
+                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:text-destructive" onClick={() => removeLink(i)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-[10px]">URL (paste any link)</Label>
+                    <Input
+                      value={link.url}
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        updateLink(i, { url, platform: detectPlatform(url) });
+                      }}
+                      placeholder="https://instagram.com/your-handle"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px]">Display Label</Label>
+                      <Input
+                        value={link.label}
+                        onChange={(e) => updateLink(i, { label: e.target.value })}
+                        placeholder="Follow us"
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px]">Platform / Icon</Label>
+                      <Select value={link.platform} onValueChange={(v) => updateLink(i, { platform: v as LinkPlatform })}>
+                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="instagram">Instagram</SelectItem>
+                          <SelectItem value="youtube">YouTube</SelectItem>
+                          <SelectItem value="facebook">Facebook</SelectItem>
+                          <SelectItem value="twitter">Twitter / X</SelectItem>
+                          <SelectItem value="tiktok">TikTok</SelectItem>
+                          <SelectItem value="linkedin">LinkedIn</SelectItem>
+                          <SelectItem value="github">GitHub</SelectItem>
+                          <SelectItem value="website">Website / Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-[10px]">Button Color (override)</Label>
+                    <div className="flex gap-1">
+                      <input
+                        type="color"
+                        value={link.iconColor || '#1f2937'}
+                        onChange={(e) => updateLink(i, { iconColor: e.target.value })}
+                        className="h-7 w-7 rounded cursor-pointer border-none"
+                      />
+                      <Input
+                        value={link.iconColor || ''}
+                        onChange={(e) => updateLink(i, { iconColor: e.target.value })}
+                        placeholder="(uses platform color)"
+                        className="h-7 text-[10px] font-mono flex-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {links.length === 0 && (
+                <p className="text-[11px] text-muted-foreground text-center py-3">
+                  No links yet. Click "Add Link" to start.
+                </p>
+              )}
+            </div>
+          </>
+        );
+      })()}
+
       {/* ── TEXT / RSS ── */}
       {(widget.type === 'text' || widget.type === 'rss') && (
         <>
