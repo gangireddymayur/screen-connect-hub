@@ -79,7 +79,7 @@ function LinksWidget({ widget, interactive }: { widget: ContentWidget; interacti
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
           No links configured
         </div>
-      ) : links.map((link, index) => {
+      ) : links.map((link) => {
         const meta = platformMeta[link.platform];
         const Icon = meta.icon;
         const bg = link.iconColor || meta.color;
