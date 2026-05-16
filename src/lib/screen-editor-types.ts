@@ -16,6 +16,8 @@ export interface LinkItem {
   iconColor?: string;
 }
 
+export type LinksOrientation = 'auto' | 'horizontal' | 'vertical';
+
 export const MAX_LINKS = 4;
 
 export function detectPlatform(url: string): LinkPlatform {
