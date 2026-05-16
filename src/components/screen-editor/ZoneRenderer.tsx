@@ -61,8 +61,20 @@ function LinksWidget({ widget, interactive }: { widget: ContentWidget; interacti
   const setting = widget.linksOrientation || 'auto';
   const isHorizontal = setting === 'auto' ? autoHorizontal : setting === 'horizontal';
 
+  const style: React.CSSProperties = {
+    backgroundColor: widget.backgroundColor || 'transparent',
+    padding: widget.padding,
+    borderRadius: widget.borderRadius,
+    opacity: (widget.opacity ?? 100) / 100,
+    pointerEvents: interactive ? 'none' : 'auto',
+  };
+
   return (
-    <div ref={containerRef} className={cn("w-full h-full flex gap-1.5 p-1", isHorizontal ? "flex-row" : "flex-col")}>
+    <div
+      ref={containerRef}
+      className={cn("w-full h-full flex overflow-hidden", isHorizontal ? "flex-row" : "flex-col")}
+      style={style}
+    >
       {links.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
           No links configured
@@ -82,11 +94,12 @@ function LinksWidget({ widget, interactive }: { widget: ContentWidget; interacti
             onClick={handleClick}
             title={link.url || meta.label}
             className={cn(
-              "flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-md transition-transform px-2",
+              "min-w-0 min-h-0 flex flex-1 basis-0 items-center justify-center gap-1.5 px-2 transition-colors",
+              isHorizontal ? "border-r border-background/20 last:border-r-0" : "border-b border-background/20 last:border-b-0",
               interactive && link.url ? "cursor-pointer hover:scale-[1.03]" : "cursor-default",
               !link.url && "opacity-70",
             )}
-            style={{ backgroundColor: bg, color: '#fff' }}
+            style={{ backgroundColor: bg, color: '#fff', pointerEvents: interactive && link.url ? 'auto' : 'none' }}
           >
             <Icon className="h-4 w-4 shrink-0" />
             <span className="text-[11px] font-semibold truncate">{link.label || meta.label}</span>
@@ -452,8 +465,8 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
   if (zone.split !== 'none' && zone.children) {
     const isH = zone.split === 'horizontal';
     return (
-      <div className={cn("flex w-full h-full", isH ? "flex-row" : "flex-col")} style={previewMode ? undefined : { gap: 2 }}>
-        <div style={{ [isH ? 'width' : 'height']: `${zone.splitRatio}%`, [isH ? 'height' : 'width']: '100%' }}>
+      <div className={cn("flex w-full h-full overflow-hidden", isH ? "flex-row" : "flex-col")} style={previewMode ? undefined : { gap: 2 }}>
+        <div className="min-w-0 min-h-0 overflow-hidden" style={{ [isH ? 'width' : 'height']: `${zone.splitRatio}%`, [isH ? 'height' : 'width']: '100%' }}>
           <ZoneRenderer
             zone={zone.children[0]}
             onUpdate={(updated) => {
@@ -493,7 +506,7 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
             <GripVertical className={cn("h-3 w-3 text-muted-foreground", !isH && "rotate-90")} />
           </div>
         )}
-        <div style={{ [isH ? 'width' : 'height']: `${100 - zone.splitRatio}%`, [isH ? 'height' : 'width']: '100%' }}>
+        <div className="min-w-0 min-h-0 overflow-hidden" style={{ [isH ? 'width' : 'height']: `${100 - zone.splitRatio}%`, [isH ? 'height' : 'width']: '100%' }}>
           <ZoneRenderer
             zone={zone.children[1]}
             onUpdate={(updated) => {

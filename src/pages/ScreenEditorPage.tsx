@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ZoneRenderer } from "@/components/screen-editor/ZoneRenderer";
@@ -19,6 +19,8 @@ import {
   Save,
   Maximize,
   RotateCcw,
+  Undo2,
+  Redo2,
   Monitor,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -56,29 +58,63 @@ export default function ScreenEditorPage() {
   const [layout, setLayout] = useState<ScreenLayout>(() =>
     createDefaultLayout(device.id, `${device.name} Layout`)
   );
+  const layoutRef = useRef(layout);
+  const [history, setHistory] = useState<{ past: ScreenLayout[]; future: ScreenLayout[] }>({ past: [], future: [] });
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [isFullPreview, setIsFullPreview] = useState(false);
 
   const selectedZone = selectedZoneId ? findZone(layout.rootZone, selectedZoneId) : null;
   const selectedWidget = selectedZone?.content || null;
 
-  const handleZoneUpdate = useCallback((updatedRoot: ScreenZone) => {
-    setLayout((prev) => ({ ...prev, rootZone: updatedRoot }));
+  const commitLayout = useCallback((updater: (current: ScreenLayout) => ScreenLayout) => {
+    const current = layoutRef.current;
+    const next = updater(current);
+    layoutRef.current = next;
+    setHistory((prev) => ({ past: [...prev.past, current].slice(-50), future: [] }));
+    setLayout(next);
   }, []);
+
+  const handleZoneUpdate = useCallback((updatedRoot: ScreenZone) => {
+    commitLayout((prev) => ({ ...prev, rootZone: updatedRoot }));
+  }, [commitLayout]);
+
+  const handleUndo = () => {
+    setHistory((prev) => {
+      if (prev.past.length === 0) return prev;
+      const previous = prev.past[prev.past.length - 1];
+      const current = layoutRef.current;
+      layoutRef.current = previous;
+      setLayout(previous);
+      setSelectedZoneId(null);
+      return { past: prev.past.slice(0, -1), future: [current, ...prev.future].slice(0, 50) };
+    });
+  };
+
+  const handleRedo = () => {
+    setHistory((prev) => {
+      if (prev.future.length === 0) return prev;
+      const next = prev.future[0];
+      const current = layoutRef.current;
+      layoutRef.current = next;
+      setLayout(next);
+      setSelectedZoneId(null);
+      return { past: [...prev.past, current].slice(-50), future: prev.future.slice(1) };
+    });
+  };
 
   const handleWidgetUpdate = useCallback(
     (widget: ContentWidget) => {
       if (!selectedZoneId) return;
-      setLayout((prev) => ({
+      commitLayout((prev) => ({
         ...prev,
         rootZone: updateZoneContent(prev.rootZone, selectedZoneId, widget),
       }));
     },
-    [selectedZoneId]
+    [commitLayout, selectedZoneId]
   );
 
   const handleReset = () => {
-    setLayout(createDefaultLayout(device.id, `${device.name} Layout`));
+    commitLayout(() => createDefaultLayout(device.id, `${device.name} Layout`));
     setSelectedZoneId(null);
   };
 
@@ -125,6 +161,14 @@ export default function ScreenEditorPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleUndo} disabled={history.past.length === 0}>
+              <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+              Undo
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRedo} disabled={history.future.length === 0}>
+              <Redo2 className="h-3.5 w-3.5 mr-1.5" />
+              Redo
+            </Button>
             <Button variant="outline" size="sm" onClick={handleReset}>
               <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
               Reset
@@ -160,12 +204,12 @@ export default function ScreenEditorPage() {
                       <input
                         type="color"
                         value={layout.backgroundColor}
-                        onChange={(e) => setLayout((p) => ({ ...p, backgroundColor: e.target.value }))}
+                        onChange={(e) => commitLayout((p) => ({ ...p, backgroundColor: e.target.value }))}
                         className="h-8 w-8 rounded cursor-pointer border-none"
                       />
                       <Input
                         value={layout.backgroundColor}
-                        onChange={(e) => setLayout((p) => ({ ...p, backgroundColor: e.target.value }))}
+                        onChange={(e) => commitLayout((p) => ({ ...p, backgroundColor: e.target.value }))}
                         className="h-8 text-xs font-mono flex-1"
                       />
                     </div>

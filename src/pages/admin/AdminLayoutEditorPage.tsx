@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AdminLayout } from "@/components/AdminLayout";
 import { ZoneRenderer } from "@/components/screen-editor/ZoneRenderer";
@@ -18,6 +18,8 @@ import {
   Save,
   Maximize,
   RotateCcw,
+  Undo2,
+  Redo2,
   LayoutGrid,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -46,6 +48,8 @@ function updateZoneContent(zone: ScreenZone, zoneId: string, widget: ContentWidg
   return zone;
 }
 
+type EditorSnapshot = { rootZone: ScreenZone; backgroundColor: string };
+
 export default function AdminLayoutEditorPage() {
   const { layoutId } = useParams<{ layoutId: string }>();
   const navigate = useNavigate();
@@ -55,6 +59,8 @@ export default function AdminLayoutEditorPage() {
   const [resWidth, setResWidth] = useState(1920);
   const [resHeight, setResHeight] = useState(1080);
   const [rootZone, setRootZone] = useState<ScreenZone>(() => createZone("root"));
+  const snapshotRef = useRef<EditorSnapshot>({ rootZone: createZone("root"), backgroundColor: "#1a1a2e" });
+  const [history, setHistory] = useState<{ past: EditorSnapshot[]; future: EditorSnapshot[] }>({ past: [], future: [] });
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [isFullPreview, setIsFullPreview] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -81,11 +87,18 @@ export default function AdminLayoutEditorPage() {
       setBackgroundColor(data.background_color);
       setResWidth(data.resolution_width);
       setResHeight(data.resolution_height);
+      const nextSnapshot: EditorSnapshot = {
+        rootZone: createZone("root"),
+        backgroundColor: data.background_color,
+      };
       if (data.layout_data && typeof data.layout_data === "object" && (data.layout_data as any).id) {
-        setRootZone(data.layout_data as unknown as ScreenZone);
+        nextSnapshot.rootZone = data.layout_data as unknown as ScreenZone;
       } else {
-        setRootZone(createZone("root"));
+        nextSnapshot.rootZone = createZone("root");
       }
+      snapshotRef.current = nextSnapshot;
+      setRootZone(nextSnapshot.rootZone);
+      setHistory({ past: [], future: [] });
 
       // Fetch content items for this company
       const { data: contentData } = await supabase
@@ -100,20 +113,55 @@ export default function AdminLayoutEditorPage() {
     fetchLayout();
   }, [layoutId, navigate]);
 
-  const handleZoneUpdate = useCallback((updatedRoot: ScreenZone) => {
-    setRootZone(updatedRoot);
+  const commitSnapshot = useCallback((updater: (current: EditorSnapshot) => EditorSnapshot) => {
+    const current = snapshotRef.current;
+    const next = updater(current);
+    snapshotRef.current = next;
+    setHistory((prev) => ({ past: [...prev.past, current].slice(-50), future: [] }));
+    setRootZone(next.rootZone);
+    setBackgroundColor(next.backgroundColor);
   }, []);
+
+  const handleZoneUpdate = useCallback((updatedRoot: ScreenZone) => {
+    commitSnapshot((prev) => ({ ...prev, rootZone: updatedRoot }));
+  }, [commitSnapshot]);
 
   const handleWidgetUpdate = useCallback(
     (widget: ContentWidget) => {
       if (!selectedZoneId) return;
-      setRootZone((prev) => updateZoneContent(prev, selectedZoneId, widget));
+      commitSnapshot((prev) => ({ ...prev, rootZone: updateZoneContent(prev.rootZone, selectedZoneId, widget) }));
     },
-    [selectedZoneId]
+    [commitSnapshot, selectedZoneId]
   );
 
+  const handleUndo = () => {
+    setHistory((prev) => {
+      if (prev.past.length === 0) return prev;
+      const previous = prev.past[prev.past.length - 1];
+      const current = snapshotRef.current;
+      snapshotRef.current = previous;
+      setRootZone(previous.rootZone);
+      setBackgroundColor(previous.backgroundColor);
+      setSelectedZoneId(null);
+      return { past: prev.past.slice(0, -1), future: [current, ...prev.future].slice(0, 50) };
+    });
+  };
+
+  const handleRedo = () => {
+    setHistory((prev) => {
+      if (prev.future.length === 0) return prev;
+      const next = prev.future[0];
+      const current = snapshotRef.current;
+      snapshotRef.current = next;
+      setRootZone(next.rootZone);
+      setBackgroundColor(next.backgroundColor);
+      setSelectedZoneId(null);
+      return { past: [...prev.past, current].slice(-50), future: prev.future.slice(1) };
+    });
+  };
+
   const handleReset = () => {
-    setRootZone(createZone("root"));
+    commitSnapshot((prev) => ({ ...prev, rootZone: createZone("root") }));
     setSelectedZoneId(null);
   };
 
@@ -183,6 +231,14 @@ export default function AdminLayoutEditorPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleUndo} disabled={history.past.length === 0}>
+              <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+              Undo
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRedo} disabled={history.future.length === 0}>
+              <Redo2 className="h-3.5 w-3.5 mr-1.5" />
+              Redo
+            </Button>
             <Button variant="outline" size="sm" onClick={handleReset}>
               <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
               Reset
@@ -214,12 +270,12 @@ export default function AdminLayoutEditorPage() {
                       <input
                         type="color"
                         value={backgroundColor}
-                        onChange={(e) => setBackgroundColor(e.target.value)}
+                        onChange={(e) => commitSnapshot((prev) => ({ ...prev, backgroundColor: e.target.value }))}
                         className="h-8 w-8 rounded cursor-pointer border-none"
                       />
                       <Input
                         value={backgroundColor}
-                        onChange={(e) => setBackgroundColor(e.target.value)}
+                        onChange={(e) => commitSnapshot((prev) => ({ ...prev, backgroundColor: e.target.value }))}
                         className="h-8 text-xs font-mono flex-1"
                       />
                     </div>
