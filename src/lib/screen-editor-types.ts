@@ -4,7 +4,31 @@ export type TextAnimation = 'none' | 'scroll-left' | 'scroll-right' | 'scroll-up
 
 export type SlideTransition = 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'zoom-in' | 'zoom-out' | 'flip' | 'none';
 
-export type ContentWidgetType = 'image' | 'video' | 'text' | 'clock' | 'weather' | 'rss' | 'slideshow' | 'empty';
+export type ContentWidgetType = 'image' | 'video' | 'text' | 'clock' | 'weather' | 'rss' | 'slideshow' | 'links' | 'empty';
+
+export type LinkPlatform = 'instagram' | 'youtube' | 'facebook' | 'twitter' | 'tiktok' | 'linkedin' | 'github' | 'website';
+
+export interface LinkItem {
+  id: string;
+  url: string;
+  label: string;          // custom display label
+  platform: LinkPlatform; // auto-detected, can be overridden
+  iconColor?: string;
+}
+
+export const MAX_LINKS = 4;
+
+export function detectPlatform(url: string): LinkPlatform {
+  const u = url.toLowerCase();
+  if (u.includes('instagram.com')) return 'instagram';
+  if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+  if (u.includes('facebook.com') || u.includes('fb.com')) return 'facebook';
+  if (u.includes('twitter.com') || u.includes('x.com')) return 'twitter';
+  if (u.includes('tiktok.com')) return 'tiktok';
+  if (u.includes('linkedin.com')) return 'linkedin';
+  if (u.includes('github.com')) return 'github';
+  return 'website';
+}
 
 export interface SlideshowItem {
   id: string;
