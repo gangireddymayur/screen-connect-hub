@@ -63,6 +63,9 @@ export interface ContentWidget {
   // slideshow props
   slides?: SlideshowItem[];
   slideshowLoop?: boolean;
+  // links widget
+  links?: LinkItem[];
+  linksOrientation?: 'horizontal' | 'vertical';
   // styling
   backgroundColor?: string;
   padding?: number;
