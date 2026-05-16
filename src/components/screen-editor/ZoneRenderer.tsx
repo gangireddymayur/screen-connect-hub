@@ -465,8 +465,8 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
   if (zone.split !== 'none' && zone.children) {
     const isH = zone.split === 'horizontal';
     return (
-      <div className={cn("flex w-full h-full", isH ? "flex-row" : "flex-col")} style={previewMode ? undefined : { gap: 2 }}>
-        <div style={{ [isH ? 'width' : 'height']: `${zone.splitRatio}%`, [isH ? 'height' : 'width']: '100%' }}>
+      <div className={cn("flex w-full h-full overflow-hidden", isH ? "flex-row" : "flex-col")} style={previewMode ? undefined : { gap: 2 }}>
+        <div className="min-w-0 min-h-0 overflow-hidden" style={{ [isH ? 'width' : 'height']: `${zone.splitRatio}%`, [isH ? 'height' : 'width']: '100%' }}>
           <ZoneRenderer
             zone={zone.children[0]}
             onUpdate={(updated) => {
@@ -506,7 +506,7 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
             <GripVertical className={cn("h-3 w-3 text-muted-foreground", !isH && "rotate-90")} />
           </div>
         )}
-        <div style={{ [isH ? 'width' : 'height']: `${100 - zone.splitRatio}%`, [isH ? 'height' : 'width']: '100%' }}>
+        <div className="min-w-0 min-h-0 overflow-hidden" style={{ [isH ? 'width' : 'height']: `${100 - zone.splitRatio}%`, [isH ? 'height' : 'width']: '100%' }}>
           <ZoneRenderer
             zone={zone.children[1]}
             onUpdate={(updated) => {
