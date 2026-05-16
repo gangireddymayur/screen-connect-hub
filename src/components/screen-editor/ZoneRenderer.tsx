@@ -6,6 +6,7 @@ import {
   ContentWidgetType,
   SlideshowItem,
   SlideTransition,
+  LinkPlatform,
   splitZone,
   createWidget,
 } from "@/lib/screen-editor-types";
@@ -14,8 +15,70 @@ import {
   SplitSquareVertical,
   Trash2,
   GripVertical,
+  Instagram,
+  Youtube,
+  Facebook,
+  Twitter,
+  Linkedin,
+  Github,
+  Globe,
+  Music2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const platformMeta: Record<LinkPlatform, { icon: React.ElementType; color: string; label: string }> = {
+  instagram: { icon: Instagram, color: '#E1306C', label: 'Instagram' },
+  youtube:   { icon: Youtube,   color: '#FF0000', label: 'YouTube' },
+  facebook:  { icon: Facebook,  color: '#1877F2', label: 'Facebook' },
+  twitter:   { icon: Twitter,   color: '#1DA1F2', label: 'Twitter / X' },
+  tiktok:    { icon: Music2,    color: '#000000', label: 'TikTok' },
+  linkedin:  { icon: Linkedin,  color: '#0A66C2', label: 'LinkedIn' },
+  github:    { icon: Github,    color: '#24292e', label: 'GitHub' },
+  website:   { icon: Globe,     color: '#0ea5e9', label: 'Website' },
+};
+
+function LinksWidget({ widget, interactive }: { widget: ContentWidget; interactive: boolean }) {
+  const links = (widget.links || []).filter(l => l.url || interactive);
+  const isHorizontal = (widget.linksOrientation || 'horizontal') === 'horizontal';
+  if (links.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+        No links configured
+      </div>
+    );
+  }
+  return (
+    <div className={cn("w-full h-full flex gap-2 p-1", isHorizontal ? "flex-row" : "flex-col")}>
+      {links.map((link) => {
+        const meta = platformMeta[link.platform];
+        const Icon = meta.icon;
+        const bg = link.iconColor || meta.color;
+        const handleClick = (e: React.MouseEvent) => {
+          if (!interactive || !link.url) return;
+          e.stopPropagation();
+          window.open(link.url, '_blank', 'noopener,noreferrer');
+        };
+        return (
+          <button
+            key={link.id}
+            onClick={handleClick}
+            title={link.url || meta.label}
+            className={cn(
+              "flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-md transition-transform",
+              interactive && link.url ? "cursor-pointer hover:scale-[1.03]" : "cursor-default",
+              !link.url && "opacity-60",
+            )}
+            style={{ backgroundColor: bg, color: '#fff' }}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className="text-[11px] font-semibold truncate">{link.label || meta.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 
 interface ZoneRendererProps {
   zone: ScreenZone;
@@ -170,7 +233,10 @@ function OverlayText({ slide }: { slide: SlideshowItem }) {
 }
 
 /* ── Standard Widget Preview ── */
-function WidgetPreview({ widget }: { widget: ContentWidget }) {
+function WidgetPreview({ widget, previewMode = false }: { widget: ContentWidget; previewMode?: boolean }) {
+  if (widget.type === 'links') {
+    return <LinksWidget widget={widget} interactive={previewMode} />;
+  }
   if (widget.type === 'slideshow') {
     return <SlideshowPreview widget={widget} />;
   }
@@ -429,7 +495,7 @@ export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, dep
   if (previewMode) {
     return (
       <div className="relative w-full h-full">
-        {zone.content ? <WidgetPreview widget={zone.content} /> : null}
+        {zone.content ? <WidgetPreview widget={zone.content} previewMode /> : null}
       </div>
     );
   }
