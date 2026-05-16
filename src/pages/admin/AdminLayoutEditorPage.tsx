@@ -231,6 +231,14 @@ export default function AdminLayoutEditorPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleUndo} disabled={history.past.length === 0}>
+              <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+              Undo
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRedo} disabled={history.future.length === 0}>
+              <Redo2 className="h-3.5 w-3.5 mr-1.5" />
+              Redo
+            </Button>
             <Button variant="outline" size="sm" onClick={handleReset}>
               <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
               Reset
@@ -262,12 +270,12 @@ export default function AdminLayoutEditorPage() {
                       <input
                         type="color"
                         value={backgroundColor}
-                        onChange={(e) => setBackgroundColor(e.target.value)}
+                        onChange={(e) => commitSnapshot((prev) => ({ ...prev, backgroundColor: e.target.value }))}
                         className="h-8 w-8 rounded cursor-pointer border-none"
                       />
                       <Input
                         value={backgroundColor}
-                        onChange={(e) => setBackgroundColor(e.target.value)}
+                        onChange={(e) => commitSnapshot((prev) => ({ ...prev, backgroundColor: e.target.value }))}
                         className="h-8 text-xs font-mono flex-1"
                       />
                     </div>
