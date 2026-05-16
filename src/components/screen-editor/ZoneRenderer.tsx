@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type DragEvent } from "react";
+import { useState, useEffect, useCallback, useRef, type DragEvent } from "react";
 import { cn } from "@/lib/utils";
 import {
   ScreenZone,
