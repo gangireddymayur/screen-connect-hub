@@ -107,7 +107,7 @@ export default function LoginPage() {
               Any password works in demo mode.
             </p>
           </div>
-
+        </CardContent>
       </Card>
     </div>
   );
