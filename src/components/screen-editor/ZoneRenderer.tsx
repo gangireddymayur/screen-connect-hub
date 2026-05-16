@@ -61,13 +61,25 @@ function LinksWidget({ widget, interactive }: { widget: ContentWidget; interacti
   const setting = widget.linksOrientation || 'auto';
   const isHorizontal = setting === 'auto' ? autoHorizontal : setting === 'horizontal';
 
+  const style: React.CSSProperties = {
+    backgroundColor: widget.backgroundColor || 'transparent',
+    padding: widget.padding,
+    borderRadius: widget.borderRadius,
+    opacity: (widget.opacity ?? 100) / 100,
+    pointerEvents: interactive ? 'none' : 'auto',
+  };
+
   return (
-    <div ref={containerRef} className={cn("w-full h-full flex gap-1.5 p-1", isHorizontal ? "flex-row" : "flex-col")}>
+    <div
+      ref={containerRef}
+      className={cn("w-full h-full flex overflow-hidden", isHorizontal ? "flex-row" : "flex-col")}
+      style={style}
+    >
       {links.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
           No links configured
         </div>
-      ) : links.map((link) => {
+      ) : links.map((link, index) => {
         const meta = platformMeta[link.platform];
         const Icon = meta.icon;
         const bg = link.iconColor || meta.color;
@@ -82,11 +94,12 @@ function LinksWidget({ widget, interactive }: { widget: ContentWidget; interacti
             onClick={handleClick}
             title={link.url || meta.label}
             className={cn(
-              "flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-md transition-transform px-2",
+              "min-w-0 min-h-0 flex flex-1 basis-0 items-center justify-center gap-1.5 px-2 transition-colors",
+              isHorizontal ? "border-r border-background/20 last:border-r-0" : "border-b border-background/20 last:border-b-0",
               interactive && link.url ? "cursor-pointer hover:scale-[1.03]" : "cursor-default",
               !link.url && "opacity-70",
             )}
-            style={{ backgroundColor: bg, color: '#fff' }}
+            style={{ backgroundColor: bg, color: '#fff', pointerEvents: interactive && link.url ? 'auto' : 'none' }}
           >
             <Icon className="h-4 w-4 shrink-0" />
             <span className="text-[11px] font-semibold truncate">{link.label || meta.label}</span>
