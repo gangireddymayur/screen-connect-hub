@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AdminLayout } from "@/components/AdminLayout";
 import { ZoneRenderer } from "@/components/screen-editor/ZoneRenderer";
@@ -18,6 +18,8 @@ import {
   Save,
   Maximize,
   RotateCcw,
+  Undo2,
+  Redo2,
   LayoutGrid,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -46,6 +48,8 @@ function updateZoneContent(zone: ScreenZone, zoneId: string, widget: ContentWidg
   return zone;
 }
 
+type EditorSnapshot = { rootZone: ScreenZone; backgroundColor: string };
+
 export default function AdminLayoutEditorPage() {
   const { layoutId } = useParams<{ layoutId: string }>();
   const navigate = useNavigate();
@@ -55,6 +59,8 @@ export default function AdminLayoutEditorPage() {
   const [resWidth, setResWidth] = useState(1920);
   const [resHeight, setResHeight] = useState(1080);
   const [rootZone, setRootZone] = useState<ScreenZone>(() => createZone("root"));
+  const snapshotRef = useRef<EditorSnapshot>({ rootZone: createZone("root"), backgroundColor: "#1a1a2e" });
+  const [history, setHistory] = useState<{ past: EditorSnapshot[]; future: EditorSnapshot[] }>({ past: [], future: [] });
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [isFullPreview, setIsFullPreview] = useState(false);
   const [loading, setLoading] = useState(true);
