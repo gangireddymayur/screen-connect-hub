@@ -171,6 +171,7 @@ export function createWidget(type: ContentWidgetType): ContentWidget {
           { id: `link-${Date.now()}-2`, url: '', label: 'Website', platform: 'website' },
         ],
       };
+    default:
       return base;
   }
 }
