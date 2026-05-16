@@ -100,7 +100,7 @@ export default function ScreenEditorPage() {
       setSelectedZoneId(null);
       return { past: [...prev.past, current].slice(-50), future: prev.future.slice(1) };
     });
-  }, []);
+  };
 
   const handleWidgetUpdate = useCallback(
     (widget: ContentWidget) => {
@@ -161,6 +161,14 @@ export default function ScreenEditorPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleUndo} disabled={history.past.length === 0}>
+              <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+              Undo
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRedo} disabled={history.future.length === 0}>
+              <Redo2 className="h-3.5 w-3.5 mr-1.5" />
+              Redo
+            </Button>
             <Button variant="outline" size="sm" onClick={handleReset}>
               <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
               Reset
@@ -196,12 +204,12 @@ export default function ScreenEditorPage() {
                       <input
                         type="color"
                         value={layout.backgroundColor}
-                        onChange={(e) => setLayout((p) => ({ ...p, backgroundColor: e.target.value }))}
+                        onChange={(e) => commitLayout((p) => ({ ...p, backgroundColor: e.target.value }))}
                         className="h-8 w-8 rounded cursor-pointer border-none"
                       />
                       <Input
                         value={layout.backgroundColor}
-                        onChange={(e) => setLayout((p) => ({ ...p, backgroundColor: e.target.value }))}
+                        onChange={(e) => commitLayout((p) => ({ ...p, backgroundColor: e.target.value }))}
                         className="h-8 text-xs font-mono flex-1"
                       />
                     </div>
