@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type DragEvent } from "react";
+import { useState, useEffect, useCallback, useRef, type DragEvent } from "react";
 import { cn } from "@/lib/utils";
 import {
   ScreenZone,
@@ -38,18 +38,36 @@ const platformMeta: Record<LinkPlatform, { icon: React.ElementType; color: strin
 };
 
 function LinksWidget({ widget, interactive }: { widget: ContentWidget; interactive: boolean }) {
-  const links = (widget.links || []).filter(l => l.url || interactive);
-  const isHorizontal = (widget.linksOrientation || 'horizontal') === 'horizontal';
-  if (links.length === 0) {
-    return (
-      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-        No links configured
-      </div>
-    );
-  }
+  // Show all links in the editor (even empty ones) so the user sees the slots.
+  // In live preview, only show ones that have a URL.
+  const links = interactive
+    ? (widget.links || []).filter(l => l.url)
+    : (widget.links || []);
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [autoHorizontal, setAutoHorizontal] = useState(true);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setAutoHorizontal(width >= height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const setting = widget.linksOrientation || 'auto';
+  const isHorizontal = setting === 'auto' ? autoHorizontal : setting === 'horizontal';
+
   return (
-    <div className={cn("w-full h-full flex gap-2 p-1", isHorizontal ? "flex-row" : "flex-col")}>
-      {links.map((link) => {
+    <div ref={containerRef} className={cn("w-full h-full flex gap-1.5 p-1", isHorizontal ? "flex-row" : "flex-col")}>
+      {links.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
+          No links configured
+        </div>
+      ) : links.map((link) => {
         const meta = platformMeta[link.platform];
         const Icon = meta.icon;
         const bg = link.iconColor || meta.color;
@@ -64,9 +82,9 @@ function LinksWidget({ widget, interactive }: { widget: ContentWidget; interacti
             onClick={handleClick}
             title={link.url || meta.label}
             className={cn(
-              "flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-md transition-transform",
+              "flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-md transition-transform px-2",
               interactive && link.url ? "cursor-pointer hover:scale-[1.03]" : "cursor-default",
-              !link.url && "opacity-60",
+              !link.url && "opacity-70",
             )}
             style={{ backgroundColor: bg, color: '#fff' }}
           >

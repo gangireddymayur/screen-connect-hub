@@ -339,11 +339,12 @@ export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZoneProp
             <div className="space-y-1.5">
               <Label className="text-xs">Orientation</Label>
               <Select
-                value={widget.linksOrientation || 'horizontal'}
-                onValueChange={(v) => update({ linksOrientation: v as 'horizontal' | 'vertical' })}
+                value={widget.linksOrientation || 'auto'}
+                onValueChange={(v) => update({ linksOrientation: v as 'auto' | 'horizontal' | 'vertical' })}
               >
                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="auto">Auto (fits zone shape)</SelectItem>
                   <SelectItem value="horizontal">Horizontal Bar</SelectItem>
                   <SelectItem value="vertical">Vertical Bar</SelectItem>
                 </SelectContent>
