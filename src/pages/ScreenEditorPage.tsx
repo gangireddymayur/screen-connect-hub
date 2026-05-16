@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ZoneRenderer } from "@/components/screen-editor/ZoneRenderer";
@@ -19,6 +19,8 @@ import {
   Save,
   Maximize,
   RotateCcw,
+  Undo2,
+  Redo2,
   Monitor,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -56,29 +58,63 @@ export default function ScreenEditorPage() {
   const [layout, setLayout] = useState<ScreenLayout>(() =>
     createDefaultLayout(device.id, `${device.name} Layout`)
   );
+  const layoutRef = useRef(layout);
+  const [history, setHistory] = useState<{ past: ScreenLayout[]; future: ScreenLayout[] }>({ past: [], future: [] });
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [isFullPreview, setIsFullPreview] = useState(false);
 
   const selectedZone = selectedZoneId ? findZone(layout.rootZone, selectedZoneId) : null;
   const selectedWidget = selectedZone?.content || null;
 
+  const commitLayout = useCallback((updater: (current: ScreenLayout) => ScreenLayout) => {
+    const current = layoutRef.current;
+    const next = updater(current);
+    layoutRef.current = next;
+    setHistory((prev) => ({ past: [...prev.past, current].slice(-50), future: [] }));
+    setLayout(next);
+  }, []);
+
   const handleZoneUpdate = useCallback((updatedRoot: ScreenZone) => {
-    setLayout((prev) => ({ ...prev, rootZone: updatedRoot }));
+    commitLayout((prev) => ({ ...prev, rootZone: updatedRoot }));
+  }, [commitLayout]);
+
+  const handleUndo = () => {
+    setHistory((prev) => {
+      if (prev.past.length === 0) return prev;
+      const previous = prev.past[prev.past.length - 1];
+      const current = layoutRef.current;
+      layoutRef.current = previous;
+      setLayout(previous);
+      setSelectedZoneId(null);
+      return { past: prev.past.slice(0, -1), future: [current, ...prev.future].slice(0, 50) };
+    });
+  };
+
+  const handleRedo = () => {
+    setHistory((prev) => {
+      if (prev.future.length === 0) return prev;
+      const next = prev.future[0];
+      const current = layoutRef.current;
+      layoutRef.current = next;
+      setLayout(next);
+      setSelectedZoneId(null);
+      return { past: [...prev.past, current].slice(-50), future: prev.future.slice(1) };
+    });
   }, []);
 
   const handleWidgetUpdate = useCallback(
     (widget: ContentWidget) => {
       if (!selectedZoneId) return;
-      setLayout((prev) => ({
+      commitLayout((prev) => ({
         ...prev,
         rootZone: updateZoneContent(prev.rootZone, selectedZoneId, widget),
       }));
     },
-    [selectedZoneId]
+    [commitLayout, selectedZoneId]
   );
 
   const handleReset = () => {
-    setLayout(createDefaultLayout(device.id, `${device.name} Layout`));
+    commitLayout(() => createDefaultLayout(device.id, `${device.name} Layout`));
     setSelectedZoneId(null);
   };
 
