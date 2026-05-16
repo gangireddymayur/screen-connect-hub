@@ -167,10 +167,12 @@ export function createWidget(type: ContentWidgetType): ContentWidget {
         backgroundColor: 'rgba(0,0,0,0.55)',
         padding: 6,
         borderRadius: 8,
-        linksOrientation: 'horizontal',
+        linksOrientation: 'auto',
         links: [
           { id: `link-${Date.now()}-1`, url: '', label: 'Instagram', platform: 'instagram' },
-          { id: `link-${Date.now()}-2`, url: '', label: 'Website', platform: 'website' },
+          { id: `link-${Date.now()}-2`, url: '', label: 'YouTube',   platform: 'youtube' },
+          { id: `link-${Date.now()}-3`, url: '', label: 'Facebook',  platform: 'facebook' },
+          { id: `link-${Date.now()}-4`, url: '', label: 'Website',   platform: 'website' },
         ],
       };
     default:
