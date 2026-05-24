@@ -81,32 +81,12 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 pt-4 border-t space-y-2">
+          <div className="mt-6 pt-4 border-t">
             <p className="text-[11px] uppercase tracking-widest text-muted-foreground text-center">
-              Demo accounts (DB paused)
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => { setEmail("super@demo.com"); setPassword("demo"); }}
-              >
-                Super Admin
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => { setEmail("admin@acme.com"); setPassword("demo"); }}
-              >
-                Company Admin
-              </Button>
-            </div>
-            <p className="text-[10px] text-muted-foreground text-center">
-              Any password works in demo mode.
+              Connected to Plesk backend
             </p>
           </div>
+
         </CardContent>
       </Card>
     </div>
