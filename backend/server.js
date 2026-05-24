@@ -18,11 +18,14 @@ try {
   const crud = require('./src/routes/crud');
 
   app.use('/api/auth', authRoutes);
-  app.use('/api/companies', authRequired, crud('companies', { tenantScoped: false }));
-  app.use('/api/devices',   authRequired, crud('devices'));
-  app.use('/api/layouts',   authRequired, crud('layouts'));
-  app.use('/api/content',   authRequired, crud('content'));
-  app.use('/api/schedules', authRequired, crud('schedules'));
+  app.use('/api/companies',  authRequired, crud('companies',  { tenantScoped: false }));
+  app.use('/api/users',      authRequired, crud('users',      { tenantScoped: false }));
+  app.use('/api/profiles',   authRequired, crud('users',      { tenantScoped: false })); // alias
+  app.use('/api/user_roles', authRequired, crud('user_roles', { tenantScoped: false }));
+  app.use('/api/devices',    authRequired, crud('devices'));
+  app.use('/api/layouts',    authRequired, crud('layouts'));
+  app.use('/api/content',    authRequired, crud('content'));
+  app.use('/api/schedules',  authRequired, crud('schedules'));
 } catch (err) {
   console.error('ROUTE_LOAD_ERROR:', err.stack || err);
   app.use('/api', (_req, res) =>
