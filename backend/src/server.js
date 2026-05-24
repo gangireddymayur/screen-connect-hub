@@ -25,5 +25,6 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: err.message || 'server error' });
 });
 
-const port = Number(process.env.PORT || 8080);
-app.listen(port, () => console.log(`API listening on :${port}`));
+// Plesk/IIS can provide PORT as a named pipe, so do not coerce it with Number().
+const port = process.env.PORT || process.env.HTTP_PLATFORM_PORT || 8080;
+app.listen(port, () => console.log(`API listening on ${port}`));
