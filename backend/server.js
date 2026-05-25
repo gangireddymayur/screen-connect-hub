@@ -7,7 +7,7 @@ process.on('unhandledRejection', (err) => console.error('UNHANDLED:', err.stack 
 
 const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '25mb' }));
 
 app.get('/', (_req, res) => res.send('SERVER WORKING'));
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
@@ -16,11 +16,16 @@ try {
   const { authRequired } = require('./src/lib/auth');
   const authRoutes = require('./src/routes/auth');
   const crud = require('./src/routes/crud');
+  const functionRoutes = require('./src/routes/functions');
+  const storageRoutes = require('./src/routes/storage');
 
+  app.use('/uploads', express.static(storageRoutes.uploadRoot));
   app.use('/api/auth', authRoutes);
-  app.use('/api/companies',  authRequired, crud('companies',  { tenantScoped: false }));
-  app.use('/api/users',      authRequired, crud('users',      { tenantScoped: false }));
-  app.use('/api/profiles',   authRequired, crud('users',      { tenantScoped: false })); // alias
+  app.use('/api/functions', authRequired, functionRoutes);
+  app.use('/api/storage', authRequired, storageRoutes.router);
+  app.use('/api/companies',  authRequired, crud('companies'));
+  app.use('/api/users',      authRequired, crud('users',      { tenantScoped: false, superAdminOnly: true }));
+  app.use('/api/profiles',   authRequired, crud('users')); // alias; admins see users in their own company
   app.use('/api/user_roles', authRequired, crud('user_roles', { tenantScoped: false }));
   app.use('/api/devices',    authRequired, crud('devices'));
   app.use('/api/layouts',    authRequired, crud('layouts'));
@@ -40,3 +45,9 @@ app.use((err, _req, res, _next) => {
 
 const port = process.env.PORT || process.env.HTTP_PLATFORM_PORT || 8080;
 app.listen(port, () => console.log('RUNNING ON PORT:', port));
+
+
+
+
+
+

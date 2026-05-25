@@ -35,4 +35,19 @@ router.post('/login', async (req, res) => {
 // GET /api/auth/me
 router.get('/me', authRequired, (req, res) => res.json({ user: req.user }));
 
+// PATCH /api/auth/password { password }
+router.patch('/password', authRequired, async (req, res) => {
+  try {
+    const { password } = req.body || {};
+    if (!password || String(password).length < 6) return res.status(400).json({ error: 'password must be at least 6 characters' });
+    const password_hash = await bcrypt.hash(String(password), 10);
+    await db.query('UPDATE users SET password_hash = :password_hash WHERE id = :id', { password_hash, id: req.user.id });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('PASSWORD_ERROR:', err.stack || err);
+    res.status(500).json({ error: 'Password update failed' });
+  }
+});
 module.exports = router;
+
+

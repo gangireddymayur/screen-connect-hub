@@ -336,77 +336,75 @@ const authApi = {
     listeners.forEach((l) => l("SIGNED_OUT", null));
     return { error: null };
   },
-  async updateUser(_attrs: any) {
-    return { data: { user: currentSession?.user ?? null }, error: null };
+  async updateUser(attrs: any) {
+    try {
+      if (attrs?.password) await api("PATCH", "/auth/password", { password: attrs.password });
+      return { data: { user: currentSession?.user ?? null }, error: null };
+    } catch (e: any) {
+      return { data: { user: currentSession?.user ?? null }, error: { message: e?.message || "Update failed" } };
+    }
   },
   async resetPasswordForEmail() {
     return { data: {}, error: { message: "Password reset is handled by your administrator." } };
   },
 };
 
-// ---------------- Edge functions (stubs over local cache) ----------------
+// ---------------- Edge functions (Express-backed) ----------------
+const clearTableCache = (...tables: string[]) => {
+  for (const table of tables) {
+    delete cache[table];
+    delete loaded[table];
+  }
+};
+
 const functionsApi = {
   async invoke(name: string, opts?: { body?: any }) {
-    const body = opts?.body ?? {};
-    await ensureLoaded("companies").catch(() => {});
-    await ensureLoaded("devices").catch(() => {});
-    await ensureLoaded("content").catch(() => {});
-    await ensureLoaded("layouts").catch(() => {});
-    await ensureLoaded("schedules").catch(() => {});
-    await ensureLoaded("profiles").catch(() => {});
-
-    switch (name) {
-      case "list-auth-users":
-        return {
-          data: {
-            users: (cache.profiles || []).map((p) => ({
-              id: p.id, email: p.email, banned_until: null, created_at: p.created_at,
-            })),
-          },
-          error: null,
-        };
-      case "get-company-stats": {
-        const cId = body.company_id;
-        return {
-          data: {
-            devices:   (cache.devices   || []).filter((d) => d.company_id === cId).length,
-            content:   (cache.content   || []).filter((c) => c.company_id === cId).length,
-            layouts:   (cache.layouts   || []).filter((l) => l.company_id === cId).length,
-            schedules: (cache.schedules || []).filter((s) => s.company_id === cId).length,
-            users:     (cache.profiles  || []).filter((p) => p.company_id === cId).length,
-          },
-          error: null,
-        };
-      }
-      default:
-        return { data: null, error: { message: `Function "${name}" is not available on this backend.` } };
+    try {
+      const data = await api("POST", `/functions/${name}`, opts?.body ?? {});
+      clearTableCache("companies", "profiles", "user_roles", "devices", "content", "layouts", "schedules");
+      return { data, error: null };
+    } catch (e: any) {
+      return { data: null, error: { message: e?.message || `Function "${name}" failed` } };
     }
   },
 };
 
-// ---------------- Storage (object-URL stub) ----------------
+const fileToBase64 = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.onerror = () => reject(reader.error || new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+
+// ---------------- Storage (Express-backed) ----------------
 const storageApi = {
   from(_bucket: string) {
     return {
       async upload(path: string, file: File) {
         try {
-          (window as any).__shBlobs ??= {};
-          (window as any).__shBlobs[path] = URL.createObjectURL(file);
-        } catch {}
-        return { data: { path }, error: null };
+          const data = await fileToBase64(file);
+          await api("POST", "/storage/upload", { path, data, contentType: file.type });
+          return { data: { path }, error: null };
+        } catch (e: any) {
+          return { data: null, error: { message: e?.message || "Upload failed" } };
+        }
       },
       getPublicUrl(path: string) {
-        const url =
-          (window as any).__shBlobs?.[path] ??
-          `https://picsum.photos/seed/${encodeURIComponent(path)}/1920/1080`;
-        return { data: { publicUrl: url } };
+        return { data: { publicUrl: `/uploads/${path}` } };
       },
-      async remove(_paths: string[]) { return { data: [], error: null }; },
+      async remove(paths: string[]) {
+        try {
+          await api("POST", "/storage/remove", { paths });
+          return { data: [], error: null };
+        } catch (e: any) {
+          return { data: null, error: { message: e?.message || "Remove failed" } };
+        }
+      },
       async list() { return { data: [], error: null }; },
     };
   },
 };
-
 // ---------------- Channels (no-op realtime) ----------------
 const channelApi = (_name: string) => {
   const ch: any = {

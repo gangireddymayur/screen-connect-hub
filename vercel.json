@@ -4,6 +4,10 @@
       "source": "/api/:path*",
       "destination": "http://angry-kalam.103-69-196-157.plesk.page/api/:path*"
     },
+    {
+      "source": "/uploads/:path*",
+      "destination": "http://angry-kalam.103-69-196-157.plesk.page/uploads/:path*"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
