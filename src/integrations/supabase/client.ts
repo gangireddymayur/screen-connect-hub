@@ -8,9 +8,9 @@ const API = (import.meta as any).env?.VITE_API_URL || "/api";
 const TOKEN_KEY = "sh_token";
 const SESSION_KEY = "sh_session";
 
-// --- table aliases (frontend names → backend table names)
+// --- table aliases (frontend names -> backend table names)
 const TABLE_ALIAS: Record<string, string> = {
-  profiles: "profiles", // backend maps /api/profiles → users
+  profiles: "profiles", // backend maps /api/profiles -> users
 };
 
 const uid = () =>
@@ -34,11 +34,27 @@ async function api(method: string, path: string, body?: any): Promise<any> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const t = getToken();
   if (t) headers.Authorization = `Bearer ${t}`;
-  const res = await fetch(`${API}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (e: any) {
+    if (e?.name === "AbortError") {
+      throw new Error("API request timed out. Check the backend connection and database.");
+    }
+    throw new Error(e?.message || "Failed to fetch");
+  } finally {
+    window.clearTimeout(timeout);
+  }
+
   let json: any = null;
   try { json = await res.json(); } catch {}
   if (!res.ok) {
@@ -411,3 +427,4 @@ export const supabase: any = {
   removeChannel: () => {},
   rpc: async (_fn: string, _args?: any) => ({ data: null, error: null }),
 };
+
