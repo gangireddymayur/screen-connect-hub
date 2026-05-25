@@ -19,9 +19,11 @@ try {
   const functionRoutes = require('./src/routes/functions');
   const storageRoutes = require('./src/routes/storage');
   const playerRoutes = require('./src/routes/player');
+  const tvRoutes = require('./src/routes/tv');
 
   app.use('/uploads', express.static(storageRoutes.uploadRoot));
   app.use('/api/player', playerRoutes);
+  app.use('/api/tv', tvRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/functions', authRequired, functionRoutes);
   app.use('/api/storage', authRequired, storageRoutes.router);
@@ -47,6 +49,7 @@ app.use((err, _req, res, _next) => {
 
 const port = process.env.PORT || process.env.HTTP_PLATFORM_PORT || 8080;
 app.listen(port, () => console.log('RUNNING ON PORT:', port));
+
 
 
 
