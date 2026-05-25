@@ -394,8 +394,8 @@ function WidgetPreview({ widget, previewMode = false }: { widget: ContentWidget;
         {widget.mediaUrl ? (
           <video
             src={widget.mediaUrl}
-            className="w-full h-full"
-            style={{ objectFit: widget.objectFit || 'cover' }}
+            className="block w-full h-full"
+            style={{ objectFit: previewMode ? 'cover' : widget.objectFit || 'cover' }}
             autoPlay
             muted
             loop
