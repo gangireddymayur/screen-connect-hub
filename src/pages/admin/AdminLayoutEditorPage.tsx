@@ -50,7 +50,7 @@ function updateZoneContent(zone: ScreenZone, zoneId: string, widget: ContentWidg
 
 function normalizeZoneForSave(zone: ScreenZone): ScreenZone {
   const content =
-    zone.content?.type === "video"
+    zone.content?.type === "video" && !zone.content.objectFit
       ? { ...zone.content, objectFit: "cover" as const }
       : zone.content;
 

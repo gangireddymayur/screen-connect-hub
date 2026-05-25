@@ -389,7 +389,7 @@ function WidgetPreview({ widget, previewMode = false }: { widget: ContentWidget;
   }
 
   if (widget.type === 'video') {
-    const fit = previewMode ? 'cover' : widget.objectFit || 'cover';
+    const fit = widget.objectFit || 'cover';
     const cropLetterbox = fit === 'cover';
 
     return (
