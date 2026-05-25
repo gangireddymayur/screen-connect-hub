@@ -118,8 +118,9 @@ function crud(table, { tenantScoped = true, superAdminOnly = false } = {}) {
     if (!cols.length) return res.json({ ok: true });
     const sets = cols.map((c) => `\`${c}\` = :${c}`).join(',');
     const scoped = scope(req, 'AND ');
-    await db.query(`UPDATE \`${table}\` SET ${sets} WHERE id = :id${scoped.clause}`, { ...payload, id: req.params.id, ...scoped.params });
-    res.json({ ok: true });
+    const [result] = await db.query(`UPDATE \`${table}\` SET ${sets} WHERE id = :id${scoped.clause}`, { ...payload, id: req.params.id, ...scoped.params });
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'not found or not allowed' });
+    res.json({ ok: true, affectedRows: result.affectedRows, changedRows: result.changedRows });
   });
 
   router.delete('/:id', async (req, res) => {

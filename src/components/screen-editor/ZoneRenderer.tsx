@@ -400,7 +400,7 @@ function WidgetPreview({ widget, previewMode = false }: { widget: ContentWidget;
             className="block w-full h-full"
             style={{
               objectFit: fit,
-              transform: cropLetterbox ? 'scale(1.035)' : undefined,
+              transform: cropLetterbox ? 'scale(1.12)' : undefined,
               transformOrigin: 'center',
             }}
             autoPlay

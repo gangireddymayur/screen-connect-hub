@@ -254,9 +254,20 @@ class QueryBuilder {
 
       if (this.op === "update") {
         const matched = this.apply(rows);
+        if (matched.length === 0) {
+          const filterText = this.filters.length
+            ? this.filters.map((f) => `${f.col}=${String(f.val)}`).join(", ")
+            : "no filters";
+          return { data: null, error: { message: `No ${this.table} row matched update (${filterText})` } };
+        }
         const updated: Row[] = [];
         for (const m of matched) {
-          try { await api("PATCH", `/${t}/${m.id}`, this.payload); }
+          try {
+            const r = await api("PATCH", `/${t}/${m.id}`, this.payload);
+            if (r?.affectedRows === 0) {
+              return { data: null, error: { message: `No ${this.table} row was updated` } };
+            }
+          }
           catch (e) { return { data: null, error: { message: (e as any).message } }; }
           Object.assign(m, this.payload);
           updated.push(m);

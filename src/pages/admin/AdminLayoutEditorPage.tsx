@@ -190,6 +190,25 @@ export default function AdminLayoutEditorPage() {
       background_color: backgroundColor,
       updated_at: new Date().toISOString(),
     }).eq("id", layoutId);
+
+    if (!error) {
+      const { data: saved, error: verifyError } = await supabase
+        .from("layouts")
+        .select("layout_data, background_color")
+        .eq("id", layoutId)
+        .single();
+
+      if (verifyError || !saved?.layout_data) {
+        setSaving(false);
+        toast.error(verifyError?.message || "Save could not be verified");
+        return;
+      }
+
+      snapshotRef.current = { rootZone: saved.layout_data as ScreenZone, backgroundColor: saved.background_color };
+      setRootZone(saved.layout_data as ScreenZone);
+      setBackgroundColor(saved.background_color);
+    }
+
     setSaving(false);
     if (error) toast.error(error.message);
     else toast.success("Layout saved!");
