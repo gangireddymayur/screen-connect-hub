@@ -69,17 +69,16 @@ export default function PlayerPage() {
 
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ backgroundColor: layout.background_color || "#000000" }}>
-      <div className="w-screen h-screen flex items-center justify-center">
-        <div className="w-full h-full" style={{ aspectRatio: `${layout.resolution_width}/${layout.resolution_height}` }}>
-          <ZoneRenderer
-            zone={rootZone}
-            onUpdate={() => {}}
-            onSelectZone={() => {}}
-            selectedZoneId={null}
-            previewMode
-          />
-        </div>
+      <div className="absolute inset-0">
+        <ZoneRenderer
+          zone={rootZone}
+          onUpdate={() => {}}
+          onSelectZone={() => {}}
+          selectedZoneId={null}
+          previewMode
+        />
       </div>
     </div>
   );
 }
+

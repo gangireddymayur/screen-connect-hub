@@ -121,7 +121,7 @@ export function createWidget(type: ContentWidgetType): ContentWidget {
     type,
     label: type.charAt(0).toUpperCase() + type.slice(1),
     backgroundColor: 'transparent',
-    padding: 8,
+    padding: 0,
     borderRadius: 0,
     opacity: 100,
   };
@@ -165,7 +165,7 @@ export function createWidget(type: ContentWidgetType): ContentWidget {
         ...base,
         label: 'Quick Links',
         backgroundColor: 'rgba(0,0,0,0.55)',
-        padding: 6,
+        padding: 0,
         borderRadius: 8,
         linksOrientation: 'auto',
         links: [
@@ -204,3 +204,4 @@ export function createDefaultLayout(deviceId: string, name: string): ScreenLayou
     rootZone: createZone('root'),
   };
 }
+
