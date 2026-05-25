@@ -389,13 +389,20 @@ function WidgetPreview({ widget, previewMode = false }: { widget: ContentWidget;
   }
 
   if (widget.type === 'video') {
+    const fit = previewMode ? 'cover' : widget.objectFit || 'cover';
+    const cropLetterbox = fit === 'cover';
+
     return (
       <div style={style}>
         {widget.mediaUrl ? (
           <video
             src={widget.mediaUrl}
             className="block w-full h-full"
-            style={{ objectFit: previewMode ? 'cover' : widget.objectFit || 'cover' }}
+            style={{
+              objectFit: fit,
+              transform: cropLetterbox ? 'scale(1.035)' : undefined,
+              transformOrigin: 'center',
+            }}
             autoPlay
             muted
             loop
