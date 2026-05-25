@@ -65,7 +65,6 @@ export default function ScreenEditorPage() {
 
   const selectedZone = selectedZoneId ? findZone(layout.rootZone, selectedZoneId) : null;
   const selectedWidget = selectedZone?.content || null;
-  const canvasAspect = layout.resolution.width / layout.resolution.height;
   const canvasRatio = `${layout.resolution.width}/${layout.resolution.height}`;
 
   const commitLayout = useCallback((updater: (current: ScreenLayout) => ScreenLayout) => {
@@ -127,14 +126,7 @@ export default function ScreenEditorPage() {
         style={{ backgroundColor: layout.backgroundColor }}
         onClick={() => setIsFullPreview(false)}
       >
-        <div
-          className="max-w-full max-h-full overflow-hidden"
-          style={{
-            aspectRatio: canvasRatio,
-            width: `min(100vw, calc(100vh * ${canvasAspect}))`,
-            height: `min(100vh, calc(100vw / ${canvasAspect}))`,
-          }}
-        >
+        <div className="absolute inset-0 overflow-hidden">
           <ZoneRenderer
             zone={layout.rootZone}
             onUpdate={() => {}}

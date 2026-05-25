@@ -84,7 +84,6 @@ export default function AdminLayoutEditorPage() {
 
   const selectedZone = selectedZoneId ? findZone(rootZone, selectedZoneId) : null;
   const selectedWidget = selectedZone?.content || null;
-  const canvasAspect = resWidth / resHeight;
   const canvasRatio = `${resWidth}/${resHeight}`;
 
   useEffect(() => {
@@ -213,14 +212,7 @@ export default function AdminLayoutEditorPage() {
         style={{ backgroundColor }}
         onClick={() => setIsFullPreview(false)}
       >
-        <div
-          className="max-w-full max-h-full overflow-hidden"
-          style={{
-            aspectRatio: canvasRatio,
-            width: `min(100vw, calc(100vh * ${canvasAspect}))`,
-            height: `min(100vh, calc(100vw / ${canvasAspect}))`,
-          }}
-        >
+        <div className="absolute inset-0 overflow-hidden">
           <ZoneRenderer
             zone={rootZone}
             onUpdate={() => {}}

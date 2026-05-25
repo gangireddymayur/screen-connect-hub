@@ -66,20 +66,10 @@ export default function PlayerPage() {
   }
 
   const rootZone = layout.layout_data || createZone("root");
-  const resolutionWidth = layout.resolution_width || 1920;
-  const resolutionHeight = layout.resolution_height || 1080;
-  const canvasAspect = resolutionWidth / resolutionHeight;
 
   return (
-    <div className="fixed inset-0 overflow-hidden flex items-center justify-center" style={{ backgroundColor: layout.background_color || "#000000" }}>
-      <div
-        className="max-w-full max-h-full overflow-hidden"
-        style={{
-          aspectRatio: `${resolutionWidth}/${resolutionHeight}`,
-          width: `min(100vw, calc(100vh * ${canvasAspect}))`,
-          height: `min(100vh, calc(100vw / ${canvasAspect}))`,
-        }}
-      >
+    <div className="fixed inset-0 overflow-hidden" style={{ backgroundColor: layout.background_color || "#000000" }}>
+      <div className="absolute inset-0 overflow-hidden">
         <ZoneRenderer
           zone={rootZone}
           onUpdate={() => {}}
