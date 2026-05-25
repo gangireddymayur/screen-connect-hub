@@ -65,6 +65,8 @@ export default function ScreenEditorPage() {
 
   const selectedZone = selectedZoneId ? findZone(layout.rootZone, selectedZoneId) : null;
   const selectedWidget = selectedZone?.content || null;
+  const canvasAspect = layout.resolution.width / layout.resolution.height;
+  const canvasRatio = `${layout.resolution.width}/${layout.resolution.height}`;
 
   const commitLayout = useCallback((updater: (current: ScreenLayout) => ScreenLayout) => {
     const current = layoutRef.current;
@@ -125,7 +127,14 @@ export default function ScreenEditorPage() {
         style={{ backgroundColor: layout.backgroundColor }}
         onClick={() => setIsFullPreview(false)}
       >
-        <div className="w-full h-full max-w-[1920px] max-h-[1080px]" style={{ aspectRatio: '16/9' }}>
+        <div
+          className="max-w-full max-h-full overflow-hidden"
+          style={{
+            aspectRatio: canvasRatio,
+            width: `min(100vw, calc(100vh * ${canvasAspect}))`,
+            height: `min(100vh, calc(100vw / ${canvasAspect}))`,
+          }}
+        >
           <ZoneRenderer
             zone={layout.rootZone}
             onUpdate={() => {}}
@@ -222,11 +231,12 @@ export default function ScreenEditorPage() {
           {/* Center - Canvas */}
           <div className="flex-1 flex items-center justify-center bg-muted/30 rounded-xl border border-border/50 overflow-hidden p-4">
             <div
-              className="w-full rounded-lg overflow-hidden shadow-lg border border-border/30"
+              className="rounded-lg overflow-hidden shadow-lg border border-border/30 max-w-full max-h-full"
               style={{
                 backgroundColor: layout.backgroundColor,
-                aspectRatio: '16/9',
-                maxHeight: '100%',
+                aspectRatio: canvasRatio,
+                width: '100%',
+                height: 'auto',
               }}
               onClick={() => setSelectedZoneId(null)}
             >

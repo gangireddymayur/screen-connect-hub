@@ -152,7 +152,7 @@ export function createWidget(type: ContentWidgetType): ContentWidget {
     case 'image':
       return { ...base, objectFit: 'cover' };
     case 'video':
-      return { ...base, objectFit: 'contain' };
+      return { ...base, objectFit: 'cover' };
     case 'slideshow':
       return {
         ...base,

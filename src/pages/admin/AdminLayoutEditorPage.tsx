@@ -48,6 +48,21 @@ function updateZoneContent(zone: ScreenZone, zoneId: string, widget: ContentWidg
   return zone;
 }
 
+function normalizeZoneForSave(zone: ScreenZone): ScreenZone {
+  const content =
+    zone.content?.type === "video" && !zone.content.objectFit
+      ? { ...zone.content, objectFit: "cover" as const }
+      : zone.content;
+
+  return {
+    ...zone,
+    content,
+    children: zone.children
+      ? [normalizeZoneForSave(zone.children[0]), normalizeZoneForSave(zone.children[1])]
+      : null,
+  };
+}
+
 type EditorSnapshot = { rootZone: ScreenZone; backgroundColor: string };
 
 export default function AdminLayoutEditorPage() {
@@ -69,6 +84,8 @@ export default function AdminLayoutEditorPage() {
 
   const selectedZone = selectedZoneId ? findZone(rootZone, selectedZoneId) : null;
   const selectedWidget = selectedZone?.content || null;
+  const canvasAspect = resWidth / resHeight;
+  const canvasRatio = `${resWidth}/${resHeight}`;
 
   useEffect(() => {
     if (!layoutId) return;
@@ -168,8 +185,9 @@ export default function AdminLayoutEditorPage() {
   const handleSave = async () => {
     if (!layoutId) return;
     setSaving(true);
+    const layoutData = normalizeZoneForSave(rootZone);
     const { error } = await supabase.from("layouts").update({
-      layout_data: rootZone as any,
+      layout_data: layoutData as any,
       background_color: backgroundColor,
       updated_at: new Date().toISOString(),
     }).eq("id", layoutId);
@@ -195,7 +213,14 @@ export default function AdminLayoutEditorPage() {
         style={{ backgroundColor }}
         onClick={() => setIsFullPreview(false)}
       >
-        <div className="w-full h-full max-w-[1920px] max-h-[1080px]" style={{ aspectRatio: `${resWidth}/${resHeight}` }}>
+        <div
+          className="max-w-full max-h-full overflow-hidden"
+          style={{
+            aspectRatio: canvasRatio,
+            width: `min(100vw, calc(100vh * ${canvasAspect}))`,
+            height: `min(100vh, calc(100vw / ${canvasAspect}))`,
+          }}
+        >
           <ZoneRenderer
             zone={rootZone}
             onUpdate={() => {}}
@@ -288,11 +313,12 @@ export default function AdminLayoutEditorPage() {
           {/* Center - Canvas */}
           <div className="flex-1 flex items-center justify-center bg-muted/30 rounded-xl border border-border/50 overflow-hidden p-4">
             <div
-              className="w-full rounded-lg overflow-hidden shadow-lg border border-border/30"
+              className="rounded-lg overflow-hidden shadow-lg border border-border/30 max-w-full max-h-full"
               style={{
                 backgroundColor,
-                aspectRatio: `${resWidth}/${resHeight}`,
-                maxHeight: "100%",
+                aspectRatio: canvasRatio,
+                width: "100%",
+                height: "auto",
               }}
               onClick={() => setSelectedZoneId(null)}
             >
