@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Monitor, Pencil, Trash2, MapPin, Copy, Check, Link2, Search } from "lucide-react";
+import { Plus, Monitor, Pencil, Trash2, MapPin, Search, LogOut } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -68,6 +68,10 @@ export default function AdminDevicesPage() {
   // Delete
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteDevice, setDeleteDevice] = useState<Device | null>(null);
+
+  // Logout / unpair TV
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [logoutDevice, setLogoutDevice] = useState<Device | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -166,6 +170,23 @@ export default function AdminDevicesPage() {
       setDeleteDevice(null);
       fetchDevices(companyId);
     }
+  };
+
+  const handleLogoutDevice = async () => {
+    if (!logoutDevice || !companyId) return;
+    setSubmitting(true);
+    const { data, error } = await supabase.functions.invoke("logout-tv-device", {
+      body: { device_id: logoutDevice.id },
+    });
+    setSubmitting(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || "Failed to logout TV");
+      return;
+    }
+    toast.success(`${logoutDevice.name} logged out. The TV will return to pairing.`);
+    setLogoutOpen(false);
+    setLogoutDevice(null);
+    fetchDevices(companyId);
   };
 
   const handleAssignLayout = async (deviceId: string, layoutId: string | null) => {
@@ -348,6 +369,17 @@ export default function AdminDevicesPage() {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(d)}><Pencil className="h-3.5 w-3.5" /></Button>
+                          {d.is_paired && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-amber-600 hover:text-amber-700"
+                              onClick={() => { setLogoutDevice(d); setLogoutOpen(true); }}
+                              title="Logout TV"
+                            >
+                              <LogOut className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDeleteDevice(d); setDeleteOpen(true); }}><Trash2 className="h-3.5 w-3.5" /></Button>
                         </div>
                       </TableCell>
@@ -389,6 +421,20 @@ export default function AdminDevicesPage() {
           <div className="flex gap-3 justify-end mt-4">
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={submitting}>{submitting ? "Deleting..." : "Delete Device"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Logout Confirmation */}
+      <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Logout TV</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Logout <strong>{logoutDevice?.name}</strong>? The TV app will clear its pairing and show a new pairing code.
+          </p>
+          <div className="flex gap-3 justify-end mt-4">
+            <Button variant="outline" onClick={() => setLogoutOpen(false)}>Cancel</Button>
+            <Button onClick={handleLogoutDevice} disabled={submitting}>{submitting ? "Logging out..." : "Logout TV"}</Button>
           </div>
         </DialogContent>
       </Dialog>

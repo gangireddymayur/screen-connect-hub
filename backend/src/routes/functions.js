@@ -192,6 +192,23 @@ async function claimTvCode(req, res) {
   res.json({ device: updated });
 }
 
+async function logoutTvDevice(req, res) {
+  const { device_id } = req.body || {};
+  if (!device_id) return res.status(400).json({ error: 'device_id is required' });
+  if (!req.user.company_id && req.user.role !== 'super_admin') return res.status(403).json({ error: 'Your account is not linked to a company' });
+
+  const params = { device_id };
+  const companyClause = req.user.role === 'super_admin' ? '' : ' AND company_id = :company_id';
+  if (req.user.role !== 'super_admin') params.company_id = req.user.company_id;
+
+  const device = await first(`SELECT id FROM devices WHERE id = :device_id${companyClause} LIMIT 1`, params);
+  if (!device) return res.status(404).json({ error: 'Device not found' });
+
+  await db.query('DELETE FROM schedules WHERE device_id = :device_id', { device_id });
+  await db.query(`DELETE FROM devices WHERE id = :device_id${companyClause}`, params);
+  res.json({ success: true, reset: true });
+}
+
 const handlers = {
   'create-company-admin': createCompanyAdmin,
   'delete-company': deleteCompany,
@@ -201,6 +218,7 @@ const handlers = {
   'get-company-stats': getCompanyStats,
   'list-auth-users': listAuthUsers,
   'claim-tv-code': claimTvCode,
+  'logout-tv-device': logoutTvDevice,
 };
 
 router.post('/:name', async (req, res) => {

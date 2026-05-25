@@ -138,4 +138,19 @@ router.post('/poll-status', async (req, res) => {
   }
 });
 
+router.post('/logout', async (req, res) => {
+  try {
+    const { device_id } = req.body || {};
+    if (!device_id) return res.status(400).json({ error: 'device_id is required' });
+    const [devices] = await db.query('SELECT id FROM devices WHERE id = :id LIMIT 1', { id: device_id });
+    if (!devices[0]) return res.json({ success: true, reset: true });
+    await db.query('DELETE FROM schedules WHERE device_id = :device_id', { device_id });
+    await db.query('DELETE FROM devices WHERE id = :id', { id: device_id });
+    res.json({ success: true, reset: true });
+  } catch (err) {
+    console.error('TV_LOGOUT_ERROR:', err.stack || err);
+    res.status(500).json({ error: err.message || 'TV logout failed' });
+  }
+});
+
 module.exports = router;
