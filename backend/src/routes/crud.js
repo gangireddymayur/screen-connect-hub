@@ -88,6 +88,12 @@ function crud(table, { tenantScoped = true, superAdminOnly = false } = {}) {
     const db = require('../lib/db');
     const id = req.body.id || uuid();
     const payload = normalizePayload(table, { ...req.body, id });
+
+    // Let MariaDB manage timestamp columns with DEFAULT / ON UPDATE.
+    // Browser ISO strings can break MariaDB DATETIME inserts/updates.
+    delete payload.created_at;
+    delete payload.updated_at;
+
     if (tenantScoped && req.user.role !== 'super_admin') payload.company_id = req.user.company_id;
     const cols = Object.keys(payload);
     const placeholders = cols.map((c) => `:${c}`).join(',');
@@ -103,6 +109,11 @@ function crud(table, { tenantScoped = true, superAdminOnly = false } = {}) {
     if (!requireAllowed(req, res)) return;
     const db = require('../lib/db');
     const payload = normalizePayload(table, req.body);
+
+    // Do not allow frontend payloads to overwrite DB-managed timestamps.
+    delete payload.created_at;
+    delete payload.updated_at;
+
     const cols = Object.keys(payload);
     if (!cols.length) return res.json({ ok: true });
     const sets = cols.map((c) => `\`${c}\` = :${c}`).join(',');

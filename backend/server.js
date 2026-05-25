@@ -18,8 +18,10 @@ try {
   const crud = require('./src/routes/crud');
   const functionRoutes = require('./src/routes/functions');
   const storageRoutes = require('./src/routes/storage');
+  const playerRoutes = require('./src/routes/player');
 
   app.use('/uploads', express.static(storageRoutes.uploadRoot));
+  app.use('/api/player', playerRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/functions', authRequired, functionRoutes);
   app.use('/api/storage', authRequired, storageRoutes.router);

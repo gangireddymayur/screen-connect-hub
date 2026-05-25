@@ -15,15 +15,18 @@ import { toast } from "sonner";
 interface Schedule {
   id: string;
   device_id: string;
+  layout_id: string | null;
   start_time: string;
   end_time: string;
   days_of_week: number[];
   is_active: boolean;
   created_at: string;
   device_name?: string;
+  layout_name?: string;
 }
 
 interface Device { id: string; name: string; }
+interface LayoutOption { id: string; name: string; }
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -46,12 +49,14 @@ export default function AdminSchedulePage() {
   const { user } = useAuth();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [layouts, setLayouts] = useState<LayoutOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [view, setView] = useState<"calendar" | "list">("calendar");
 
   const [addOpen, setAddOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState("");
+  const [selectedLayout, setSelectedLayout] = useState("");
   const [startTime, setStartTime] = useState("00:00");
   const [endTime, setEndTime] = useState("23:59");
   const [days, setDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
@@ -72,15 +77,19 @@ export default function AdminSchedulePage() {
   }, [user]);
 
   const fetchAll = async (cId: string) => {
-    const [schedulesRes, devicesRes] = await Promise.all([
+    const [schedulesRes, devicesRes, layoutsRes] = await Promise.all([
       supabase.from("schedules").select("*").eq("company_id", cId).order("created_at", { ascending: false }),
       supabase.from("devices").select("id, name").eq("company_id", cId),
+      supabase.from("layouts").select("id, name").eq("company_id", cId).order("name"),
     ]);
     const devMap = new Map((devicesRes.data ?? []).map((d: any) => [d.id, d.name]));
+    const layoutMap = new Map((layoutsRes.data ?? []).map((l: any) => [l.id, l.name]));
     setDevices(devicesRes.data ?? []);
+    setLayouts(layoutsRes.data ?? []);
     setSchedules((schedulesRes.data ?? []).map((s: any) => ({
       ...s,
       device_name: devMap.get(s.device_id) ?? "Unknown",
+      layout_name: s.layout_id ? layoutMap.get(s.layout_id) ?? "Unknown layout" : "Device default layout",
     })));
     setLoading(false);
   };
@@ -98,6 +107,7 @@ export default function AdminSchedulePage() {
     const { error } = await supabase.from("schedules").insert({
       company_id: companyId,
       device_id: selectedDevice,
+      layout_id: selectedLayout || null,
       start_time: startTime,
       end_time: endTime,
       days_of_week: days,
@@ -107,7 +117,7 @@ export default function AdminSchedulePage() {
     else {
       toast.success("Schedule created!");
       setAddOpen(false);
-      setSelectedDevice("");
+      setSelectedDevice(""); setSelectedLayout("");
       setStartTime("00:00"); setEndTime("23:59");
       setDays([0, 1, 2, 3, 4, 5, 6]);
       fetchAll(companyId);
@@ -167,6 +177,13 @@ export default function AdminSchedulePage() {
                     <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={selectedDevice} onChange={(e) => setSelectedDevice(e.target.value)} required>
                       <option value="">Select a device...</option>
                       {devices.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Layout</Label>
+                    <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={selectedLayout} onChange={(e) => setSelectedLayout(e.target.value)}>
+                      <option value="">Use device default layout</option>
+                      {layouts.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                     </select>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -251,10 +268,11 @@ export default function AdminSchedulePage() {
                                   onClick={() => { setDeleteSchedule(s); setDeleteOpen(true); }}
                                   className="absolute left-0.5 right-0.5 rounded px-1.5 py-1 text-[10px] cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
                                   style={{ top, height, backgroundColor: color, color: "white" }}
-                                  title={`${s.device_name} · ${s.start_time}–${s.end_time}`}
+                                  title={`${s.device_name} - ${s.layout_name} - ${s.start_time}-${s.end_time}`}
                                 >
                                   <div className="font-semibold truncate">{s.device_name}</div>
-                                  <div className="opacity-90">{s.start_time}–{s.end_time}</div>
+                                  <div className="truncate opacity-90">{s.layout_name}</div>
+                                  <div className="opacity-90">{s.start_time}-{s.end_time}</div>
                                 </div>
                               );
                             })}
@@ -275,6 +293,7 @@ export default function AdminSchedulePage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Device</TableHead>
+                    <TableHead>Layout</TableHead>
                     <TableHead>Time</TableHead>
                     <TableHead>Days</TableHead>
                     <TableHead>Active</TableHead>
@@ -291,6 +310,7 @@ export default function AdminSchedulePage() {
                           <span className="text-sm">{s.device_name}</span>
                         </div>
                       </TableCell>
+                      <TableCell className="text-sm">{s.layout_name}</TableCell>
                       <TableCell className="text-sm">{s.start_time} – {s.end_time}</TableCell>
                       <TableCell>
                         <div className="flex gap-0.5">

@@ -18,6 +18,7 @@ import AdminSchedulePage from "./pages/admin/AdminSchedulePage";
 import AdminLayoutsPage from "./pages/admin/AdminLayoutsPage";
 import AdminLayoutEditorPage from "./pages/admin/AdminLayoutEditorPage";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
+import PlayerPage from "./pages/PlayerPage";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/player/:deviceId" element={<PlayerPage />} />
             {/* Super Admin Routes */}
             <Route path="/" element={<ProtectedRoute requiredRole="super_admin"><DashboardPage /></ProtectedRoute>} />
             <Route path="/companies" element={<ProtectedRoute requiredRole="super_admin"><CompaniesPage /></ProtectedRoute>} />
