@@ -444,6 +444,108 @@ function ClockWidget({ fontSize, color, fontWeight }: { fontSize?: number; color
   );
 }
 
+/* ── Playlist Player (image + video, with optional time/day scheduling) ── */
+function parseHM(s?: string): number | null {
+  if (!s) return null;
+  const [h, m] = s.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+function isItemActive(item: PlaylistItem, now: Date): boolean {
+  if (!item.scheduleEnabled) return true;
+  const days = item.daysOfWeek;
+  if (days && days.length && !days.includes(now.getDay())) return false;
+  const start = parseHM(item.startTime);
+  const end = parseHM(item.endTime);
+  if (start == null && end == null) return true;
+  const cur = now.getHours() * 60 + now.getMinutes();
+  const s = start ?? 0;
+  const e = end ?? 24 * 60;
+  return s <= e ? cur >= s && cur < e : cur >= s || cur < e;
+}
+
+function PlaylistPlayer({
+  items,
+  fit,
+  fallbackName,
+}: {
+  items: PlaylistItem[];
+  fit: 'cover' | 'contain' | 'fill';
+  fallbackName?: string;
+}) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const i = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(i);
+  }, []);
+
+  const now = new Date();
+  const active = items.filter((it) => it.mediaUrl && isItemActive(it, now));
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (active.length === 0) return;
+    if (idx >= active.length) setIdx(0);
+  }, [active.length, idx, tick]);
+
+  const current = active[idx % Math.max(active.length, 1)];
+
+  useEffect(() => {
+    if (!current) return;
+    if (current.mediaType === 'video' && (!current.duration || current.duration === 0)) return;
+    const ms = Math.max(1, current.duration || 8) * 1000;
+    const t = setTimeout(() => {
+      setIdx((p) => (active.length ? (p + 1) % active.length : 0));
+    }, ms);
+    return () => clearTimeout(t);
+  }, [current?.id, current?.duration, current?.mediaType, active.length]);
+
+  if (active.length === 0) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground">
+        <div className="text-2xl">🕒</div>
+        <span className="text-xs">
+          {items.length === 0 ? (fallbackName || 'No playlist items') : 'No item scheduled for now'}
+        </span>
+      </div>
+    );
+  }
+
+  if (!current) return null;
+
+  if (current.mediaType === 'image') {
+    return (
+      <img
+        key={current.id}
+        src={current.mediaUrl}
+        alt={current.mediaName}
+        className="w-full h-full"
+        style={{ objectFit: fit }}
+      />
+    );
+  }
+
+  return (
+    <video
+      key={current.id}
+      src={current.mediaUrl}
+      className="block w-full h-full"
+      style={{ objectFit: fit }}
+      autoPlay
+      muted
+      playsInline
+      loop={active.length === 1 && (!current.duration || current.duration === 0)}
+      onEnded={() => {
+        if (!current.duration || current.duration === 0) {
+          setIdx((p) => (active.length ? (p + 1) % active.length : 0));
+        }
+      }}
+    />
+  );
+}
+
+
+
 /* ── Zone Renderer ── */
 export function ZoneRenderer({ zone, onUpdate, onSelectZone, selectedZoneId, depth = 0, previewMode = false }: ZoneRendererProps) {
   const isSelected = zone.id === selectedZoneId;
