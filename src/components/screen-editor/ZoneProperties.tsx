@@ -594,6 +594,15 @@ export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZoneProp
               </SelectContent>
             </Select>
           </div>
+
+          <Separator />
+
+          <PlaylistEditor
+            widget={widget}
+            onUpdate={onUpdate}
+            imageLibrary={images}
+            videoLibrary={videos}
+          />
         </>
       )}
 
