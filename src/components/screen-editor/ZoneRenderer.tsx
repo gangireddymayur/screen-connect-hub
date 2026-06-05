@@ -7,6 +7,7 @@ import {
   SlideshowItem,
   SlideTransition,
   LinkPlatform,
+  PlaylistItem,
   splitZone,
   createWidget,
 } from "@/lib/screen-editor-types";
