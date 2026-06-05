@@ -244,6 +244,9 @@ export default function AdminDevicesPage() {
               <div className="text-sm text-muted-foreground -mt-2 mb-1">
                 Open the SignageHub app on your TV — it will display a 6-character code. Enter it below.
               </div>
+              <div className="text-xs rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 px-3 py-2">
+                Pairing codes expire after 15 minutes. If pairing fails, refresh or reopen the TV app to get a fresh code.
+              </div>
               <form onSubmit={handleAdd} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Pairing code (from TV)</Label>
