@@ -1,8 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
 
 process.on('uncaughtException', (err) => console.error('UNCAUGHT:', err.stack || err));
 process.on('unhandledRejection', (err) => console.error('UNHANDLED:', err.stack || err));
@@ -48,17 +46,6 @@ app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ error: err.message || 'server error' });
 });
-
-// ---- Serve built frontend (single-domain deploy on Plesk) ----
-// Put the contents of `dist/` (from `npm run build`) into backend/public/
-const staticDir = path.join(__dirname, 'public');
-if (fs.existsSync(staticDir)) {
-  app.use(express.static(staticDir));
-  app.get(/^\/(?!api|uploads).*/, (_req, res) => {
-    res.sendFile(path.join(staticDir, 'index.html'));
-  });
-}
-
 
 const port = process.env.PORT || process.env.HTTP_PLATFORM_PORT || 8080;
 app.listen(port, () => console.log('RUNNING ON PORT:', port));
