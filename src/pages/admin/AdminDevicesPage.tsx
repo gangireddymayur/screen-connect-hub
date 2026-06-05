@@ -132,7 +132,14 @@ export default function AdminDevicesPage() {
     });
     setSubmitting(false);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || "Pairing failed");
+      const errMsg = (data as any)?.error || error?.message || "Pairing failed";
+      if (/not found|expired/i.test(errMsg)) {
+        toast.error("Code not found or expired", {
+          description: "Refresh or reopen the SignageHub app on your TV to generate a new code.",
+        });
+      } else {
+        toast.error(errMsg);
+      }
       return;
     }
     toast.success(`${name} paired successfully!`);
