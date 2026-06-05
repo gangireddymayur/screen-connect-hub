@@ -51,6 +51,7 @@ export default function AdminDevicesPage() {
   const { user } = useAuth();
   const [devices, setDevices] = useState<Device[]>([]);
   const [layouts, setLayouts] = useState<LayoutOption[]>([]);
+  const [activeScheduleDeviceIds, setActiveScheduleDeviceIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
