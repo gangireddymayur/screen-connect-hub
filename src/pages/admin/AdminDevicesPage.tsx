@@ -356,21 +356,37 @@ export default function AdminDevicesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {!d.is_paired ? (
-                          <Badge variant="outline" className="text-xs">Unpaired</Badge>
-                        ) : isOnline(d.last_seen_at) ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Online</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
-                            <span className="text-xs text-muted-foreground">
-                              {d.last_seen_at ? formatDistanceToNow(new Date(d.last_seen_at), { addSuffix: true }) : "Never seen"}
-                            </span>
-                          </div>
-                        )}
+                        {(() => {
+                          const hasActiveSched = activeScheduleDeviceIds.has(d.id);
+                          const status = getDeviceStatus(d, hasActiveSched);
+                          if (status === "unpaired") {
+                            return <Badge variant="outline" className="text-xs">Unpaired / Pairing</Badge>;
+                          }
+                          if (status === "waiting_layout") {
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                                <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Waiting for layout</span>
+                              </div>
+                            );
+                          }
+                          if (status === "online") {
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Online / Playing</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                              <span className="text-xs text-muted-foreground">
+                                Offline{d.last_seen_at ? ` · ${formatDistanceToNow(new Date(d.last_seen_at), { addSuffix: true })}` : ""}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         {d.location ? (
@@ -378,20 +394,40 @@ export default function AdminDevicesPage() {
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
-                        <Select
-                          value={d.layout_id || "none"}
-                          onValueChange={(v) => handleAssignLayout(d.id, v === "none" ? null : v)}
-                        >
-                          <SelectTrigger className="h-8 text-xs w-36">
-                            <SelectValue placeholder="No layout" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No layout</SelectItem>
-                            {layouts.map((l) => (
-                              <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {(() => {
+                          const hasActiveSched = activeScheduleDeviceIds.has(d.id);
+                          const needsLayout = d.is_paired && !d.layout_id && !hasActiveSched;
+                          return (
+                            <div className="space-y-1">
+                              <Select
+                                value={d.layout_id || "none"}
+                                onValueChange={(v) => handleAssignLayout(d.id, v === "none" ? null : v)}
+                              >
+                                <SelectTrigger
+                                  className={`h-8 text-xs w-40 ${needsLayout ? "border-amber-500 ring-1 ring-amber-500/40" : ""}`}
+                                >
+                                  <SelectValue placeholder={needsLayout ? "Required — select layout" : "No layout"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No layout</SelectItem>
+                                  {layouts.map((l) => (
+                                    <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {needsLayout && (
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight max-w-[10rem]">
+                                  Assign a default layout, or create an active schedule for this device.
+                                </p>
+                              )}
+                              {!needsLayout && hasActiveSched && !d.layout_id && (
+                                <p className="text-[10px] text-muted-foreground leading-tight max-w-[10rem]">
+                                  Using active schedule
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{formatDate(d.created_at)}</TableCell>
                       <TableCell>
