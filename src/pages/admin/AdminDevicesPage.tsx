@@ -183,15 +183,18 @@ export default function AdminDevicesPage() {
   const handleDelete = async () => {
     if (!deleteDevice || !companyId) return;
     setSubmitting(true);
-    const { error } = await supabase.from("devices").delete().eq("id", deleteDevice.id);
+    const { data, error } = await supabase.functions.invoke("logout-tv-device", {
+      body: { device_id: deleteDevice.id },
+    });
     setSubmitting(false);
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Device deleted!");
-      setDeleteOpen(false);
-      setDeleteDevice(null);
-      fetchDevices(companyId);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || "Failed to remove device");
+      return;
     }
+    toast.success("Device removed. The TV will return to pairing.");
+    setDeleteOpen(false);
+    setDeleteDevice(null);
+    fetchDevices(companyId);
   };
 
   const handleLogoutDevice = async () => {
