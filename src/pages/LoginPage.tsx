@@ -82,7 +82,7 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 pt-4 border-t">
-            <p className="text-[11px] uppercase tracking-widest text-muted-foreground text-center">
+            <p className="text-[11px] uppercase tracking-widest text-blue-600 text-center">
               Connected to Plesk backend
             </p>
           </div>
