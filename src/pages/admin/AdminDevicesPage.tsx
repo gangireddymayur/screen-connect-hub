@@ -481,7 +481,7 @@ export default function AdminDevicesPage() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Delete Device</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">Are you sure you want to delete <strong>{deleteDevice?.name}</strong>? This will also remove all schedules for this device.</p>
+          <p className="text-sm text-muted-foreground">Unpair and remove <strong>{deleteDevice?.name}</strong>? The TV will be logged out and return to the pairing screen. All schedules for this device will also be removed.</p>
           <div className="flex gap-3 justify-end mt-4">
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={submitting}>{submitting ? "Deleting..." : "Delete Device"}</Button>
