@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, GripVertical, ChevronDown, ChevronUp, Image } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { PlaylistEditor } from "./PlaylistEditor";
 
 export interface MediaContentItem {
   id: string;
