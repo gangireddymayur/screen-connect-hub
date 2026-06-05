@@ -322,6 +322,12 @@ const authApi = {
   async signInWithPassword({ email, password }: { email: string; password: string }) {
     try {
       const r = await api("POST", "/auth/login", { email, password });
+      if (!r || !r.token || !r.user) {
+        throw new Error(
+          "Backend did not return a login token. Check that " +
+          `${API}/auth/login is reachable and returns JSON ({ token, user }).`
+        );
+      }
       setToken(r.token);
       currentSession = makeSession(r.token, r.user);
       saveSession(currentSession);
