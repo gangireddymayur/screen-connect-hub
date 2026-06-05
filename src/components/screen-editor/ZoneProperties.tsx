@@ -542,69 +542,74 @@ export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZoneProp
       {/* ── IMAGE / VIDEO ── */}
       {(widget.type === 'image' || widget.type === 'video') && (
         <>
-          {/* Content Library Picker */}
-          {(widget.type === 'image' ? images : videos).length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-xs">Select from Library</Label>
-              <div className="grid grid-cols-2 gap-1.5 max-h-[180px] overflow-y-auto">
-                {(widget.type === 'image' ? images : videos).map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => update({ mediaUrl: item.file_url!, mediaName: item.name })}
-                    className={cn(
-                      "relative rounded-md overflow-hidden border transition-all aspect-video",
-                      widget.mediaUrl === item.file_url
-                        ? "border-primary ring-1 ring-primary"
-                        : "border-border hover:border-primary/40"
-                    )}
-                  >
-                    {item.type === 'image' ? (
-                      <img src={item.file_url!} alt={item.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <video
-                        src={item.file_url!}
-                        className="w-full h-full object-cover"
-                        muted
-                        preload="metadata"
-                        onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
-                        onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
-                      />
-                    )}
-                    <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5">
-                      <p className="text-[9px] text-white truncate">{item.name}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Media Name</Label>
-            <Input value={widget.mediaName || ''} onChange={(e) => update({ mediaName: e.target.value })} placeholder="e.g. promo-banner.jpg" className="h-8 text-xs" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Fit Mode</Label>
-            <Select value={widget.objectFit || 'cover'} onValueChange={(v) => update({ objectFit: v as 'cover' | 'contain' | 'fill' })}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cover">Cover</SelectItem>
-                <SelectItem value="contain">Contain</SelectItem>
-                <SelectItem value="fill">Fill</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Separator />
-
+          {/* Playlist toggle FIRST so it's always visible */}
           <PlaylistEditor
             widget={widget}
             onUpdate={onUpdate}
             imageLibrary={images}
             videoLibrary={videos}
           />
+
+          {!widget.playlistEnabled && (
+            <>
+              <Separator />
+              {/* Single-media Library Picker */}
+              {(widget.type === 'image' ? images : videos).length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs">Select from Library</Label>
+                  <div className="grid grid-cols-2 gap-1.5 max-h-[180px] overflow-y-auto">
+                    {(widget.type === 'image' ? images : videos).map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => update({ mediaUrl: item.file_url!, mediaName: item.name })}
+                        className={cn(
+                          "relative rounded-md overflow-hidden border transition-all aspect-video",
+                          widget.mediaUrl === item.file_url
+                            ? "border-primary ring-1 ring-primary"
+                            : "border-border hover:border-primary/40"
+                        )}
+                      >
+                        {item.type === 'image' ? (
+                          <img src={item.file_url!} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <video
+                            src={item.file_url!}
+                            className="w-full h-full object-cover"
+                            muted
+                            preload="metadata"
+                            onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
+                            onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
+                          />
+                        )}
+                        <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5">
+                          <p className="text-[9px] text-white truncate">{item.name}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Media Name</Label>
+                <Input value={widget.mediaName || ''} onChange={(e) => update({ mediaName: e.target.value })} placeholder="e.g. promo-banner.jpg" className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Fit Mode</Label>
+                <Select value={widget.objectFit || 'cover'} onValueChange={(v) => update({ objectFit: v as 'cover' | 'contain' | 'fill' })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cover">Cover</SelectItem>
+                    <SelectItem value="contain">Contain</SelectItem>
+                    <SelectItem value="fill">Fill</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
         </>
       )}
+
 
       <Separator />
 
