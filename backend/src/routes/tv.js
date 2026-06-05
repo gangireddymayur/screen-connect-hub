@@ -3,6 +3,7 @@ const { v4: uuid } = require('uuid');
 const db = require('../lib/db');
 
 const UNPAIRED_COMPANY_ID = '00000000-0000-0000-0000-000000000000';
+const PAIRING_EXPIRES_MINUTES = 15;
 
 const parseJson = (value, fallback = null) => {
   if (!value) return fallback;
@@ -28,7 +29,17 @@ function createCode() {
   return out;
 }
 
+async function cleanupExpiredPendingDevices() {
+  await db.query(
+    `DELETE FROM devices
+     WHERE is_paired = 0
+       AND pairing_code IS NOT NULL
+       AND created_at < DATE_SUB(NOW(), INTERVAL ${PAIRING_EXPIRES_MINUTES} MINUTE)`
+  );
+}
+
 async function uniqueCode() {
+  await cleanupExpiredPendingDevices();
   for (let i = 0; i < 10; i += 1) {
     const code = createCode();
     const [rows] = await db.query('SELECT id FROM devices WHERE pairing_code = :code LIMIT 1', { code });
@@ -87,7 +98,12 @@ router.post('/generate-code', async (req, res) => {
         resolution,
       }
     );
-    res.json({ device_id: id, pairing_code: code, code });
+    res.json({
+      device_id: id,
+      pairing_code: code,
+      code,
+      expires_in_seconds: PAIRING_EXPIRES_MINUTES * 60,
+    });
   } catch (err) {
     console.error('TV_GENERATE_CODE_ERROR:', err.stack || err);
     res.status(500).json({ error: err.message || 'Could not generate pairing code' });
@@ -98,9 +114,12 @@ router.post('/poll-status', async (req, res) => {
   try {
     const { device_id } = req.body || {};
     if (!device_id) return res.status(400).json({ error: 'device_id is required' });
+
+    await cleanupExpiredPendingDevices();
+
     const [rows] = await db.query('SELECT * FROM devices WHERE id = :id LIMIT 1', { id: device_id });
     const device = rows[0];
-    if (!device) return res.status(404).json({ error: 'Device not found', reset: true });
+    if (!device) return res.status(404).json({ error: 'Device not found or pairing expired', reset: true });
 
     if (!device.is_paired) {
       return res.json({
@@ -111,6 +130,7 @@ router.post('/poll-status', async (req, res) => {
           layout_id: null,
           orientation: device.orientation,
           resolution: device.resolution,
+          status: 'pending',
         },
         layout: null,
       });
@@ -129,6 +149,7 @@ router.post('/poll-status', async (req, res) => {
         layout_id: device.layout_id,
         orientation: device.orientation,
         resolution: device.resolution,
+        status: layout ? 'playing' : 'waiting_for_layout',
       },
       layout,
     });

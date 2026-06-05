@@ -180,8 +180,10 @@ async function claimTvCode(req, res) {
   if (!name) return res.status(400).json({ error: 'Device name is required' });
   if (!req.user.company_id) return res.status(403).json({ error: 'Your account is not linked to a company' });
 
-  const device = await first('SELECT id, is_paired FROM devices WHERE pairing_code = :code LIMIT 1', { code: cleanCode });
-  if (!device) return res.status(404).json({ error: 'Code not found. Make sure your TV is showing this code.' });
+  await db.query("DELETE FROM devices WHERE is_paired = 0 AND pairing_code IS NOT NULL AND created_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)");
+
+  const device = await first("SELECT id, is_paired, created_at FROM devices WHERE pairing_code = :code LIMIT 1", { code: cleanCode });
+  if (!device) return res.status(404).json({ error: 'Code not found or expired. Refresh the TV app to generate a new code.' });
   if (device.is_paired) return res.status(409).json({ error: 'This code has already been used' });
 
   await db.query(
@@ -233,3 +235,4 @@ router.post('/:name', async (req, res) => {
 });
 
 module.exports = router;
+

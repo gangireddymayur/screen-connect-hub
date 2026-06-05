@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import DashboardPage from "./pages/DashboardPage";
+import HomeRedirect from "./pages/HomeRedirect";
 import CompaniesPage from "./pages/CompaniesPage";
 import UsersPage from "./pages/UsersPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -32,8 +33,9 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/player/:deviceId" element={<PlayerPage />} />
+            <Route path="/" element={<HomeRedirect />} />
             {/* Super Admin Routes */}
-            <Route path="/" element={<ProtectedRoute requiredRole="super_admin"><DashboardPage /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute requiredRole="super_admin"><DashboardPage /></ProtectedRoute>} />
             <Route path="/companies" element={<ProtectedRoute requiredRole="super_admin"><CompaniesPage /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute requiredRole="super_admin"><UsersPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRole="super_admin"><SettingsPage /></ProtectedRoute>} />
