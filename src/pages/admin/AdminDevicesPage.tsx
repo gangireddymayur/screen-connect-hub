@@ -17,6 +17,14 @@ import { formatDistanceToNow } from "date-fns";
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
 const isOnline = (lastSeen: string | null) => !!lastSeen && Date.now() - new Date(lastSeen).getTime() < ONLINE_THRESHOLD_MS;
 
+type DeviceStatus = "unpaired" | "waiting_layout" | "online" | "offline";
+const getDeviceStatus = (d: { is_paired: boolean; layout_id: string | null; last_seen_at: string | null }, hasActiveSchedule: boolean): DeviceStatus => {
+  if (!d.is_paired) return "unpaired";
+  const hasLayout = !!d.layout_id || hasActiveSchedule;
+  if (!hasLayout) return "waiting_layout";
+  return isOnline(d.last_seen_at) ? "online" : "offline";
+};
+
 interface Device {
   id: string;
   name: string;
@@ -43,6 +51,7 @@ export default function AdminDevicesPage() {
   const { user } = useAuth();
   const [devices, setDevices] = useState<Device[]>([]);
   const [layouts, setLayouts] = useState<LayoutOption[]>([]);
+  const [activeScheduleDeviceIds, setActiveScheduleDeviceIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
@@ -81,6 +90,7 @@ export default function AdminDevicesPage() {
           setCompanyId(data.company_id);
           fetchDevices(data.company_id);
           fetchLayouts(data.company_id);
+          fetchActiveSchedules(data.company_id);
         } else {
           setLoading(false);
         }
@@ -90,6 +100,11 @@ export default function AdminDevicesPage() {
   const fetchLayouts = async (cId: string) => {
     const { data } = await supabase.from("layouts").select("id, name").eq("company_id", cId).order("name");
     setLayouts(data ?? []);
+  };
+
+  const fetchActiveSchedules = async (cId: string) => {
+    const { data } = await supabase.from("schedules").select("device_id").eq("company_id", cId).eq("is_active", true);
+    setActiveScheduleDeviceIds(new Set((data ?? []).map((s: any) => s.device_id).filter(Boolean)));
   };
 
   const fetchDevices = async (cId: string) => {
@@ -117,7 +132,14 @@ export default function AdminDevicesPage() {
     });
     setSubmitting(false);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || "Pairing failed");
+      const errMsg = (data as any)?.error || error?.message || "Pairing failed";
+      if (/not found|expired/i.test(errMsg)) {
+        toast.error("Code not found or expired", {
+          description: "Refresh or reopen the SignageHub app on your TV to generate a new code.",
+        });
+      } else {
+        toast.error(errMsg);
+      }
       return;
     }
     toast.success(`${name} paired successfully!`);
@@ -161,15 +183,18 @@ export default function AdminDevicesPage() {
   const handleDelete = async () => {
     if (!deleteDevice || !companyId) return;
     setSubmitting(true);
-    const { error } = await supabase.from("devices").delete().eq("id", deleteDevice.id);
+    const { data, error } = await supabase.functions.invoke("logout-tv-device", {
+      body: { device_id: deleteDevice.id },
+    });
     setSubmitting(false);
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Device deleted!");
-      setDeleteOpen(false);
-      setDeleteDevice(null);
-      fetchDevices(companyId);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || "Failed to remove device");
+      return;
     }
+    toast.success("Device removed. The TV will return to pairing.");
+    setDeleteOpen(false);
+    setDeleteDevice(null);
+    fetchDevices(companyId);
   };
 
   const handleLogoutDevice = async () => {
@@ -218,6 +243,9 @@ export default function AdminDevicesPage() {
               </DialogHeader>
               <div className="text-sm text-muted-foreground -mt-2 mb-1">
                 Open the SignageHub app on your TV — it will display a 6-character code. Enter it below.
+              </div>
+              <div className="text-xs rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 px-3 py-2">
+                Pairing codes expire after 15 minutes. If pairing fails, refresh or reopen the TV app to get a fresh code.
               </div>
               <form onSubmit={handleAdd} className="space-y-4">
                 <div className="space-y-2">
@@ -328,21 +356,37 @@ export default function AdminDevicesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {!d.is_paired ? (
-                          <Badge variant="outline" className="text-xs">Unpaired</Badge>
-                        ) : isOnline(d.last_seen_at) ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Online</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
-                            <span className="text-xs text-muted-foreground">
-                              {d.last_seen_at ? formatDistanceToNow(new Date(d.last_seen_at), { addSuffix: true }) : "Never seen"}
-                            </span>
-                          </div>
-                        )}
+                        {(() => {
+                          const hasActiveSched = activeScheduleDeviceIds.has(d.id);
+                          const status = getDeviceStatus(d, hasActiveSched);
+                          if (status === "unpaired") {
+                            return <Badge variant="outline" className="text-xs">Unpaired / Pairing</Badge>;
+                          }
+                          if (status === "waiting_layout") {
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                                <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Waiting for layout</span>
+                              </div>
+                            );
+                          }
+                          if (status === "online") {
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Online / Playing</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                              <span className="text-xs text-muted-foreground">
+                                Offline{d.last_seen_at ? ` · ${formatDistanceToNow(new Date(d.last_seen_at), { addSuffix: true })}` : ""}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         {d.location ? (
@@ -350,20 +394,40 @@ export default function AdminDevicesPage() {
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
-                        <Select
-                          value={d.layout_id || "none"}
-                          onValueChange={(v) => handleAssignLayout(d.id, v === "none" ? null : v)}
-                        >
-                          <SelectTrigger className="h-8 text-xs w-36">
-                            <SelectValue placeholder="No layout" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No layout</SelectItem>
-                            {layouts.map((l) => (
-                              <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {(() => {
+                          const hasActiveSched = activeScheduleDeviceIds.has(d.id);
+                          const needsLayout = d.is_paired && !d.layout_id && !hasActiveSched;
+                          return (
+                            <div className="space-y-1">
+                              <Select
+                                value={d.layout_id || "none"}
+                                onValueChange={(v) => handleAssignLayout(d.id, v === "none" ? null : v)}
+                              >
+                                <SelectTrigger
+                                  className={`h-8 text-xs w-40 ${needsLayout ? "border-amber-500 ring-1 ring-amber-500/40" : ""}`}
+                                >
+                                  <SelectValue placeholder={needsLayout ? "Required — select layout" : "No layout"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No layout</SelectItem>
+                                  {layouts.map((l) => (
+                                    <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {needsLayout && (
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight max-w-[10rem]">
+                                  Assign a default layout, or create an active schedule for this device.
+                                </p>
+                              )}
+                              {!needsLayout && hasActiveSched && !d.layout_id && (
+                                <p className="text-[10px] text-muted-foreground leading-tight max-w-[10rem]">
+                                  Using active schedule
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{formatDate(d.created_at)}</TableCell>
                       <TableCell>
@@ -417,7 +481,7 @@ export default function AdminDevicesPage() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Delete Device</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">Are you sure you want to delete <strong>{deleteDevice?.name}</strong>? This will also remove all schedules for this device.</p>
+          <p className="text-sm text-muted-foreground">Unpair and remove <strong>{deleteDevice?.name}</strong>? The TV will be logged out and return to the pairing screen. All schedules for this device will also be removed.</p>
           <div className="flex gap-3 justify-end mt-4">
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={submitting}>{submitting ? "Deleting..." : "Delete Device"}</Button>
