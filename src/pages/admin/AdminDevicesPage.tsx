@@ -90,6 +90,7 @@ export default function AdminDevicesPage() {
           setCompanyId(data.company_id);
           fetchDevices(data.company_id);
           fetchLayouts(data.company_id);
+          fetchActiveSchedules(data.company_id);
         } else {
           setLoading(false);
         }
@@ -99,6 +100,11 @@ export default function AdminDevicesPage() {
   const fetchLayouts = async (cId: string) => {
     const { data } = await supabase.from("layouts").select("id, name").eq("company_id", cId).order("name");
     setLayouts(data ?? []);
+  };
+
+  const fetchActiveSchedules = async (cId: string) => {
+    const { data } = await supabase.from("schedules").select("device_id").eq("company_id", cId).eq("is_active", true);
+    setActiveScheduleDeviceIds(new Set((data ?? []).map((s: any) => s.device_id).filter(Boolean)));
   };
 
   const fetchDevices = async (cId: string) => {
