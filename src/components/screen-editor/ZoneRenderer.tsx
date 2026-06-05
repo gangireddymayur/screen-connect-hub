@@ -374,25 +374,30 @@ function WidgetPreview({ widget, previewMode = false }: { widget: ContentWidget;
     );
   }
 
-  if (widget.type === 'image') {
-    return (
-      <div style={style} className="relative">
-        {widget.mediaUrl ? (
-          <img src={widget.mediaUrl} alt="" className="w-full h-full" style={{ objectFit: widget.objectFit || 'cover' }} />
-        ) : (
-          <div className="flex flex-col items-center gap-1 text-muted-foreground">
-            <div className="text-2xl">🖼️</div>
-            <span className="text-xs">{widget.mediaName || 'No image'}</span>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (widget.type === 'video') {
+  if (widget.type === 'image' || widget.type === 'video') {
     const fit = widget.objectFit || 'cover';
+    if (widget.playlistEnabled && (widget.playlistItems?.length ?? 0) > 0) {
+      return (
+        <div style={style}>
+          <PlaylistPlayer items={widget.playlistItems!} fit={fit} fallbackName={widget.mediaName} />
+        </div>
+      );
+    }
+    if (widget.type === 'image') {
+      return (
+        <div style={style} className="relative">
+          {widget.mediaUrl ? (
+            <img src={widget.mediaUrl} alt="" className="w-full h-full" style={{ objectFit: fit }} />
+          ) : (
+            <div className="flex flex-col items-center gap-1 text-muted-foreground">
+              <div className="text-2xl">🖼️</div>
+              <span className="text-xs">{widget.mediaName || 'No image'}</span>
+            </div>
+          )}
+        </div>
+      );
+    }
     const cropLetterbox = fit === 'cover';
-
     return (
       <div style={style}>
         {widget.mediaUrl ? (
