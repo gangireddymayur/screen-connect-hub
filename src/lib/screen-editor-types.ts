@@ -46,6 +46,33 @@ export interface SlideshowItem {
   overlayAnimation?: TextAnimation;
 }
 
+/** Playlist item for image/video widgets with optional time-window scheduling. */
+export interface PlaylistItem {
+  id: string;
+  mediaType: 'image' | 'video';
+  mediaUrl: string;
+  mediaName: string;
+  /** Seconds. For videos, 0 = play full video length. */
+  duration: number;
+  /** If true, only play during the configured window/days. Otherwise plays always. */
+  scheduleEnabled?: boolean;
+  startTime?: string; // "HH:MM"
+  endTime?: string;   // "HH:MM"
+  daysOfWeek?: number[]; // 0=Sun..6=Sat. Empty/undefined = every day.
+}
+
+export function createPlaylistItem(mediaType: 'image' | 'video' = 'image'): PlaylistItem {
+  return {
+    id: `pl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    mediaType,
+    mediaUrl: '',
+    mediaName: '',
+    duration: mediaType === 'video' ? 0 : 8,
+    scheduleEnabled: false,
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+  };
+}
+
 export interface ContentWidget {
   id: string;
   type: ContentWidgetType;
@@ -62,6 +89,9 @@ export interface ContentWidget {
   mediaUrl?: string;
   mediaName?: string;
   objectFit?: 'cover' | 'contain' | 'fill';
+  // playlist mode for image/video widgets
+  playlistEnabled?: boolean;
+  playlistItems?: PlaylistItem[];
   // slideshow props
   slides?: SlideshowItem[];
   slideshowLoop?: boolean;
