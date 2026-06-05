@@ -17,6 +17,14 @@ import { formatDistanceToNow } from "date-fns";
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
 const isOnline = (lastSeen: string | null) => !!lastSeen && Date.now() - new Date(lastSeen).getTime() < ONLINE_THRESHOLD_MS;
 
+type DeviceStatus = "unpaired" | "waiting_layout" | "online" | "offline";
+const getDeviceStatus = (d: { is_paired: boolean; layout_id: string | null; last_seen_at: string | null }, hasActiveSchedule: boolean): DeviceStatus => {
+  if (!d.is_paired) return "unpaired";
+  const hasLayout = !!d.layout_id || hasActiveSchedule;
+  if (!hasLayout) return "waiting_layout";
+  return isOnline(d.last_seen_at) ? "online" : "offline";
+};
+
 interface Device {
   id: string;
   name: string;
