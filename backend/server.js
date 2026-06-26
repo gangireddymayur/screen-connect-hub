@@ -9,7 +9,6 @@ const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json({ limit: '25mb' }));
 
-app.get('/', (_req, res) => res.send('SERVER WORKING'));
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
 try {
@@ -41,6 +40,14 @@ try {
     res.status(500).json({ error: 'Routes failed to load. Check logs/node.log.' })
   );
 }
+
+// Serve frontend static files from root dist/
+const path = require('path');
+const distDir = path.join(__dirname, '../dist');
+app.use(express.static(distDir, { maxAge: '1h', index: false }));
+app.get(/^(?!\/api|\/uploads).*/, (_req, res) => {
+  res.sendFile(path.join(distDir, 'index.html'));
+});
 
 app.use((err, _req, res, _next) => {
   console.error(err);
