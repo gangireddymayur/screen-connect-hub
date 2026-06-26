@@ -38,7 +38,7 @@ router.post('/remove', async (req, res) => {
       const rel = safePath(p);
       const full = path.join(uploadRoot, rel);
       if (full.startsWith(uploadRoot)) await fs.rm(full, { force: true });
-    } catch {}
+    } catch { }
   }
   res.json({ success: true });
 });

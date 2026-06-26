@@ -30,7 +30,7 @@ function normalizeRow(table, row) {
   if (!row) return row;
   const out = { ...row };
   if (table === 'layouts' && typeof out.layout_data === 'string') {
-    try { out.layout_data = JSON.parse(out.layout_data); } catch {}
+    try { out.layout_data = JSON.parse(out.layout_data); } catch { }
   }
   if (table === 'schedules' && typeof out.days_of_week === 'string') {
     out.days_of_week = out.days_of_week.split(',').filter(Boolean).map(Number);
