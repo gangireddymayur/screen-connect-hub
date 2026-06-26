@@ -11,6 +11,40 @@ app.use(express.json({ limit: '25mb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
+app.get('/api/storage-debug', async (_req, res) => {
+  const fs = require('fs/promises');
+  const path = require('path');
+  const pathsToTest = {
+    'root-App_Data': path.join(__dirname, '../App_Data/uploads'),
+    'backend-App_Data': path.join(__dirname, './App_Data/uploads'),
+    'root-public-uploads': path.join(__dirname, '../public/uploads'),
+    'root-uploads': path.join(__dirname, '../uploads'),
+    'backend-uploads': path.join(__dirname, './uploads'),
+    'root-dist-uploads': path.join(__dirname, '../dist/uploads')
+  };
+
+  const results = {};
+  for (const [key, dirPath] of Object.entries(pathsToTest)) {
+    try {
+      await fs.mkdir(dirPath, { recursive: true });
+      const testFile = path.join(dirPath, 'test_write.txt');
+      await fs.writeFile(testFile, 'write test ' + new Date().toISOString());
+      await fs.unlink(testFile);
+      results[key] = { success: true, path: dirPath };
+    } catch (err) {
+      results[key] = { success: false, path: dirPath, error: err.message, code: err.code };
+    }
+  }
+
+  res.json({
+    message: 'Write test diagnostics',
+    cwd: process.cwd(),
+    uid: process.getuid ? process.getuid() : 'n/a',
+    gid: process.getgid ? process.getgid() : 'n/a',
+    results
+  });
+});
+
 try {
   const { authRequired } = require('./src/lib/auth');
   const authRoutes = require('./src/routes/auth');
