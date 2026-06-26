@@ -97,24 +97,34 @@ export default function AdminContentPage() {
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
+    let successCount = 0;
     setUploading(true);
     for (const file of Array.from(files)) {
       const ext = file.name.split(".").pop();
       const path = `${companyId}/${generateUUID()}.${ext}`;
       const type = file.type.startsWith("video") ? "video" : "image";
       const { error: uploadError } = await supabase.storage.from("content").upload(path, file);
-      if (uploadError) { toast.error(`Failed to upload ${file.name}`); continue; }
+      if (uploadError) {
+        toast.error(`Failed to upload ${file.name}: ${uploadError.message}`);
+        continue;
+      }
       const { data: urlData } = supabase.storage.from("content").getPublicUrl(path);
       const { error: insertError } = await supabase.from("content").insert({
         company_id: companyId, name: file.name, type,
         file_url: urlData.publicUrl, file_size: file.size,
         duration: type === "image" ? 10 : 30,
       });
-      if (insertError) toast.error(`Failed to save ${file.name}`);
+      if (insertError) {
+        toast.error(`Failed to save ${file.name}: ${insertError.message}`);
+      } else {
+        successCount++;
+      }
     }
-    toast.success("Content uploaded!");
+    if (successCount > 0) {
+      toast.success(`${successCount} file(s) uploaded successfully!`);
+      setUploadOpen(false);
+    }
     setUploading(false);
-    setUploadOpen(false);
     if (fileRef.current) fileRef.current.value = "";
     fetchContent(companyId);
   };
