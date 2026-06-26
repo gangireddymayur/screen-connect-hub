@@ -26,6 +26,17 @@ interface ContentItem {
 
 const formatSize = (bytes: number | null) => bytes ? formatBytes(bytes) : "—";
 
+const generateUUID = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 export default function AdminContentPage() {
   const { user } = useAuth();
   const [content, setContent] = useState<ContentItem[]>([]);
@@ -89,7 +100,7 @@ export default function AdminContentPage() {
     setUploading(true);
     for (const file of Array.from(files)) {
       const ext = file.name.split(".").pop();
-      const path = `${companyId}/${crypto.randomUUID()}.${ext}`;
+      const path = `${companyId}/${generateUUID()}.${ext}`;
       const type = file.type.startsWith("video") ? "video" : "image";
       const { error: uploadError } = await supabase.storage.from("content").upload(path, file);
       if (uploadError) { toast.error(`Failed to upload ${file.name}`); continue; }
