@@ -946,7 +946,7 @@ export default function AdminSchedulePage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full text-xs h-7 border-white/10 bg-white/5 hover:bg-white/10"
+                className="w-full text-xs h-7 border-border bg-muted/30 hover:bg-muted"
                 onClick={handleToday}
               >
                 Today
@@ -972,7 +972,7 @@ export default function AdminSchedulePage() {
                     }}
                     className={cn(
                       "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-primary/40 focus:ring-offset-1 focus:ring-offset-background",
-                      selectedDevice.schedules_enabled === 0 ? "bg-amber-600/70 border-amber-500/50" : "bg-white/10 border-white/5"
+                      selectedDevice.schedules_enabled === 0 ? "bg-amber-600 border-amber-500/50" : "bg-muted border-border"
                     )}
                   >
                     <span
@@ -985,16 +985,16 @@ export default function AdminSchedulePage() {
                 </div>
 
                 {selectedDevice.schedules_enabled === 0 && (
-                  <div className="space-y-1.5 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="space-y-1.5 pt-2 border-t border-border animate-in fade-in slide-in-from-top-1 duration-150">
                     <Label className="text-[10px] text-muted-foreground font-semibold">Default Fallback Layout</Label>
                     <select
                       value={selectedDevice.layout_id || ""}
                       onChange={(e) => updateDeviceDefaultLayout(e.target.value || null)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl h-8 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                      className="w-full bg-background border border-input rounded-xl h-8 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
                     >
-                      <option value="" disabled className="bg-[#0d0f12] text-muted-foreground">Select a default layout...</option>
+                      <option value="" disabled className="bg-popover text-muted-foreground">Select a default layout...</option>
                       {layouts.map((l) => (
-                        <option key={l.id} value={l.id} className="bg-[#0d0f12] text-foreground">
+                        <option key={l.id} value={l.id} className="bg-popover text-foreground">
                           {l.name}
                         </option>
                       ))}
@@ -1010,12 +1010,12 @@ export default function AdminSchedulePage() {
           {/* ======================================================== */}
           <div className="flex flex-col gap-4" ref={weekGridRef}>
             {/* Week Selector navigation bar */}
-            <div className="flex items-center justify-between bg-white/[0.02] border border-white/5 rounded-2xl px-4 py-2.5 shadow-sm">
+            <div className="flex items-center justify-between bg-muted/20 border border-border rounded-2xl px-4 py-2.5 shadow-sm">
               <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-8 rounded-full border border-white/5 hover:bg-white/5"
+                  className="size-8 rounded-full border border-border hover:bg-muted"
                   onClick={handlePrevWeek}
                 >
                   <ChevronLeft className="size-4" />
@@ -1023,7 +1023,7 @@ export default function AdminSchedulePage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-8 rounded-full border border-white/5 hover:bg-white/5"
+                  className="size-8 rounded-full border border-border hover:bg-muted"
                   onClick={handleNextWeek}
                 >
                   <ChevronRight className="size-4" />
@@ -1052,9 +1052,9 @@ export default function AdminSchedulePage() {
             ) : (
               <GlassCard className="p-0 overflow-hidden flex flex-col select-none">
                 {/* Header days row */}
-                <div className="grid grid-cols-[60px_1fr] border-b border-white/5 bg-white/[0.02]">
-                  <div className="h-10 border-r border-white/5" />
-                  <div className="grid grid-cols-7 h-10 divide-x divide-white/5">
+                <div className="grid grid-cols-[60px_1fr] border-b border-border bg-muted/20">
+                  <div className="h-10 border-r border-border" />
+                  <div className="grid grid-cols-7 h-10 divide-x divide-border">
                     {weekDates.map((date, idx) => {
                       const dateIso = toISO(date);
                       const isSelected = selectedDate === dateIso;
@@ -1078,7 +1078,7 @@ export default function AdminSchedulePage() {
                             "flex flex-col items-center justify-center text-center py-1 transition-colors relative",
                             !schedulesEnabled
                               ? "opacity-40 cursor-not-allowed pointer-events-none"
-                              : "cursor-pointer hover:bg-white/5",
+                              : "cursor-pointer hover:bg-muted",
                             isSelected && "bg-primary/5",
                             isCurrent && "bg-primary/5"
                           )}
@@ -1119,16 +1119,16 @@ export default function AdminSchedulePage() {
                 {/* Vertical board content area */}
                 <div className="grid grid-cols-[60px_1fr] relative overflow-y-auto max-h-[700px] custom-scrollbar">
                   {/* Hours timeline side gutter */}
-                  <div className="bg-white/[0.01] border-r border-white/5 select-none text-[10px] text-muted-foreground pr-2 pt-1.5 text-right font-medium">
+                  <div className="bg-muted/10 border-r border-border select-none text-[10px] text-muted-foreground pr-2 pt-1.5 text-right font-medium">
                     {Array.from({ length: 24 }).map((_, h) => (
-                      <div key={h} style={{ height: HOUR_HEIGHT }} className="border-b border-white/5 select-none pr-1">
+                      <div key={h} style={{ height: HOUR_HEIGHT }} className="border-b border-border select-none pr-1">
                         {String(h).padStart(2, "0")}:00
                       </div>
                     ))}
                   </div>
 
                   {/* Day columns */}
-                  <div className="grid grid-cols-7 relative divide-x divide-white/5 bg-white/[0.005]">
+                  <div className="grid grid-cols-7 relative divide-x divide-border bg-card/10">
                     {!schedulesEnabled && (
                       <div
                         onClick={() => {
@@ -1148,7 +1148,7 @@ export default function AdminSchedulePage() {
                     {Array.from({ length: 24 }).map((_, h) => (
                       <div
                         key={h}
-                        className="absolute left-0 right-0 border-b border-white/[0.04] pointer-events-none"
+                        className="absolute left-0 right-0 border-b border-border/40 pointer-events-none"
                         style={{ top: (h + 1) * HOUR_HEIGHT - 1, height: 1 }}
                       />
                     ))}
@@ -1169,7 +1169,7 @@ export default function AdminSchedulePage() {
                           className={cn(
                             "relative h-full flex flex-col transition-colors min-h-[1152px]",
                             isSelected && "bg-primary/[0.01]",
-                            isPast && "bg-white/[0.005]"
+                            isPast && "bg-muted/20"
                           )}
                         >
                           {/* Render schedule instances */}
@@ -1198,8 +1198,9 @@ export default function AdminSchedulePage() {
                                 style={{
                                   top,
                                   height,
-                                  background: `color-mix(in oklch, ${color} 15%, #0d0f12)`,
+                                  background: `color-mix(in oklch, ${color} 12%, hsl(var(--card)))`,
                                   borderColor: color,
+                                  color: `color-mix(in oklch, ${color} 50%, hsl(var(--foreground)))`
                                 }}
                               >
                                 {/* Resize Handle Top */}
@@ -1270,7 +1271,7 @@ export default function AdminSchedulePage() {
                   placeholder="Search layouts..."
                   value={layoutSearch}
                   onChange={(e) => setLayoutSearch(e.target.value)}
-                  className="pl-8 bg-white/5 border-white/10 text-xs h-8"
+                  className="pl-8 bg-background border-input text-xs h-8"
                 />
               </div>
               <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar animate-in">
@@ -1284,7 +1285,7 @@ export default function AdminSchedulePage() {
                         e.dataTransfer.setData("text/plain", l.id);
                         e.dataTransfer.effectAllowed = "copy";
                       }}
-                      className="p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] active:scale-[0.98] transition-all cursor-grab active:cursor-grabbing flex flex-col gap-1.5 shadow-sm group select-none"
+                      className="p-3 rounded-xl border border-border bg-card hover:bg-muted active:scale-[0.98] transition-all cursor-grab active:cursor-grabbing flex flex-col gap-1.5 shadow-sm group select-none"
                       style={{ borderLeftWidth: 3, borderLeftColor: color }}
                     >
                       <div className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors truncate">
@@ -1308,7 +1309,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Edit / Configure Schedule Details                 */}
       {/* ======================================================== */}
       <Dialog open={editPopupOpen} onOpenChange={setEditPopupOpen}>
-        <DialogContent className="sm:max-w-md glass-strong border-white/10">
+        <DialogContent className="sm:max-w-md border border-border">
           <DialogHeader>
             <DialogTitle>Configure Schedule</DialogTitle>
           </DialogHeader>
@@ -1318,11 +1319,11 @@ export default function AdminSchedulePage() {
               <select
                 value={editLayout}
                 onChange={(e) => setEditLayout(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                className="w-full bg-background border border-input rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
               >
-                <option value="">Use device default layout</option>
+                <option value="" className="bg-popover text-foreground">Use device default layout</option>
                 {layouts.map((l) => (
-                  <option key={l.id} value={l.id} className="bg-[#0d0f12] text-foreground">
+                  <option key={l.id} value={l.id} className="bg-popover text-foreground">
                     {l.name}
                   </option>
                 ))}
@@ -1336,7 +1337,7 @@ export default function AdminSchedulePage() {
                   type="time"
                   value={editStartTime}
                   onChange={(e) => setEditStartTime(e.target.value)}
-                  className="bg-white/5 border-white/10 text-xs"
+                  className="bg-background border-input text-xs"
                 />
               </div>
               <div className="space-y-1.5">
@@ -1345,7 +1346,7 @@ export default function AdminSchedulePage() {
                   type="time"
                   value={editEndTime}
                   onChange={(e) => setEditEndTime(e.target.value)}
-                  className="bg-white/5 border-white/10 text-xs"
+                  className="bg-background border-input text-xs"
                 />
               </div>
             </div>
@@ -1362,11 +1363,11 @@ export default function AdminSchedulePage() {
               <select
                 value={editRepeatMode}
                 onChange={(e) => setEditRepeatMode(e.target.value as any)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                className="w-full bg-background border border-input rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
               >
-                <option value="none" className="bg-[#0d0f12]">Run only on this day (No Recurrence)</option>
-                <option value="daily" className="bg-[#0d0f12]">Daily (Repeat everyday)</option>
-                <option value="custom" className="bg-[#0d0f12]">Custom Interval Repeat</option>
+                <option value="none" className="bg-popover text-foreground">Run only on this day (No Recurrence)</option>
+                <option value="daily" className="bg-popover text-foreground">Daily (Repeat everyday)</option>
+                <option value="custom" className="bg-popover text-foreground">Custom Interval Repeat</option>
               </select>
             </div>
 
@@ -1379,7 +1380,7 @@ export default function AdminSchedulePage() {
                     min={1}
                     value={editRepeatInterval}
                     onChange={(e) => setEditRepeatInterval(Number(e.target.value))}
-                    className="bg-white/5 border-white/10 text-xs"
+                    className="bg-background border-input text-xs"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -1389,27 +1390,27 @@ export default function AdminSchedulePage() {
                     min={1}
                     value={editDaysCount}
                     onChange={(e) => setEditDaysCount(Number(e.target.value))}
-                    className="bg-white/5 border-white/10 text-xs"
+                    className="bg-background border-input text-xs"
                   />
                 </div>
               </div>
             )}
 
             {editRepeatMode === "daily" && (
-              <div className="space-y-1.5 animate-in fade-in duration-200">
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
                 <Label>Total Repeat Occurrences (Days)</Label>
                 <Input
                   type="number"
                   min={1}
                   value={editDaysCount}
                   onChange={(e) => setEditDaysCount(Number(e.target.value))}
-                  className="bg-white/5 border-white/10 text-xs"
+                  className="bg-background border-input text-xs"
                 />
               </div>
             )}
 
             {selectedSchedule && (
-              <div className="text-[10px] text-muted-foreground/80 leading-relaxed py-1.5 border-y border-white/5 flex items-center gap-1.5 bg-white/[0.01] px-2 rounded-lg">
+              <div className="text-[10px] text-muted-foreground/80 leading-relaxed py-1.5 border-y border-border flex items-center gap-1.5 bg-muted/20 px-2 rounded-lg">
                 <Clock className="size-3.5 shrink-0 text-primary" />
                 <span>{getRecurrenceRangeText()}</span>
               </div>
@@ -1421,7 +1422,7 @@ export default function AdminSchedulePage() {
                 <Button
                   variant="outline"
                   onClick={() => setEditPopupOpen(false)}
-                  className="text-xs border-white/10 h-8"
+                  className="text-xs border-border h-8"
                 >
                   Cancel
                 </Button>
@@ -1443,14 +1444,14 @@ export default function AdminSchedulePage() {
               </div>
 
               {selectedSchedule && (
-                <div className="pt-3 border-t border-dashed border-white/10 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Danger Zone</span>
+                <div className="pt-3 border-t border-dashed border-border flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-destructive uppercase tracking-wider">Danger Zone</span>
                   <div className="flex gap-2">
                     {selectedSchedule.repeat_mode !== "none" && (
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="text-[10px] font-bold h-7 bg-red-950/40 text-rose-400 border border-rose-900/50 hover:bg-red-900/30"
+                        className="text-[10px] font-bold h-7 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-rose-400 border border-red-200 dark:border-rose-900/50 hover:bg-red-100 dark:hover:bg-red-900/30"
                         onClick={handleDeleteScheduleOccurrence}
                       >
                         Delete Only This Day
@@ -1476,7 +1477,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Bulk Repeat Day Schedules / Copy Actions          */}
       {/* ======================================================== */}
       <Dialog open={bulkRepeatOpen} onOpenChange={setBulkRepeatOpen}>
-        <DialogContent className="sm:max-w-md glass-strong border-white/10">
+        <DialogContent className="sm:max-w-md border border-border">
           <DialogHeader>
             <DialogTitle>Configure Day Recurrence</DialogTitle>
             <DialogDescription>
@@ -1486,18 +1487,18 @@ export default function AdminSchedulePage() {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             {/* Day Schedules List */}
-            <div className="border border-white/5 rounded-xl overflow-hidden bg-white/[0.01]">
-              <div className="px-3 py-2 bg-white/5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <div className="border border-border rounded-xl overflow-hidden bg-card">
+              <div className="px-3 py-2 bg-muted text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Schedules for this day
               </div>
-              <div className="divide-y divide-white/5 max-h-[120px] overflow-y-auto custom-scrollbar">
+              <div className="divide-y divide-border max-h-[120px] overflow-y-auto custom-scrollbar">
                 {(() => {
                   const dayInstanceSchedules = instances.filter(i => i.date === bulkRepeatDate);
                   const dayScheduleIds = Array.from(new Set(dayInstanceSchedules.map(i => i.schedule_id)));
                   const targetSchedules = schedules.filter(s => dayScheduleIds.includes(s.id));
 
                   if (targetSchedules.length === 0) {
-                    return <div className="p-3 text-xs italic text-center text-muted-foreground">No templates scheduled on this day</div>;
+                    return <div className="p-3 text-xs italic text-center text-muted-foreground">No layouts scheduled on this day</div>;
                   }
                   return targetSchedules.map((s) => {
                     const color = deviceColorMap.get(s.device_id) || "hsl(var(--primary))";
@@ -1520,11 +1521,11 @@ export default function AdminSchedulePage() {
               <select
                 value={bulkRepeatMode}
                 onChange={(e) => setBulkRepeatMode(e.target.value as any)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                className="w-full bg-background border border-input rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
               >
-                <option value="none" className="bg-[#0d0f12]">No recurrence</option>
-                <option value="daily" className="bg-[#0d0f12]">Daily (Repeat everyday)</option>
-                <option value="custom" className="bg-[#0d0f12]">Custom Interval Repeat</option>
+                <option value="none" className="bg-popover text-foreground">No recurrence</option>
+                <option value="daily" className="bg-popover text-foreground">Daily (Repeat everyday)</option>
+                <option value="custom" className="bg-popover text-foreground">Custom Interval Repeat</option>
               </select>
             </div>
 
@@ -1537,7 +1538,7 @@ export default function AdminSchedulePage() {
                     min={1}
                     value={bulkRepeatInterval}
                     onChange={(e) => setBulkRepeatInterval(Number(e.target.value))}
-                    className="bg-white/5 border-white/10 text-xs"
+                    className="bg-background border-input text-xs"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -1547,7 +1548,7 @@ export default function AdminSchedulePage() {
                     min={1}
                     value={bulkRepeatDaysCount}
                     onChange={(e) => setBulkRepeatDaysCount(Number(e.target.value))}
-                    className="bg-white/5 border-white/10 text-xs"
+                    className="bg-background border-input text-xs"
                   />
                 </div>
               </div>
@@ -1561,13 +1562,13 @@ export default function AdminSchedulePage() {
                   min={1}
                   value={bulkRepeatDaysCount}
                   onChange={(e) => setBulkRepeatDaysCount(Number(e.target.value))}
-                  className="bg-white/5 border-white/10 text-xs"
+                  className="bg-background border-input text-xs"
                 />
               </div>
             )}
 
             {bulkRepeatDate && (
-              <div className="text-[10px] text-muted-foreground/80 leading-relaxed py-1.5 border-y border-white/5 flex items-center gap-1.5 bg-white/[0.01] px-2 rounded-lg">
+              <div className="text-[10px] text-muted-foreground/80 leading-relaxed py-1.5 border-y border-border flex items-center gap-1.5 bg-muted/20 px-2 rounded-lg">
                 <Clock className="size-3.5 shrink-0 text-primary" />
                 <span>{getBulkRecurrenceRangeText()}</span>
               </div>
@@ -1587,7 +1588,7 @@ export default function AdminSchedulePage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setBulkRepeatOpen(false)}
-                  className="text-xs h-8 border-white/10"
+                  className="text-xs h-8 border-border"
                 >
                   Cancel
                 </Button>
@@ -1609,7 +1610,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Bulk Copy Day Selection Modal                    */}
       {/* ======================================================== */}
       <Dialog open={copyDayOpen} onOpenChange={setCopyDayOpen}>
-        <DialogContent className="sm:max-w-md glass-strong border-white/10">
+        <DialogContent className="sm:max-w-md border border-border">
           <DialogHeader>
             <DialogTitle>Bulk Copy Day Schedules</DialogTitle>
             <DialogDescription>
@@ -1630,7 +1631,7 @@ export default function AdminSchedulePage() {
                       .filter(Boolean);
                     setCopyTargetDates(parsed);
                   }}
-                  className="bg-white/5 border-white/10 text-xs"
+                  className="bg-background border-input text-xs"
                 />
                 <span className="text-[10px] text-muted-foreground leading-normal">
                   Example: 2026-06-29, 2026-06-30. Past dates will be skipped.
@@ -1642,7 +1643,7 @@ export default function AdminSchedulePage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setCopyDayOpen(false)}
-                className="text-xs h-8 border-white/10"
+                className="text-xs h-8 border-border"
               >
                 Cancel
               </Button>
@@ -1663,7 +1664,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Drag Move/Resize Exception Split Confirm          */}
       {/* ======================================================== */}
       <Dialog open={!!pendingUpdate} onOpenChange={() => setPendingUpdate(null)}>
-        <DialogContent className="max-w-sm glass-strong border-white/10">
+        <DialogContent className="max-w-sm border border-border">
           <DialogHeader>
             <DialogTitle>Adjust Recurring Occurrence</DialogTitle>
             <DialogDescription>
@@ -1686,7 +1687,7 @@ export default function AdminSchedulePage() {
             <Button
               variant="outline"
               onClick={() => setPendingUpdate(null)}
-              className="w-full text-xs border-white/10 h-8"
+              className="w-full text-xs border-border h-8"
             >
               Cancel
             </Button>
@@ -1698,7 +1699,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Overwrite Recurrence Conflicts                    */}
       {/* ======================================================== */}
       <Dialog open={bulkOverwriteDates !== null} onOpenChange={() => setBulkOverwriteDates(null)}>
-        <DialogContent className="max-w-sm glass-strong border-white/10">
+        <DialogContent className="max-w-sm border border-border">
           <DialogHeader>
             <DialogTitle>Overwrite Existing Schedules?</DialogTitle>
             <DialogDescription>
@@ -1716,7 +1717,7 @@ export default function AdminSchedulePage() {
             <Button
               variant="outline"
               onClick={() => setBulkOverwriteDates(null)}
-              className="w-full text-xs border-white/10 h-8"
+              className="w-full text-xs border-border h-8"
             >
               No, Cancel
             </Button>
@@ -1728,7 +1729,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Overwrite Copy-Day Conflicts                       */}
       {/* ======================================================== */}
       <Dialog open={copyOverwriteOpen} onOpenChange={setCopyOverwriteOpen}>
-        <DialogContent className="max-w-sm glass-strong border-white/10">
+        <DialogContent className="max-w-sm border border-border">
           <DialogHeader>
             <DialogTitle>Overwrite Existing Schedules?</DialogTitle>
             <DialogDescription>
@@ -1746,7 +1747,7 @@ export default function AdminSchedulePage() {
             <Button
               variant="outline"
               onClick={() => setCopyOverwriteOpen(false)}
-              className="w-full text-xs border-white/10 h-8"
+              className="w-full text-xs border-border h-8"
             >
               No, Cancel
             </Button>
