@@ -171,6 +171,7 @@ export default function AdminSchedulePage() {
   const [deviceSearch, setDeviceSearch] = useState("");
   const [layoutSearch, setLayoutSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState<string>(toISO(new Date()));
+  const [currentWeekDate, setCurrentWeekDate] = useState<string>(toISO(new Date()));
 
   // Drag-and-drop state
   const [dragState, setDragState] = useState<DragState>(initialDragState);
@@ -224,7 +225,7 @@ export default function AdminSchedulePage() {
 
   // Retrieve current week date range starting on Monday
   const weekDates = useMemo(() => {
-    const current = new Date(selectedDate + "T00:00:00");
+    const current = new Date(currentWeekDate + "T00:00:00");
     const day = current.getDay();
     // Monday is index 0 in our weekly rendering headers
     const distanceToMon = day === 0 ? -6 : 1 - day;
@@ -236,7 +237,7 @@ export default function AdminSchedulePage() {
       d.setDate(monday.getDate() + idx);
       return d;
     });
-  }, [selectedDate]);
+  }, [currentWeekDate]);
 
   // Compute bulk copy date ranges to display helper text
   const getBulkRecurrenceRangeText = () => {
@@ -552,19 +553,20 @@ export default function AdminSchedulePage() {
 
   // Navigations
   const handlePrevWeek = () => {
-    const d = new Date(selectedDate + "T00:00:00");
+    const d = new Date(currentWeekDate + "T00:00:00");
     d.setDate(d.getDate() - 7);
-    setSelectedDate(toISO(d));
+    setCurrentWeekDate(toISO(d));
   };
 
   const handleNextWeek = () => {
-    const d = new Date(selectedDate + "T00:00:00");
+    const d = new Date(currentWeekDate + "T00:00:00");
     d.setDate(d.getDate() + 7);
-    setSelectedDate(toISO(d));
+    setCurrentWeekDate(toISO(d));
   };
 
   const handleToday = () => {
     const today = toISO(new Date());
+    setCurrentWeekDate(today);
     setSelectedDate(today);
     setCalendarMonth(new Date());
   };
@@ -958,7 +960,10 @@ export default function AdminSchedulePage() {
                   return (
                     <button
                       key={idx}
-                      onClick={() => setSelectedDate(cellIso)}
+                    onClick={() => {
+                      setSelectedDate(cellIso);
+                      setCurrentWeekDate(cellIso);
+                    }}
                       className={cn(
                         "aspect-square text-[10px] rounded-md transition-colors relative flex flex-col items-center justify-center font-medium",
                         isSelected
@@ -1085,7 +1090,7 @@ export default function AdminSchedulePage() {
             ) : (
               <GlassCard className="p-0 overflow-hidden flex flex-col select-none">
                 {/* Header days row */}
-                <div className="grid grid-cols-[60px_1fr] border-b border-border bg-muted/20">
+                <div className="grid grid-cols-[60px_1fr] border-b border-border bg-muted/20 pr-2">
                   <div className="h-10 border-r border-border" />
                   <div className="grid grid-cols-7 h-10 divide-x divide-border">
                     {weekDates.map((date, idx) => {
@@ -1101,11 +1106,23 @@ export default function AdminSchedulePage() {
                           onClick={() => {
                             if (!schedulesEnabled) return;
                             setSelectedDate(dateIso);
-                            setBulkRepeatDate(dateIso);
-                            setBulkRepeatMode("none");
-                            setBulkRepeatInterval(1);
-                            setBulkRepeatDaysCount(6);
-                            setBulkRepeatOpen(true);
+                            setCurrentWeekDate(dateIso);
+                            
+                            if (isPast) {
+                              toast.error("Past days cannot be repeated or duplicated.");
+                              return;
+                            }
+                            
+                            const dayInstances = instances.filter((i) => i.date === dateIso);
+                            if (dayInstances.length > 0) {
+                              setBulkRepeatDate(dateIso);
+                              setBulkRepeatMode("none");
+                              setBulkRepeatInterval(1);
+                              setBulkRepeatDaysCount(6);
+                              setBulkRepeatOpen(true);
+                            } else {
+                              toast.info("No layouts scheduled on this day to repeat.");
+                            }
                           }}
                           className={cn(
                             "flex flex-col items-center justify-center text-center py-1 transition-colors relative",
@@ -1150,7 +1167,7 @@ export default function AdminSchedulePage() {
                 </div>
 
                 {/* Vertical board content area */}
-                <div className="grid grid-cols-[60px_1fr] relative overflow-y-auto max-h-[700px] custom-scrollbar">
+                <div className="grid grid-cols-[60px_1fr] relative overflow-y-scroll max-h-[700px] custom-scrollbar">
                   {/* Hours timeline side gutter */}
                   <div className="bg-muted/10 border-r border-border select-none text-[10px] text-muted-foreground pr-2 pt-1.5 text-right font-medium">
                     {Array.from({ length: 24 }).map((_, h) => (
