@@ -139,6 +139,12 @@ const toISO = (d: Date) => {
   return `${y}-${m}-${day}`;
 };
 
+const parseISODate = (s: string) => {
+  if (!s) return new Date();
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
 const initialDragState: DragState = {
   action: "idle",
   blockId: null,
@@ -225,7 +231,7 @@ export default function AdminSchedulePage() {
 
   // Retrieve current week date range starting on Monday
   const weekDates = useMemo(() => {
-    const current = new Date(currentWeekDate + "T00:00:00");
+    const current = parseISODate(currentWeekDate);
     const day = current.getDay();
     // Monday is index 0 in our weekly rendering headers
     const distanceToMon = day === 0 ? -6 : 1 - day;
@@ -242,7 +248,7 @@ export default function AdminSchedulePage() {
   // Compute bulk copy date ranges to display helper text
   const getBulkRecurrenceRangeText = () => {
     if (!bulkRepeatDate) return "";
-    const start = new Date(bulkRepeatDate + "T00:00:00");
+    const start = parseISODate(bulkRepeatDate);
     const totalDays = bulkRepeatMode === "none" ? 1 : bulkRepeatDaysCount;
     const interval = bulkRepeatMode === "custom" ? bulkRepeatInterval : 1;
 
@@ -258,7 +264,7 @@ export default function AdminSchedulePage() {
 
   const getRecurrenceRangeText = () => {
     if (!selectedSchedule) return "";
-    const start = new Date(selectedSchedule.start_date + "T00:00:00");
+    const start = parseISODate(selectedSchedule.start_date);
     const totalDays = editRepeatMode === "none" ? 1 : editDaysCount;
     const interval = editRepeatMode === "custom" ? editRepeatInterval : 1;
 
@@ -384,7 +390,7 @@ export default function AdminSchedulePage() {
           newEnd = 24 * 60;
         }
 
-        const d = new Date(dragState.originalDate + "T00:00:00");
+        const d = parseISODate(dragState.originalDate);
         d.setDate(d.getDate() + dayDelta);
 
         setDragState((prev) => ({
@@ -553,13 +559,13 @@ export default function AdminSchedulePage() {
 
   // Navigations
   const handlePrevWeek = () => {
-    const d = new Date(currentWeekDate + "T00:00:00");
+    const d = parseISODate(currentWeekDate);
     d.setDate(d.getDate() - 7);
     setCurrentWeekDate(toISO(d));
   };
 
   const handleNextWeek = () => {
-    const d = new Date(currentWeekDate + "T00:00:00");
+    const d = parseISODate(currentWeekDate);
     d.setDate(d.getDate() + 7);
     setCurrentWeekDate(toISO(d));
   };
@@ -1097,7 +1103,7 @@ export default function AdminSchedulePage() {
                       const dateIso = toISO(date);
                       const isSelected = selectedDate === dateIso;
                       const isCurrent = dateIso === toISO(new Date());
-                      const isPast = new Date(dateIso + "T00:00:00") < new Date(toISO(new Date()) + "T00:00:00");
+                      const isPast = parseISODate(dateIso).getTime() < parseISODate(toISO(new Date())).getTime();
                       const formattedDay = date.toLocaleDateString(undefined, { day: "numeric" });
                       
                       return (
@@ -1207,7 +1213,7 @@ export default function AdminSchedulePage() {
                     {weekDates.map((date, colIdx) => {
                       const dateIso = toISO(date);
                       const isSelected = selectedDate === dateIso;
-                      const isPast = new Date(dateIso + "T00:00:00") < new Date(toISO(new Date()) + "T00:00:00");
+                      const isPast = parseISODate(dateIso).getTime() < parseISODate(toISO(new Date())).getTime();
 
                       const dayInstances = instances.filter((i) => i.date === dateIso);
 
@@ -1359,7 +1365,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Edit / Configure Schedule Details                 */}
       {/* ======================================================== */}
       <Dialog open={editPopupOpen} onOpenChange={setEditPopupOpen}>
-        <DialogContent className="sm:max-w-md border border-border">
+        <DialogContent className="sm:max-w-xl border border-border">
           <DialogHeader>
             <DialogTitle>Configure Schedule</DialogTitle>
           </DialogHeader>
@@ -1555,7 +1561,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Bulk Repeat Day Schedules / Copy Actions          */}
       {/* ======================================================== */}
       <Dialog open={bulkRepeatOpen} onOpenChange={setBulkRepeatOpen}>
-        <DialogContent className="sm:max-w-md border border-border">
+        <DialogContent className="sm:max-w-xl border border-border">
           <DialogHeader>
             <DialogTitle>Configure Day Recurrence</DialogTitle>
             <DialogDescription>
@@ -1708,7 +1714,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Drag Move/Resize Exception Split Confirm          */}
       {/* ======================================================== */}
       <Dialog open={!!pendingUpdate} onOpenChange={() => setPendingUpdate(null)}>
-        <DialogContent className="max-w-sm border border-border">
+        <DialogContent className="max-w-md border border-border">
           <DialogHeader>
             <DialogTitle>Adjust Recurring Occurrence</DialogTitle>
             <DialogDescription>
@@ -1743,7 +1749,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Overwrite Recurrence Conflicts                    */}
       {/* ======================================================== */}
       <Dialog open={bulkOverwriteDates !== null} onOpenChange={() => setBulkOverwriteDates(null)}>
-        <DialogContent className="max-w-sm border border-border">
+        <DialogContent className="max-w-md border border-border">
           <DialogHeader>
             <DialogTitle>Overwrite Existing Schedules?</DialogTitle>
             <DialogDescription>
