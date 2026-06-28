@@ -50,7 +50,10 @@ async function uniqueCode() {
 
 async function getActiveLayout(device) {
   const now = new Date();
-  const day = now.getDay();
+  const y = now.getFullYear();
+  const mo = String(now.getMonth() + 1).padStart(2, "0");
+  const da = String(now.getDate()).padStart(2, "0");
+  const today = `${y}-${mo}-${da}`;
   const time = now.toTimeString().slice(0, 8);
 
   const schedulesEnabled = device.schedules_enabled ?? 1;
@@ -59,17 +62,14 @@ async function getActiveLayout(device) {
   if (schedulesEnabled) {
     const [rows] = await db.query(
       `SELECT l.*
-       FROM schedules s
-       JOIN layouts l ON l.id = s.layout_id
-       WHERE s.device_id = :device_id
-         AND s.company_id = :company_id
-         AND s.is_active = 1
-         AND FIND_IN_SET(:day, s.days_of_week)
-         AND s.start_time <= :time
-         AND s.end_time >= :time
-       ORDER BY s.start_time DESC
+       FROM schedule_instances i
+       JOIN layouts l ON l.id = i.layout_id
+       WHERE i.device_id = :device_id 
+         AND i.date = :date 
+         AND i.start_time <= :time 
+         AND i.end_time > :time
        LIMIT 1`,
-      { device_id: device.id, company_id: device.company_id, day, time }
+      { device_id: device.id, date: today, time }
     );
     scheduledLayouts = rows;
   }

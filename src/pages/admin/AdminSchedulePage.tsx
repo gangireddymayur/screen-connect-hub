@@ -4,37 +4,69 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  Plus,
-  CalendarClock,
-  Trash2,
-  Monitor,
-  List,
-  Calendar as CalendarIcon,
   Search,
-  Move,
+  ChevronLeft,
+  ChevronRight,
   Info,
   SlidersHorizontal,
+  Move,
+  Trash2,
+  CalendarDays,
+  Copy,
+  Clock,
+  ExternalLink,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-interface Schedule {
-  id: string;
+// --- API client fetch helper ---
+const apiFetch = async (method: string, path: string, body?: any) => {
+  const token = localStorage.getItem("sh_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`/api${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(json?.error || `${res.status} ${res.statusText}`);
+  }
+  return json;
+};
+
+interface ApiScheduleInstance {
+  id: number;
+  schedule_id: number;
   device_id: string;
-  layout_id: string | null;
+  layout_id: string;
+  layout_name: string | null;
+  date: string;
   start_time: string;
   end_time: string;
-  days_of_week: number[];
-  is_active: boolean;
-  created_at: string;
-  device_name?: string;
-  layout_name?: string;
+  start_datetime: string;
+  end_datetime: string;
+}
+
+interface ApiSchedule {
+  id: number;
+  device_id: string;
+  layout_id: string;
+  layout_name: string | null;
+  start_time: string;
+  end_time: string;
+  start_date: string;
+  repeat_mode: "none" | "daily" | "custom";
+  repeat_interval: number;
+  days_count: number;
 }
 
 interface Device {
@@ -52,26 +84,25 @@ interface LayoutOption {
 }
 
 interface DragState {
-  action: "idle" | "move" | "resize-top" | "resize-bottom" | "drag-new";
-  blockId: string | null;
-  originalDayIndex: number;
+  action: "idle" | "move" | "resize-top" | "resize-bottom";
+  blockId: number | null; // schedule_id
+  originalDate: string;
   originalStartMins: number;
   originalEndMins: number;
   startY: number;
   startX: number;
-  currentDayIndex: number;
+  currentDate: string;
   currentStartMins: number;
   currentEndMins: number;
-  draggedLayoutId?: string;
 }
 
-const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0]; // Mon=1, Tue=2, Wed=3, Thu=4, Fri=5, Sat=6, Sun=0
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const COLUMN_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
 
-const HOUR_HEIGHT = 48; // px per hour (fits beautifully)
+const HOUR_HEIGHT = 48; // px per hour
 const PX_PER_MIN = HOUR_HEIGHT / 60;
-const TOTAL_MINUTES = 24 * 60;
 
 const DEVICE_COLORS = [
   "hsl(var(--primary))",
@@ -101,16 +132,24 @@ const formatMinsAMPM = (mins: number) => {
   return `${displayH}:${String(m).padStart(2, "0")} ${ampm}`;
 };
 
+const toISO = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 const initialDragState: DragState = {
   action: "idle",
   blockId: null,
-  originalDayIndex: 0,
+  originalDate: "",
   originalStartMins: 0,
   originalEndMins: 0,
   startY: 0,
   startX: 0,
-  currentDayIndex: 0,
+  currentDate: "",
   currentStartMins: 0,
+  currentEndMins: 0,
 };
 
 const GlassCard = ({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
@@ -121,57 +160,122 @@ const GlassCard = ({ children, className, ...props }: React.HTMLAttributes<HTMLD
 
 export default function AdminSchedulePage() {
   const { user } = useAuth();
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [schedules, setSchedules] = useState<ApiSchedule[]>([]);
+  const [instances, setInstances] = useState<ApiScheduleInstance[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [layouts, setLayouts] = useState<LayoutOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
-  const [view, setView] = useState<"calendar" | "list">("calendar");
 
-  // Selection & control states
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [deviceSearch, setDeviceSearch] = useState("");
   const [layoutSearch, setLayoutSearch] = useState("");
-
-  // Edit / Details Popup
-  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
-  const [editPopupOpen, setEditPopupOpen] = useState(false);
-  const [editLayout, setEditLayout] = useState("");
-  const [editDays, setEditDays] = useState<number[]>([]);
-  const [editStartTime, setEditStartTime] = useState("09:00");
-  const [editEndTime, setEditEndTime] = useState("17:00");
-  const [editActive, setEditActive] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string>(toISO(new Date()));
 
   // Drag-and-drop state
   const [dragState, setDragState] = useState<DragState>(initialDragState);
   const weekGridRef = useRef<HTMLDivElement | null>(null);
   const [colWidth, setColWidth] = useState(120);
 
-  // Time Indicator state
-  const [nowTime, setNowTime] = useState(new Date());
+  // Active configure popup state
+  const [selectedSchedule, setSelectedSchedule] = useState<ApiSchedule | null>(null);
+  const [editPopupOpen, setEditPopupOpen] = useState(false);
+  const [editRepeatMode, setEditRepeatMode] = useState<"none" | "daily" | "custom">("none");
+  const [editRepeatInterval, setEditRepeatInterval] = useState(1);
+  const [editDaysCount, setEditDaysCount] = useState(6);
+  const [editStartTime, setEditStartTime] = useState("09:00");
+  const [editEndTime, setEditEndTime] = useState("17:00");
+  const [editLayout, setEditLayout] = useState("");
 
-  // Overwrite Dialogs states
-  const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false);
-  const [overwritePayload, setOverwritePayload] = useState<{
-    id?: string;
-    device_id: string;
-    layout_id: string | null;
+  // Edit occurrence vs series confirmation
+  const [pendingUpdate, setPendingUpdate] = useState<{
+    id: number;
+    date: string;
     start_time: string;
     end_time: string;
-    days_of_week: number[];
-    is_active: boolean;
+    layout_id: string;
   } | null>(null);
+
+  // Bulk copy operations states
+  const [bulkRepeatOpen, setBulkRepeatOpen] = useState(false);
+  const [bulkRepeatDate, setBulkRepeatDate] = useState<string | null>(null);
+  const [bulkRepeatMode, setBulkRepeatMode] = useState<"none" | "daily" | "custom">("none");
+  const [bulkRepeatInterval, setBulkRepeatInterval] = useState(1);
+  const [bulkRepeatDaysCount, setBulkRepeatDaysCount] = useState(6);
+
+  // Day replication copy states
+  const [copyDayOpen, setCopyDayOpen] = useState(false);
+  const [copyTargetDates, setCopyTargetDates] = useState<string[]>([]);
+  const [copyOverwriteOpen, setCopyOverwriteOpen] = useState(false);
+
+  // Overwrite validation confirmations
+  const [bulkOverwriteDates, setBulkOverwriteDates] = useState<string[] | null>(null);
+  const [repeatOverwritePayload, setRepeatOverwritePayload] = useState<{
+    schedule_id: number;
+    start_date: string;
+    repeat_mode: "none" | "daily" | "custom";
+    repeat_interval?: number;
+    days_count?: number;
+    start_time?: string;
+    end_time?: string;
+  } | null>(null);
+
+  // Month Switcher for Mini Calendar
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   const selectedDevice = devices.find((d) => d.id === selectedDeviceId);
   const schedulesEnabled = selectedDevice ? (selectedDevice.schedules_enabled !== 0) : true;
 
-  // Auto-refresh Time Indicator
-  useEffect(() => {
-    const timer = setInterval(() => setNowTime(new Date()), 30000);
-    return () => clearInterval(timer);
-  }, []);
+  // Retrieve current week date range starting on Monday
+  const weekDates = useMemo(() => {
+    const current = new Date(selectedDate + "T00:00:00");
+    const day = current.getDay();
+    // Monday is index 0 in our weekly rendering headers
+    const distanceToMon = day === 0 ? -6 : 1 - day;
+    const monday = new Date(current.getTime());
+    monday.setDate(current.getDate() + distanceToMon);
 
-  // Measure Column width on mount / resize
+    return Array.from({ length: 7 }).map((_, idx) => {
+      const d = new Date(monday.getTime());
+      d.setDate(monday.getDate() + idx);
+      return d;
+    });
+  }, [selectedDate]);
+
+  // Compute bulk copy date ranges to display helper text
+  const getBulkRecurrenceRangeText = () => {
+    if (!bulkRepeatDate) return "";
+    const start = new Date(bulkRepeatDate + "T00:00:00");
+    const totalDays = bulkRepeatMode === "none" ? 1 : bulkRepeatDaysCount;
+    const interval = bulkRepeatMode === "custom" ? bulkRepeatInterval : 1;
+
+    const end = new Date(start.getTime());
+    end.setDate(start.getDate() + (totalDays - 1) * interval);
+
+    const startStr = start.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    const endStr = end.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+    if (bulkRepeatMode === "none") return `Occurs only on ${startStr}`;
+    return `Repeats from ${startStr} to ${endStr} (${totalDays} occurrences)`;
+  };
+
+  const getRecurrenceRangeText = () => {
+    if (!selectedSchedule) return "";
+    const start = new Date(selectedSchedule.start_date + "T00:00:00");
+    const totalDays = editRepeatMode === "none" ? 1 : editDaysCount;
+    const interval = editRepeatMode === "custom" ? editRepeatInterval : 1;
+
+    const end = new Date(start.getTime());
+    end.setDate(start.getDate() + (totalDays - 1) * interval);
+
+    const startStr = start.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    const endStr = end.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+    if (editRepeatMode === "none") return `Occurs only on ${startStr}`;
+    return `Repeats from ${startStr} to ${endStr} (${totalDays} occurrences)`;
+  };
+
+  // Measure Columns widths dynamically
   useEffect(() => {
     const handleResize = () => {
       if (weekGridRef.current) {
@@ -184,7 +288,7 @@ export default function AdminSchedulePage() {
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [view, loading]);
+  }, [loading]);
 
   useEffect(() => {
     if (!user) return;
@@ -192,36 +296,40 @@ export default function AdminSchedulePage() {
       .then(({ data }) => {
         if (data?.company_id) {
           setCompanyId(data.company_id);
-          fetchAll(data.company_id);
+          fetchDevicesAndLayouts(data.company_id);
         } else setLoading(false);
       });
   }, [user]);
 
-  // Set default selected device on load
-  useEffect(() => {
-    if (selectedDeviceId === null && devices.length > 0) {
-      setSelectedDeviceId(devices[0].id);
-    }
-  }, [devices, selectedDeviceId]);
-
-  const fetchAll = async (cId: string) => {
-    const [schedulesRes, devicesRes, layoutsRes] = await Promise.all([
-      supabase.from("schedules").select("*").eq("company_id", cId),
+  const fetchDevicesAndLayouts = async (cId: string) => {
+    const [devicesRes, layoutsRes] = await Promise.all([
       supabase.from("devices").select("*").eq("company_id", cId),
       supabase.from("layouts").select("id, name").eq("company_id", cId).order("name"),
     ]);
 
-    const devMap = new Map((devicesRes.data ?? []).map((d: any) => [d.id, d.name]));
-    const layoutMap = new Map((layoutsRes.data ?? []).map((l: any) => [l.id, l.name]));
-
-    setDevices(devicesRes.data ?? []);
+    const devs = devicesRes.data ?? [];
+    setDevices(devs);
     setLayouts(layoutsRes.data ?? []);
-    setSchedules((schedulesRes.data ?? []).map((s: any) => ({
-      ...s,
-      device_name: devMap.get(s.device_id) ?? "Unknown",
-      layout_name: s.layout_id ? layoutMap.get(s.layout_id) ?? "Unknown layout" : "Device default layout",
-    })));
-    setLoading(false);
+
+    if (devs.length > 0) {
+      setSelectedDeviceId(devs[0].id);
+      fetchSchedules(devs[0].id);
+    } else {
+      setLoading(false);
+    }
+  };
+
+  const fetchSchedules = async (deviceId: string) => {
+    setLoading(true);
+    try {
+      const data = await apiFetch("GET", `/schedules/device/${deviceId}`);
+      setSchedules(data.schedules || []);
+      setInstances(data.instances || []);
+    } catch (err: any) {
+      toast.error("Failed to load schedules: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const deviceColorMap = useMemo(() => {
@@ -230,198 +338,33 @@ export default function AdminSchedulePage() {
     return m;
   }, [devices]);
 
-  // Overlap Verification helper
-  const checkOverlaps = (
-    deviceId: string,
-    startTime: string,
-    endTime: string,
-    daysOfWeek: number[],
-    excludeScheduleId?: string
-  ) => {
-    const startMins = timeToMinutes(startTime);
-    const endMins = timeToMinutes(endTime);
-
-    return schedules.filter((s) => {
-      if (!s.is_active) return false;
-      if (s.device_id !== deviceId) return false;
-      if (excludeScheduleId && s.id === excludeScheduleId) return false;
-
-      const hasDayOverlap = s.days_of_week.some((d) => daysOfWeek.includes(d));
-      if (!hasDayOverlap) return false;
-
-      const sStart = timeToMinutes(s.start_time);
-      const sEnd = timeToMinutes(s.end_time);
-
-      return startMins < sEnd && endMins > sStart;
-    });
-  };
-
-  // Perform overwriting operation by deleting conflicting schedules
-  const executeOverwrite = async (payload: NonNullable<typeof overwritePayload>) => {
-    if (!companyId) return;
-    setOverwriteConfirmOpen(false);
-
-    const conflicts = checkOverlaps(
-      payload.device_id,
-      payload.start_time,
-      payload.end_time,
-      payload.days_of_week,
-      payload.id
-    );
-
-    try {
-      // Purge overlaps
-      for (const conf of conflicts) {
-        await supabase.from("schedules").delete().eq("id", conf.id);
-      }
-
-      if (payload.id) {
-        // Update existing schedule
-        const { error } = await supabase.from("schedules").update({
-          layout_id: payload.layout_id,
-          start_time: payload.start_time,
-          end_time: payload.end_time,
-          days_of_week: payload.days_of_week,
-          is_active: payload.is_active,
-        }).eq("id", payload.id);
-
-        if (error) throw error;
-        toast.success("Schedule updated successfully!");
-      } else {
-        // Insert new schedule
-        const { error } = await supabase.from("schedules").insert({
-          company_id: companyId,
-          device_id: payload.device_id,
-          layout_id: payload.layout_id,
-          start_time: payload.start_time,
-          end_time: payload.end_time,
-          days_of_week: payload.days_of_week,
-          is_active: payload.is_active,
-        });
-
-        if (error) throw error;
-        toast.success("New schedule created!");
-      }
-
-      setEditPopupOpen(false);
-      fetchAll(companyId);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to save schedule");
-    }
-  };
-
-  // Save changes handler
-  const handleSaveSchedule = async () => {
-    if (!selectedDeviceId || !companyId) return;
-
-    const payload = {
-      id: selectedSchedule?.id,
-      device_id: selectedDeviceId,
-      layout_id: editLayout || null,
-      start_time: editStartTime,
-      end_time: editEndTime,
-      days_of_week: editDays,
-      is_active: editActive,
-    };
-
-    const conflicts = checkOverlaps(
-      payload.device_id,
-      payload.start_time,
-      payload.end_time,
-      payload.days_of_week,
-      payload.id
-    );
-
-    if (conflicts.length > 0) {
-      setOverwritePayload(payload);
-      setOverwriteConfirmOpen(true);
-      return;
-    }
-
-    try {
-      if (payload.id) {
-        const { error } = await supabase.from("schedules").update({
-          layout_id: payload.layout_id,
-          start_time: payload.start_time,
-          end_time: payload.end_time,
-          days_of_week: payload.days_of_week,
-          is_active: payload.is_active,
-        }).eq("id", payload.id);
-
-        if (error) throw error;
-        toast.success("Schedule saved successfully!");
-      } else {
-        const { error } = await supabase.from("schedules").insert({
-          company_id: companyId,
-          device_id: payload.device_id,
-          layout_id: payload.layout_id,
-          start_time: payload.start_time,
-          end_time: payload.end_time,
-          days_of_week: payload.days_of_week,
-          is_active: payload.is_active,
-        });
-
-        if (error) throw error;
-        toast.success("Schedule created successfully!");
-      }
-
-      setEditPopupOpen(false);
-      fetchAll(companyId);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to save schedule");
-    }
-  };
-
-  // Delete handler
-  const handleDeleteSchedule = async (id: string) => {
-    if (!companyId) return;
-    try {
-      const { error } = await supabase.from("schedules").delete().eq("id", id);
-      if (error) throw error;
-
-      toast.success("Schedule deleted successfully!");
-      setEditPopupOpen(false);
-      fetchAll(companyId);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to delete schedule");
-    }
-  };
-
-  // Toggle single schedule active status
-  const toggleActive = async (schedule: Schedule) => {
-    const { error } = await supabase.from("schedules").update({ is_active: !schedule.is_active }).eq("id", schedule.id);
-    if (error) toast.error(error.message);
-    else setSchedules((prev) => prev.map((s) => s.id === schedule.id ? { ...s, is_active: !s.is_active } : s));
-  };
-
-  // Toggle Schedules mode on device
+  // Handle Schedules bypass status updates
   const updateDeviceSchedulesMode = async (enabled: boolean) => {
     if (!selectedDeviceId || !companyId) return;
     try {
       const { error } = await supabase.from("devices").update({ schedules_enabled: enabled ? 1 : 0 }).eq("id", selectedDeviceId);
       if (error) throw error;
-      toast.success("Device schedule mode updated");
-      fetchAll(companyId);
+      toast.success("Device schedules mode updated");
+      fetchDevicesAndLayouts(companyId);
     } catch (e: any) {
-      toast.error(e.message || "Failed to update schedule mode");
+      toast.error("Failed to update schedules mode: " + (e as Error).message);
     }
   };
 
-  // Update default layout fallback
   const updateDeviceDefaultLayout = async (layoutId: string | null) => {
     if (!selectedDeviceId || !companyId) return;
     try {
       const { error } = await supabase.from("devices").update({ layout_id: layoutId }).eq("id", selectedDeviceId);
       if (error) throw error;
       toast.success("Device default layout updated");
-      fetchAll(companyId);
+      fetchDevicesAndLayouts(companyId);
     } catch (e: any) {
-      toast.error(e.message || "Failed to update default layout");
+      toast.error("Failed to update default layout: " + (e as Error).message);
     }
   };
 
-  // Global mouse move & mouse up gesture handlers
-  React.useEffect(() => {
+  // Drag-move and drag-resize mouse listener hooks
+  useEffect(() => {
     if (dragState.action === "idle") return;
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -444,14 +387,12 @@ export default function AdminSchedulePage() {
           newEnd = 24 * 60;
         }
 
-        // Adjust day columns
-        const originalIndex = WEEK_DAYS.indexOf(dragState.originalDayIndex);
-        const nextIndex = Math.max(0, Math.min(6, originalIndex + dayDelta));
-        const nextDay = WEEK_DAYS[nextIndex];
+        const d = new Date(dragState.originalDate + "T00:00:00");
+        d.setDate(d.getDate() + dayDelta);
 
         setDragState((prev) => ({
           ...prev,
-          currentDayIndex: nextDay,
+          currentDate: toISO(d),
           currentStartMins: newStart,
           currentEndMins: newEnd,
         }));
@@ -473,63 +414,45 @@ export default function AdminSchedulePage() {
     };
 
     const handleMouseUp = async () => {
-      const { blockId, currentDayIndex, currentStartMins, currentEndMins, originalDayIndex, originalStartMins, originalEndMins } = dragState;
+      const { blockId, currentDate, currentStartMins, currentEndMins } = dragState;
       setDragState(initialDragState);
 
       if (
         blockId !== null &&
-        (currentDayIndex !== originalDayIndex ||
-        currentStartMins !== originalStartMins ||
-        currentEndMins !== originalEndMins)
+        (currentDate !== dragState.originalDate ||
+        currentStartMins !== dragState.originalStartMins ||
+        currentEndMins !== dragState.originalEndMins)
       ) {
-        const parent = schedules.find((s) => s.id === blockId);
-        if (!parent || !companyId) return;
-
-        const startTimeStr = toHHMM(currentStartMins);
-        const endTimeStr = toHHMM(currentEndMins);
-
-        // Adjust day index list
-        let nextDays = [...parent.days_of_week];
-        if (currentDayIndex !== originalDayIndex) {
-          nextDays = nextDays.map((d) => d === originalDayIndex ? currentDayIndex : d);
-        }
-
-        const payload = {
-          id: blockId,
-          device_id: parent.device_id,
-          layout_id: parent.layout_id,
-          start_time: startTimeStr,
-          end_time: endTimeStr,
-          days_of_week: nextDays,
-          is_active: parent.is_active,
-        };
-
-        const conflicts = checkOverlaps(
-          payload.device_id,
-          payload.start_time,
-          payload.end_time,
-          payload.days_of_week,
-          payload.id
-        );
-
-        if (conflicts.length > 0) {
-          setOverwritePayload(payload);
-          setOverwriteConfirmOpen(true);
+        const todayStr = toISO(new Date());
+        if (currentDate < todayStr) {
+          toast.error("You cannot schedule on past dates");
           return;
         }
 
-        try {
-          const { error } = await supabase.from("schedules").update({
-            start_time: payload.start_time,
-            end_time: payload.end_time,
-            days_of_week: payload.days_of_week,
-          }).eq("id", blockId);
+        const parent = schedules.find((s) => s.id === blockId);
+        const startTimeStr = toHHMM(currentStartMins);
+        const endTimeStr = toHHMM(currentEndMins);
 
-          if (error) throw error;
-          toast.success("Schedule adjusted!");
-          fetchAll(companyId);
-        } catch (err: any) {
-          toast.error(err.message || "Failed to update layout block");
+        if (parent && parent.repeat_mode !== "none") {
+          setPendingUpdate({
+            id: blockId,
+            date: currentDate,
+            start_time: startTimeStr,
+            end_time: endTimeStr,
+            layout_id: parent.layout_id,
+          });
+        } else {
+          try {
+            await apiFetch("PUT", `/schedules/${blockId}`, {
+              start_date: currentDate,
+              start_time: startTimeStr,
+              end_time: endTimeStr,
+            });
+            toast.success("Schedule adjusted successfully!");
+            if (selectedDeviceId) fetchSchedules(selectedDeviceId);
+          } catch (err: any) {
+            toast.error(err.message || "Failed to update schedule block");
+          }
         }
       }
     };
@@ -542,22 +465,65 @@ export default function AdminSchedulePage() {
     };
   }, [dragState, colWidth]);
 
-  // Click on active block to open edit popup
-  const handleBlockClick = (schedule: Schedule) => {
-    setSelectedSchedule(schedule);
-    setEditLayout(schedule.layout_id || "");
-    setEditDays(schedule.days_of_week);
-    setEditStartTime(schedule.start_time.slice(0, 5));
-    setEditEndTime(schedule.end_time.slice(0, 5));
-    setEditActive(schedule.is_active);
-    setEditPopupOpen(true);
+  // Click on active timeline block
+  const handleBlockClick = (scheduleId: number) => {
+    const parent = schedules.find((s) => s.id === scheduleId);
+    if (parent) {
+      setSelectedSchedule(parent);
+      setEditLayout(parent.layout_id);
+      setEditRepeatMode(parent.repeat_mode);
+      setEditRepeatInterval(parent.repeat_interval || 1);
+      setEditDaysCount(parent.days_count || 6);
+      setEditStartTime(parent.start_time.slice(0, 5));
+      setEditEndTime(parent.end_time.slice(0, 5));
+      setEditPopupOpen(true);
+    }
   };
 
-  // Mouse gestures trigger helpers
+  // Drag layouts onto columns handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDropNew = async (e: React.DragEvent, dateStr: string) => {
+    e.preventDefault();
+    if (!schedulesEnabled || !selectedDeviceId) return;
+
+    const todayStr = toISO(new Date());
+    if (dateStr < todayStr) {
+      toast.error("You cannot schedule on past dates");
+      return;
+    }
+
+    const layoutId = e.dataTransfer.getData("text/plain");
+    if (!layoutId) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const droppedMins = Math.max(0, Math.min(24 * 60 - 60, Math.floor(y / PX_PER_MIN)));
+    const startMins = Math.round(droppedMins / 15) * 15;
+    const endMins = Math.min(24 * 60, startMins + 8 * 60); // 8 Hours default
+
+    try {
+      await apiFetch("POST", "/schedules", {
+        device_id: selectedDeviceId,
+        layout_id: layoutId,
+        start_time: toHHMM(startMins),
+        end_time: toHHMM(endMins),
+        start_date: dateStr,
+        repeat_mode: "none",
+      });
+      toast.success("Schedule block added!");
+      fetchSchedules(selectedDeviceId);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to drop layout");
+    }
+  };
+
   const handleBlockMouseDown = (
     e: React.MouseEvent,
-    s: Schedule,
-    dayIndex: number,
+    instance: ApiScheduleInstance,
     action: DragState["action"]
   ) => {
     e.stopPropagation();
@@ -565,92 +531,247 @@ export default function AdminSchedulePage() {
 
     if (!schedulesEnabled) return;
 
-    const startMins = timeToMinutes(s.start_time);
-    const endMins = timeToMinutes(s.end_time);
+    const todayStr = toISO(new Date());
+    if (instance.date < todayStr) {
+      toast.error("Completed slots are locked");
+      return;
+    }
+
+    const startMins = timeToMinutes(instance.start_time);
+    const endMins = timeToMinutes(instance.end_time);
 
     setDragState({
       action,
-      blockId: s.id,
-      originalDayIndex: dayIndex,
+      blockId: instance.schedule_id,
+      originalDate: instance.date,
       originalStartMins: startMins,
       originalEndMins: endMins,
       startY: e.clientY,
       startX: e.clientX,
-      currentDayIndex: dayIndex,
+      currentDate: instance.date,
       currentStartMins: startMins,
       currentEndMins: endMins,
     });
   };
 
-  // Drag layouts over the calendar container handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
+  // Navigations
+  const handlePrevWeek = () => {
+    const d = new Date(selectedDate + "T00:00:00");
+    d.setDate(d.getDate() - 7);
+    setSelectedDate(toISO(d));
   };
 
-  const handleDropNew = async (e: React.DragEvent, dayIndex: number) => {
-    e.preventDefault();
-    if (!schedulesEnabled || !selectedDeviceId || !companyId) return;
+  const handleNextWeek = () => {
+    const d = new Date(selectedDate + "T00:00:00");
+    d.setDate(d.getDate() + 7);
+    setSelectedDate(toISO(d));
+  };
 
-    const layoutId = e.dataTransfer.getData("text/plain");
-    if (!layoutId) return;
+  const handleToday = () => {
+    const today = toISO(new Date());
+    setSelectedDate(today);
+    setCalendarMonth(new Date());
+  };
 
-    // Calculate start time relative to target board position
-    const rect = e.currentTarget.getBoundingClientRect();
-    const dropY = e.clientY - rect.top;
-    const dropMins = Math.round((dropY / PX_PER_MIN) / 15) * 15;
-
-    const startMins = Math.min(23 * 60, Math.max(0, dropMins));
-    const endMins = Math.min(24 * 60, startMins + 60);
-
-    const startTimeStr = toHHMM(startMins);
-    const endTimeStr = toHHMM(endMins);
+  // Configure Schedule submissions
+  const handleSaveConfigure = async () => {
+    if (!selectedSchedule || !selectedDeviceId) return;
 
     const payload = {
-      device_id: selectedDeviceId,
-      layout_id: layoutId,
-      start_time: startTimeStr,
-      end_time: endTimeStr,
-      days_of_week: [dayIndex],
-      is_active: true,
+      layout_id: editLayout,
+      start_time: editStartTime,
+      end_time: editEndTime,
+      start_date: selectedSchedule.start_date,
+      repeat_mode: editRepeatMode,
+      repeat_interval: editRepeatInterval,
+      days_count: editDaysCount,
     };
 
-    const conflicts = checkOverlaps(
-      payload.device_id,
-      payload.start_time,
-      payload.end_time,
-      payload.days_of_week
-    );
-
-    if (conflicts.length > 0) {
-      setOverwritePayload(payload);
-      setOverwriteConfirmOpen(true);
-      return;
-    }
-
     try {
-      const { error } = await supabase.from("schedules").insert({
-        company_id: companyId,
-        device_id: payload.device_id,
-        layout_id: payload.layout_id,
-        start_time: payload.start_time,
-        end_time: payload.end_time,
-        days_of_week: payload.days_of_week,
-      });
-
-      if (error) throw error;
-      toast.success("Schedule block added!");
-      fetchAll(companyId);
+      await apiFetch("PUT", `/schedules/${selectedSchedule.id}`, payload);
+      toast.success("Schedule series updated successfully!");
+      setEditPopupOpen(false);
+      fetchSchedules(selectedDeviceId);
     } catch (err: any) {
-      toast.error(err.message || "Failed to drop layout");
+      if (err.message && err.message.includes("Overlap")) {
+        setRepeatOverwritePayload({
+          schedule_id: selectedSchedule.id,
+          start_date: selectedSchedule.start_date,
+          repeat_mode: editRepeatMode,
+          repeat_interval: editRepeatInterval,
+          days_count: editDaysCount,
+          start_time: editStartTime,
+          end_time: editEndTime,
+        });
+        setBulkOverwriteDates([]); // trigger overlap flow
+      } else {
+        toast.error(err.message || "Failed to update series");
+      }
     }
   };
 
-  // Toggle selected edit day index
-  const toggleEditDay = (day: number) => {
-    setEditDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
-    );
+  const handleConfigureException = async () => {
+    if (!selectedSchedule || !selectedDeviceId) return;
+    try {
+      await apiFetch("POST", "/schedules/exception", {
+        schedule_id: selectedSchedule.id,
+        date: selectedDate,
+        start_time: editStartTime,
+        end_time: editEndTime,
+        layout_id: editLayout,
+      });
+      toast.success("Exceptions saved for this day successfully!");
+      setEditPopupOpen(false);
+      fetchSchedules(selectedDeviceId);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save exception");
+    }
+  };
+
+  const handleDeleteScheduleSeries = async () => {
+    if (!selectedSchedule || !selectedDeviceId) return;
+    try {
+      await apiFetch("DELETE", `/schedules/${selectedSchedule.id}`);
+      toast.success("Schedule series deleted successfully");
+      setEditPopupOpen(false);
+      fetchSchedules(selectedDeviceId);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete series");
+    }
+  };
+
+  const handleDeleteScheduleOccurrence = async () => {
+    if (!selectedSchedule || !selectedDeviceId) return;
+    try {
+      await apiFetch("DELETE", `/schedules/${selectedSchedule.id}?date=${selectedDate}`);
+      toast.success("Schedule occurrence deleted successfully");
+      setEditPopupOpen(false);
+      fetchSchedules(selectedDeviceId);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete occurrence");
+    }
+  };
+
+  // Re-save drag exception adjustments
+  const handleExecuteOccurrenceUpdate = async () => {
+    if (!pendingUpdate || !selectedDeviceId) return;
+    try {
+      await apiFetch("POST", "/schedules/exception", {
+        schedule_id: pendingUpdate.id,
+        date: pendingUpdate.date,
+        start_time: pendingUpdate.start_time,
+        end_time: pendingUpdate.end_time,
+        layout_id: pendingUpdate.layout_id,
+      });
+      toast.success("Occurrence detached successfully!");
+      setPendingUpdate(null);
+      fetchSchedules(selectedDeviceId);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to split occurrence");
+    }
+  };
+
+  const handleExecuteSeriesUpdate = async () => {
+    if (!pendingUpdate || !selectedDeviceId) return;
+    try {
+      await apiFetch("PUT", `/schedules/${pendingUpdate.id}`, {
+        start_date: pendingUpdate.date,
+        start_time: pendingUpdate.start_time,
+        end_time: pendingUpdate.end_time,
+      });
+      toast.success("Entire series updated!");
+      setPendingUpdate(null);
+      fetchSchedules(selectedDeviceId);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to adjust series");
+    }
+  };
+
+  // Overwrite recurrence conflicts handler
+  const executeRepeatOverwrite = async () => {
+    if (!repeatOverwritePayload || !selectedDeviceId) return;
+    try {
+      await apiFetch("POST", "/schedules/repeat", {
+        ...repeatOverwritePayload,
+        overwrite: true,
+      });
+      toast.success("Conflicts purged. Recurrence set!");
+      setRepeatOverwritePayload(null);
+      setBulkOverwriteDates(null);
+      setBulkRepeatOpen(false);
+      setEditPopupOpen(false);
+      fetchSchedules(selectedDeviceId);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to override recurrence");
+    }
+  };
+
+  // Bulk copy target day operations
+  const handleOpenCopyDay = () => {
+    setCopyTargetDates([]);
+    setCopyDayOpen(true);
+  };
+
+  const handleExecuteCopyDay = async (overwriteApprove = false) => {
+    if (!selectedDeviceId || !bulkRepeatDate) return;
+    try {
+      const res = await apiFetch("POST", "/schedules/copy-day", {
+        device_id: selectedDeviceId,
+        source_date: bulkRepeatDate,
+        target_dates: copyTargetDates,
+        overwrite: overwriteApprove,
+      });
+
+      if (res.has_existing) {
+        setCopyOverwriteOpen(true);
+      } else {
+        toast.success(`Copied successfully to target days!`);
+        setCopyDayOpen(false);
+        setCopyOverwriteOpen(false);
+        setBulkRepeatOpen(false);
+        fetchSchedules(selectedDeviceId);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to copy day schedules");
+    }
+  };
+
+  // Recurrence configuration checks
+  const handleBulkRecurrenceSave = async () => {
+    const dayInstanceSchedules = instances.filter(i => i.date === bulkRepeatDate);
+    const dayScheduleIds = Array.from(new Set(dayInstanceSchedules.map(i => i.schedule_id)));
+    const targetSchedules = schedules.filter(s => dayScheduleIds.includes(s.id));
+
+    if (targetSchedules.length === 0) return;
+
+    try {
+      for (const s of targetSchedules) {
+        await apiFetch("POST", "/schedules/repeat", {
+          schedule_id: s.id,
+          repeat_mode: bulkRepeatMode,
+          repeat_interval: bulkRepeatInterval,
+          days_count: bulkRepeatDaysCount,
+        });
+      }
+      toast.success("Bulk recurrence configured!");
+      setBulkRepeatOpen(false);
+      fetchSchedules(selectedDeviceId!);
+    } catch (err: any) {
+      if (err.message && err.message.includes("Overlap")) {
+        // Find first schedule to repeat
+        const firstS = targetSchedules[0];
+        setRepeatOverwritePayload({
+          schedule_id: firstS.id,
+          start_date: bulkRepeatDate!,
+          repeat_mode: bulkRepeatMode,
+          repeat_interval: bulkRepeatInterval,
+          days_count: bulkRepeatDaysCount,
+        });
+        setBulkOverwriteDates([]); // trigger overlap dialog
+      } else {
+        toast.error(err.message || "Failed to set recurrence");
+      }
+    }
   };
 
   // Sidebar Filtered lists
@@ -664,290 +785,340 @@ export default function AdminSchedulePage() {
     l.name.toLowerCase().includes(layoutSearch.toLowerCase())
   );
 
-  const activeDeviceSchedules = schedules.filter(
-    (s) => s.device_id === selectedDeviceId
-  );
-
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Schedule</h1>
-            <p className="text-sm text-muted-foreground mt-1">Assign layout playlists to devices on a schedule</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-md border bg-card">
-              <Button
-                variant={view === "calendar" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setView("calendar")}
-                className="rounded-r-none h-8 text-xs font-semibold"
-              >
-                <CalendarIcon className="h-3.5 w-3.5 mr-1.5" /> Calendar View
-              </Button>
-              <Button
-                variant={view === "list" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setView("list")}
-                className="rounded-l-none h-8 text-xs font-semibold"
-              >
-                <List className="h-3.5 w-3.5 mr-1.5" /> List View
-              </Button>
-            </div>
-            <Button
-              onClick={() => {
-                setSelectedSchedule(null);
-                setEditLayout("");
-                setEditDays([1, 2, 3, 4, 5]);
-                setEditStartTime("09:00");
-                setEditEndTime("17:00");
-                setEditActive(true);
-                setEditPopupOpen(true);
-              }}
-              disabled={!selectedDeviceId}
-              className="h-8 text-xs font-semibold"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> Create Schedule
-            </Button>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Schedule Planner</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Schedule layout playlists to show up at specific days and hours on your screens. Drag-and-drop, resize, and custom repeat rules.
+          </p>
         </div>
 
-        {loading ? (
-          <Card>
-            <CardContent className="py-12 flex justify-center">
-              <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full" />
-            </CardContent>
-          </Card>
-        ) : view === "list" ? (
-          <Card className="glass-card">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-white/5">
-                    <TableHead className="text-xs text-muted-foreground">Device</TableHead>
-                    <TableHead className="text-xs text-muted-foreground">Layout</TableHead>
-                    <TableHead className="text-xs text-muted-foreground">Time</TableHead>
-                    <TableHead className="text-xs text-muted-foreground">Days</TableHead>
-                    <TableHead className="text-xs text-muted-foreground">Status</TableHead>
-                    <TableHead className="w-16 text-xs text-muted-foreground">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {schedules.map((s) => (
-                    <TableRow key={s.id} className="hover:bg-white/[0.02] border-white/5">
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: deviceColorMap.get(s.device_id) }} />
-                          <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-sm font-semibold text-foreground">{s.device_name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{s.layout_name}</TableCell>
-                      <TableCell className="text-sm font-medium">{s.start_time.slice(0, 5)} – {s.end_time.slice(0, 5)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-0.5">
-                          {COLUMN_HEADERS.map((label, index) => {
-                            const dIndex = WEEK_DAYS[index];
-                            const active = s.days_of_week.includes(dIndex);
-                            return (
-                              <span
-                                key={index}
-                                className={cn(
-                                  "text-[9px] px-1.5 py-0.5 rounded font-semibold",
-                                  active
-                                    ? "bg-primary/10 text-primary"
-                                    : "text-muted-foreground/30 border border-white/5"
-                                )}
-                              >
-                                {label[0]}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <button
-                          onClick={() => toggleActive(s)}
-                          className={cn(
-                            "text-xs px-2 py-0.5 rounded-full font-semibold border",
-                            s.is_active
-                              ? "bg-emerald-400/10 text-emerald-400 border-emerald-400/15"
-                              : "bg-rose-400/10 text-rose-400 border-rose-400/15"
-                          )}
-                        >
-                          {s.is_active ? "Active" : "Inactive"}
-                        </button>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => handleDeleteSchedule(s.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        ) : (
-          /* ======================================================== */
-          /* GRID CALENDAR & SIDEBAR LAYOUT                           */
-          /* ======================================================== */
-          <div className="grid grid-cols-[240px_1fr_240px] gap-6">
-            {/* LEFT SIDEBAR: Device Selector & Mode Control */}
-            <div className="space-y-6">
-              <GlassCard className="p-4 flex flex-col gap-3">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
-                  Devices
-                </h2>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Search devices..."
-                    value={deviceSearch}
-                    onChange={(e) => setDeviceSearch(e.target.value)}
-                    className="pl-8 bg-white/5 border-white/10 text-xs h-8"
-                  />
-                </div>
-                <div className="space-y-1 max-h-[195px] overflow-y-auto pr-1 custom-scrollbar">
-                  {filteredDevices.map((d) => {
-                    const isSelected = d.id === selectedDeviceId;
-                    return (
-                      <button
-                        key={d.id}
-                        onClick={() => setSelectedDeviceId(d.id)}
-                        className={cn(
-                          "w-full text-left p-2 rounded-xl text-xs flex items-center justify-between border transition-all duration-200",
-                          isSelected
-                            ? "bg-primary/10 border-primary/30 text-foreground font-medium"
-                            : "bg-transparent border-transparent hover:bg-white/5 text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        <div className="truncate">
-                          <div>{d.name}</div>
-                          {d.location && <div className="text-[10px] opacity-75">{d.location}</div>}
-                        </div>
-                        <span
-                          className={cn(
-                            "size-1.5 rounded-full shrink-0 ml-1.5",
-                            d.status === "online"
-                              ? "bg-emerald-400 animate-pulse"
-                              : d.status === "pending"
-                                ? "bg-amber-400"
-                                : "bg-muted-foreground/30"
-                          )}
-                        />
-                      </button>
-                    );
-                  })}
-                  {filteredDevices.length === 0 && (
-                    <div className="text-xs text-muted-foreground italic text-center py-2">
-                      No matching devices
-                    </div>
-                  )}
-                </div>
-              </GlassCard>
-
-              {/* Schedule Mode control panel */}
-              {selectedDevice && (
-                <GlassCard className="p-4 flex flex-col gap-3">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
-                    Schedule Mode
-                  </h2>
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-xs font-medium text-foreground">Disable Schedule</span>
-                      <span className="text-[10px] text-muted-foreground">Use default fallback layout</span>
-                    </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_260px] gap-6 items-start">
+          {/* ======================================================== */}
+          {/* LEFT SIDEBAR: Device list & Mini calendar                 */}
+          {/* ======================================================== */}
+          <div className="space-y-6">
+            {/* Device Selector */}
+            <GlassCard className="p-4 flex flex-col gap-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
+                Devices
+              </h2>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search devices..."
+                  value={deviceSearch}
+                  onChange={(e) => setDeviceSearch(e.target.value)}
+                  className="pl-8 bg-white/5 border-white/10 text-xs h-8 animate-in"
+                />
+              </div>
+              <div className="space-y-1 max-h-[195px] overflow-y-auto pr-1 custom-scrollbar">
+                {filteredDevices.map((d) => {
+                  const isSelected = d.id === selectedDeviceId;
+                  return (
                     <button
+                      key={d.id}
                       onClick={() => {
-                        const nextVal = selectedDevice.schedules_enabled === 0;
-                        updateDeviceSchedulesMode(nextVal);
+                        setSelectedDeviceId(d.id);
+                        fetchSchedules(d.id);
                       }}
                       className={cn(
-                        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-primary/40 focus:ring-offset-1 focus:ring-offset-background",
-                        selectedDevice.schedules_enabled === 0 ? "bg-amber-600/70 border-amber-500/50" : "bg-white/10 border-white/5"
+                        "w-full text-left p-2 rounded-xl text-xs flex items-center justify-between border transition-all duration-200",
+                        isSelected
+                          ? "bg-primary/10 border-primary/30 text-foreground font-medium"
+                          : "bg-transparent border-transparent hover:bg-white/5 text-muted-foreground hover:text-foreground"
                       )}
                     >
+                      <div className="truncate">
+                        <div>{d.name}</div>
+                        {d.location && <div className="text-[10px] opacity-75">{d.location}</div>}
+                      </div>
                       <span
                         className={cn(
-                          "pointer-events-none inline-block size-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
-                          selectedDevice.schedules_enabled === 0 ? "translate-x-4" : "translate-x-0"
+                          "size-1.5 rounded-full shrink-0 ml-1.5",
+                          d.status === "online"
+                            ? "bg-emerald-400 animate-pulse"
+                            : d.status === "pending"
+                              ? "bg-amber-400"
+                              : "bg-muted-foreground/30"
                         )}
                       />
                     </button>
+                  );
+                })}
+                {filteredDevices.length === 0 && (
+                  <div className="text-xs text-muted-foreground italic text-center py-2">
+                    No matching devices
                   </div>
+                )}
+              </div>
+            </GlassCard>
 
-                  {selectedDevice.schedules_enabled === 0 && (
-                    <div className="space-y-1.5 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-1 duration-150">
-                      <Label className="text-[10px] text-muted-foreground font-semibold">Default Fallback Layout</Label>
-                      <select
-                        value={selectedDevice.layout_id || ""}
-                        onChange={(e) => updateDeviceDefaultLayout(e.target.value || null)}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl h-8 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
-                      >
-                        <option value="" disabled className="bg-[#0d0f12] text-muted-foreground">Select a default layout...</option>
-                        {layouts.map((l) => (
-                          <option key={l.id} value={l.id} className="bg-[#0d0f12] text-foreground">
-                            {l.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </GlassCard>
-              )}
-            </div>
-
-            {/* MAIN CALENDAR BOARD */}
-            <div className="flex flex-col gap-4" ref={weekGridRef}>
-              <div className="flex items-center justify-between bg-white/[0.02] border border-white/5 rounded-2xl px-4 py-2.5 shadow-sm">
-                <span className="text-xs font-semibold text-foreground truncate flex items-center gap-1.5">
-                  <CalendarIcon className="size-4 text-primary" />
-                  Weekly Overview Timeline — {selectedDevice ? selectedDevice.name : "Select Device"}
+            {/* Mini Calendar Picker */}
+            <GlassCard className="p-4 flex flex-col gap-3 select-none">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  {MONTHS[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
                 </span>
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <Info className="size-3.5" /> Drag layouts onto the calendar columns
-                </span>
+                <div className="flex gap-0.5">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-6 rounded-md hover:bg-white/5"
+                    onClick={() => {
+                      const m = new Date(calendarMonth);
+                      m.setMonth(m.getMonth() - 1);
+                      setCalendarMonth(m);
+                    }}
+                  >
+                    <ChevronLeft className="size-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-6 rounded-md hover:bg-white/5"
+                    onClick={() => {
+                      const m = new Date(calendarMonth);
+                      m.setMonth(m.getMonth() + 1);
+                      setCalendarMonth(m);
+                    }}
+                  >
+                    <ChevronRight className="size-3.5" />
+                  </Button>
+                </div>
               </div>
 
+              <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-bold text-muted-foreground/70">
+                {["M", "T", "W", "T", "F", "S", "S"].map((day, idx) => (
+                  <div key={idx}>{day}</div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-0.5">
+                {React.useMemo(() => {
+                  const year = calendarMonth.getFullYear();
+                  const month = calendarMonth.getMonth();
+                  const first = new Date(year, month, 1);
+                  let firstDayIndex = first.getDay() - 1;
+                  if (firstDayIndex === -1) firstDayIndex = 6;
+
+                  const daysInMonth = new Date(year, month + 1, 0).getDate();
+                  const cells: Array<{ date: Date; isCurrent: boolean } | null> = [];
+
+                  for (let i = 0; i < firstDayIndex; i++) cells.push(null);
+                  for (let d = 1; d <= daysInMonth; d++) {
+                    cells.push({ date: new Date(year, month, d), isCurrent: true });
+                  }
+
+                  while (cells.length % 7 !== 0) cells.push(null);
+                  return cells;
+                }, [calendarMonth]).map((cell, idx) => {
+                  if (cell === null) return <div key={idx} className="aspect-square" />;
+
+                  const cellIso = toISO(cell.date);
+                  const isSelected = selectedDate === cellIso;
+                  const isToday = toISO(new Date()) === cellIso;
+                  const hasSchedules = instances.some((i) => i.date === cellIso);
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedDate(cellIso)}
+                      className={cn(
+                        "aspect-square text-[10px] rounded-md transition-colors relative flex flex-col items-center justify-center font-medium",
+                        isSelected
+                          ? "bg-primary text-primary-foreground font-semibold"
+                          : isToday
+                            ? "bg-white/10 text-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                      )}
+                    >
+                      <span>{cell.date.getDate()}</span>
+                      {hasSchedules && (
+                        <span className="absolute bottom-1 size-1 rounded-full bg-rose-500" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs h-7 border-white/10 bg-white/5 hover:bg-white/10"
+                onClick={handleToday}
+              >
+                Today
+              </Button>
+            </GlassCard>
+
+            {/* Schedule Mode control panel */}
+            {selectedDevice && (
+              <GlassCard className="p-4 flex flex-col gap-3">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
+                  Schedule Mode
+                </h2>
+                
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-medium text-foreground">Disable Schedule</span>
+                    <span className="text-[10px] text-muted-foreground">Use a default layout for everything</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const nextVal = selectedDevice.schedules_enabled === 0;
+                      updateDeviceSchedulesMode(nextVal);
+                    }}
+                    className={cn(
+                      "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-primary/40 focus:ring-offset-1 focus:ring-offset-background",
+                      selectedDevice.schedules_enabled === 0 ? "bg-amber-600/70 border-amber-500/50" : "bg-white/10 border-white/5"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block size-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
+                        selectedDevice.schedules_enabled === 0 ? "translate-x-4" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {selectedDevice.schedules_enabled === 0 && (
+                  <div className="space-y-1.5 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <Label className="text-[10px] text-muted-foreground font-semibold">Default Fallback Layout</Label>
+                    <select
+                      value={selectedDevice.layout_id || ""}
+                      onChange={(e) => updateDeviceDefaultLayout(e.target.value || null)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl h-8 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                    >
+                      <option value="" disabled className="bg-[#0d0f12] text-muted-foreground">Select a default layout...</option>
+                      {layouts.map((l) => (
+                        <option key={l.id} value={l.id} className="bg-[#0d0f12] text-foreground">
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </GlassCard>
+            )}
+          </div>
+
+          {/* ======================================================== */}
+          {/* MAIN AREA: Interactive calendar week view grid            */}
+          {/* ======================================================== */}
+          <div className="flex flex-col gap-4" ref={weekGridRef}>
+            {/* Week Selector navigation bar */}
+            <div className="flex items-center justify-between bg-white/[0.02] border border-white/5 rounded-2xl px-4 py-2.5 shadow-sm">
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 rounded-full border border-white/5 hover:bg-white/5"
+                  onClick={handlePrevWeek}
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 rounded-full border border-white/5 hover:bg-white/5"
+                  onClick={handleNextWeek}
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+                <span className="text-sm font-semibold tracking-tight ml-2">
+                  Week of{" "}
+                  {weekDates[0].toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                <Info className="size-3.5" /> Drag layouts onto target date columns
+              </span>
+            </div>
+
+            {/* Main timeline hours board container */}
+            {loading ? (
+              <Card>
+                <CardContent className="py-12 flex justify-center">
+                  <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full" />
+                </CardContent>
+              </Card>
+            ) : (
               <GlassCard className="p-0 overflow-hidden flex flex-col select-none">
-                {/* Day column headers row */}
+                {/* Header days row */}
                 <div className="grid grid-cols-[60px_1fr] border-b border-white/5 bg-white/[0.02]">
                   <div className="h-10 border-r border-white/5" />
                   <div className="grid grid-cols-7 h-10 divide-x divide-white/5">
-                    {COLUMN_HEADERS.map((label, idx) => {
-                      const dayVal = WEEK_DAYS[idx];
-                      const isCurrent = nowTime.getDay() === dayVal;
+                    {weekDates.map((date, idx) => {
+                      const dateIso = toISO(date);
+                      const isSelected = selectedDate === dateIso;
+                      const isCurrent = dateIso === toISO(new Date());
+                      const isPast = new Date(dateIso + "T00:00:00") < new Date(toISO(new Date()) + "T00:00:00");
+                      const formattedDay = date.toLocaleDateString(undefined, { day: "numeric" });
+                      
                       return (
                         <div
                           key={idx}
+                          onClick={() => {
+                            if (!schedulesEnabled) return;
+                            setSelectedDate(dateIso);
+                            setBulkRepeatDate(dateIso);
+                            setBulkRepeatMode("none");
+                            setBulkRepeatInterval(1);
+                            setBulkRepeatDaysCount(6);
+                            setBulkRepeatOpen(true);
+                          }}
                           className={cn(
                             "flex flex-col items-center justify-center text-center py-1 transition-colors relative",
                             !schedulesEnabled
                               ? "opacity-40 cursor-not-allowed pointer-events-none"
                               : "cursor-pointer hover:bg-white/5",
+                            isSelected && "bg-primary/5",
                             isCurrent && "bg-primary/5"
                           )}
                         >
-                          <span className={cn("text-[10px] font-bold text-muted-foreground", isCurrent && "text-primary")}>
-                            {label}
+                          <span
+                            className={cn(
+                              "text-[10px] font-semibold",
+                              isSelected
+                                ? "text-primary"
+                                : isPast
+                                  ? "text-rose-400/90"
+                                  : "text-muted-foreground"
+                            )}
+                          >
+                            {date.toLocaleDateString(undefined, { weekday: "short" })}
                           </span>
+                          <span
+                            className={cn(
+                              "text-xs font-bold mt-0.5",
+                              isCurrent
+                                ? "text-primary"
+                                : isPast
+                                  ? "text-rose-400/80"
+                                  : "text-foreground"
+                            )}
+                          >
+                            {formattedDay}
+                          </span>
+                          {instances.some((i) => i.date === dateIso) && (
+                            <span className="absolute bottom-1 size-1 rounded-full bg-primary" />
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Main timeline hours board container */}
-                <div className="grid grid-cols-[60px_1fr] min-h-[1152px] relative overflow-y-auto max-h-[700px] custom-scrollbar">
-                  {/* Hours Gutter column */}
+                {/* Vertical board content area */}
+                <div className="grid grid-cols-[60px_1fr] relative overflow-y-auto max-h-[700px] custom-scrollbar">
+                  {/* Hours timeline side gutter */}
                   <div className="bg-white/[0.01] border-r border-white/5 select-none text-[10px] text-muted-foreground pr-2 pt-1.5 text-right font-medium">
                     {Array.from({ length: 24 }).map((_, h) => (
                       <div key={h} style={{ height: HOUR_HEIGHT }} className="border-b border-white/5 select-none pr-1">
@@ -956,8 +1127,8 @@ export default function AdminSchedulePage() {
                     ))}
                   </div>
 
-                  {/* Day grid columns containing blocks */}
-                  <div className="grid grid-cols-7 relative divide-x divide-white/5 min-h-[1152px] bg-white/[0.005]">
+                  {/* Day columns */}
+                  <div className="grid grid-cols-7 relative divide-x divide-white/5 bg-white/[0.005]">
                     {!schedulesEnabled && (
                       <div
                         onClick={() => {
@@ -973,7 +1144,7 @@ export default function AdminSchedulePage() {
                       </div>
                     )}
 
-                    {/* Horizontal row line guide overlays */}
+                    {/* Horizontal hour lines */}
                     {Array.from({ length: 24 }).map((_, h) => (
                       <div
                         key={h}
@@ -982,57 +1153,46 @@ export default function AdminSchedulePage() {
                       />
                     ))}
 
-                    {/* Weekly day columns */}
-                    {WEEK_DAYS.map((dayIndex, colIdx) => {
-                      const isCurrent = nowTime.getDay() === dayIndex;
+                    {/* Date-specific columns grid */}
+                    {weekDates.map((date, colIdx) => {
+                      const dateIso = toISO(date);
+                      const isSelected = selectedDate === dateIso;
+                      const isPast = new Date(dateIso + "T00:00:00") < new Date(toISO(new Date()) + "T00:00:00");
 
-                      // Filter schedules active on this day index
-                      const daySchedules = activeDeviceSchedules.filter((s) =>
-                        s.days_of_week.includes(dayIndex)
-                      );
-
-                      // Calculate live time indicator line
-                      const timeMins = nowTime.getHours() * 60 + nowTime.getMinutes();
-                      const indicatorTop = timeMins * PX_PER_MIN;
+                      const dayInstances = instances.filter((i) => i.date === dateIso);
 
                       return (
                         <div
-                          key={dayIndex}
+                          key={dateIso}
                           onDragOver={handleDragOver}
-                          onDrop={(e) => handleDropNew(e, dayIndex)}
+                          onDrop={(e) => handleDropNew(e, dateIso)}
                           className={cn(
                             "relative h-full flex flex-col transition-colors min-h-[1152px]",
-                            isCurrent && "bg-primary/[0.01]"
+                            isSelected && "bg-primary/[0.01]",
+                            isPast && "bg-white/[0.005]"
                           )}
                         >
-                          {/* Live Time indicator line overlay */}
-                          {isCurrent && schedulesEnabled && (
-                            <div className="absolute left-0 right-0 z-20 pointer-events-none flex items-center" style={{ top: indicatorTop }}>
-                              <span className="size-1.5 rounded-full bg-rose-500 shrink-0 -ml-1" />
-                              <span className="h-[1.5px] bg-rose-500 w-full" />
-                            </div>
-                          )}
-
-                          {/* Render schedule blocks inside column */}
-                          {daySchedules.map((s) => {
-                            const isDraggingThis = dragState.blockId === s.id && dragState.currentDayIndex === dayIndex;
-                            const startMins = isDraggingThis ? dragState.currentStartMins : timeToMinutes(s.start_time);
-                            const endMins = isDraggingThis ? dragState.currentEndMins : timeToMinutes(s.end_time);
+                          {/* Render schedule instances */}
+                          {dayInstances.map((inst) => {
+                            const isDraggingThis = dragState.blockId === inst.schedule_id && dragState.currentDate === dateIso;
+                            const startMins = isDraggingThis ? dragState.currentStartMins : timeToMinutes(inst.start_time);
+                            const endMins = isDraggingThis ? dragState.currentEndMins : timeToMinutes(inst.end_time);
 
                             const top = startMins * PX_PER_MIN;
                             const height = (endMins - startMins) * PX_PER_MIN;
-                            const color = deviceColorMap.get(s.device_id) || "hsl(var(--primary))";
+                            const color = deviceColorMap.get(inst.device_id) || "styled";
 
-                            const shouldDisplay = !isDraggingThis || (dragState.action !== "move" || dragState.currentDayIndex === dayIndex);
+                            const shouldDisplay = !isDraggingThis || (dragState.action !== "move" || dragState.currentDate === dateIso);
                             if (!shouldDisplay) return null;
 
                             return (
                               <div
-                                key={`${s.id}-${dayIndex}`}
+                                key={inst.id}
                                 draggable="false"
-                                onClick={() => handleBlockClick(s)}
+                                onClick={() => handleBlockClick(inst.schedule_id)}
                                 className={cn(
                                   "absolute left-1 right-1 rounded-xl p-2 text-[10px] overflow-hidden group shadow-md transition-shadow hover:shadow-lg border-l-4 cursor-pointer",
+                                  isPast && "opacity-60 cursor-not-allowed",
                                   isDraggingThis && "opacity-90 shadow-2xl scale-[0.98] ring-1 ring-primary/40"
                                 )}
                                 style={{
@@ -1043,39 +1203,47 @@ export default function AdminSchedulePage() {
                                 }}
                               >
                                 {/* Resize Handle Top */}
-                                <div
-                                  className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize z-10"
-                                  onMouseDown={(e) => handleBlockMouseDown(e, s, dayIndex, "resize-top")}
-                                />
+                                {!isPast && (
+                                  <div
+                                    className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize z-10"
+                                    onMouseDown={(e) => handleBlockMouseDown(e, inst, "resize-top")}
+                                  />
+                                )}
 
                                 {/* Content area */}
                                 <div className="flex flex-col h-full pointer-events-none select-none relative">
                                   <div className="font-semibold text-foreground truncate flex items-center gap-1">
                                     <span className="size-1.5 rounded-full shrink-0" style={{ background: color }} />
-                                    {s.layout_name}
+                                    {inst.layout_name}
                                   </div>
                                   <div className="text-muted-foreground text-[9px] mt-0.5 font-medium">
                                     {formatMinsAMPM(startMins)} - {formatMinsAMPM(endMins)}
                                   </div>
-                                  {!s.is_active && (
-                                    <span className="absolute top-0 right-0 text-[8px] bg-rose-500/10 text-rose-400 px-1 py-0.5 rounded font-semibold uppercase">Inactive</span>
+                                  {isPast && (
+                                    <span className="absolute top-0 right-0 text-[8px] bg-white/10 text-muted-foreground/60 px-1 py-0.5 rounded font-semibold uppercase">Completed</span>
                                   )}
-                                  <div className="mt-auto ml-auto opacity-0 group-hover:opacity-60 transition-opacity">
-                                    <Move className="size-3 text-muted-foreground" />
-                                  </div>
+                                  {!isPast && (
+                                    <div className="mt-auto ml-auto opacity-0 group-hover:opacity-60 transition-opacity">
+                                      <Move className="size-3 text-muted-foreground" />
+                                    </div>
+                                  )}
                                 </div>
 
                                 {/* Resize Handle Bottom */}
-                                <div
-                                  className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize z-10"
-                                  onMouseDown={(e) => handleBlockMouseDown(e, s, dayIndex, "resize-bottom")}
-                                />
+                                {!isPast && (
+                                  <div
+                                    className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize z-10"
+                                    onMouseDown={(e) => handleBlockMouseDown(e, inst, "resize-bottom")}
+                                  />
+                                )}
 
                                 {/* Drag-move handle center zone */}
-                                <div
-                                  className="absolute inset-x-2 inset-y-2 cursor-grab active:cursor-grabbing"
-                                  onMouseDown={(e) => handleBlockMouseDown(e, s, dayIndex, "move")}
-                                />
+                                {!isPast && (
+                                  <div
+                                    className="absolute inset-x-2 inset-y-2 cursor-grab active:cursor-grabbing"
+                                    onMouseDown={(e) => handleBlockMouseDown(e, inst, "move")}
+                                  />
+                                )}
                               </div>
                             );
                           })}
@@ -1085,53 +1253,55 @@ export default function AdminSchedulePage() {
                   </div>
                 </div>
               </GlassCard>
-            </div>
-
-            {/* RIGHT SIDEBAR: Draggable layouts list */}
-            <div className="space-y-4">
-              <GlassCard className="p-4 flex flex-col gap-3">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
-                  Layouts
-                </h2>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Search layouts..."
-                    value={layoutSearch}
-                    onChange={(e) => setLayoutSearch(e.target.value)}
-                    className="pl-8 bg-white/5 border-white/10 text-xs h-8"
-                  />
-                </div>
-                <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
-                  {filteredLayouts.map((l) => {
-                    const color = "hsl(var(--primary))";
-                    return (
-                      <div
-                        key={l.id}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("text/plain", l.id);
-                          e.dataTransfer.effectAllowed = "copy";
-                        }}
-                        className="p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] active:scale-[0.98] transition-all cursor-grab active:cursor-grabbing flex flex-col gap-1.5 shadow-sm group select-none"
-                        style={{ borderLeftWidth: 3, borderLeftColor: color }}
-                      >
-                        <div className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors truncate">
-                          {l.name}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {filteredLayouts.length === 0 && (
-                    <div className="text-xs text-muted-foreground italic text-center py-2">
-                      No matching layouts
-                    </div>
-                  )}
-                </div>
-              </GlassCard>
-            </div>
+            )}
           </div>
-        )}
+
+          {/* ======================================================== */}
+          {/* RIGHT SIDEBAR: Draggable layouts list                     */}
+          {/* ======================================================== */}
+          <div className="space-y-4">
+            <GlassCard className="p-4 flex flex-col gap-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
+                Layouts
+              </h2>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search layouts..."
+                  value={layoutSearch}
+                  onChange={(e) => setLayoutSearch(e.target.value)}
+                  className="pl-8 bg-white/5 border-white/10 text-xs h-8"
+                />
+              </div>
+              <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar animate-in">
+                {filteredLayouts.map((l) => {
+                  const color = "hsl(var(--primary))";
+                  return (
+                    <div
+                      key={l.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", l.id);
+                        e.dataTransfer.effectAllowed = "copy";
+                      }}
+                      className="p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] active:scale-[0.98] transition-all cursor-grab active:cursor-grabbing flex flex-col gap-1.5 shadow-sm group select-none"
+                      style={{ borderLeftWidth: 3, borderLeftColor: color }}
+                    >
+                      <div className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors truncate">
+                        {l.name}
+                      </div>
+                    </div>
+                  );
+                })}
+                {filteredLayouts.length === 0 && (
+                  <div className="text-xs text-muted-foreground italic text-center py-2">
+                    No matching layouts
+                  </div>
+                )}
+              </div>
+            </GlassCard>
+          </div>
+        </div>
       </div>
 
       {/* ======================================================== */}
@@ -1140,7 +1310,7 @@ export default function AdminSchedulePage() {
       <Dialog open={editPopupOpen} onOpenChange={setEditPopupOpen}>
         <DialogContent className="sm:max-w-md glass-strong border-white/10">
           <DialogHeader>
-            <DialogTitle>{selectedSchedule ? "Configure Schedule" : "Create Schedule"}</DialogTitle>
+            <DialogTitle>Configure Schedule</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
@@ -1181,49 +1351,71 @@ export default function AdminSchedulePage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Active Days</Label>
-              <div className="flex gap-1">
-                {COLUMN_HEADERS.map((label, idx) => {
-                  const dayVal = WEEK_DAYS[idx];
-                  const active = editDays.includes(dayVal);
-                  return (
-                    <Button
-                      key={idx}
-                      type="button"
-                      variant={active ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => toggleEditDay(dayVal)}
-                      className="flex-1 text-[10px] px-0 h-7 border-white/10 font-bold"
-                    >
-                      {label[0]}
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between py-2 border-y border-white/5">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-xs font-semibold text-foreground">Active Status</span>
-                <span className="text-[10px] text-muted-foreground">Only active schedules run on screens</span>
-              </div>
-              <button
-                onClick={() => setEditActive(!editActive)}
-                className={cn(
-                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-primary/40 focus:ring-offset-1 focus:ring-offset-background",
-                  editActive ? "bg-emerald-600/70 border-emerald-500/50" : "bg-white/10 border-white/5"
+              <div className="flex items-center justify-between">
+                <Label>Recurrence Rule</Label>
+                {selectedSchedule && (
+                  <span className="text-[10px] text-muted-foreground font-semibold">
+                    Series Start: {selectedSchedule.start_date}
+                  </span>
                 )}
+              </div>
+              <select
+                value={editRepeatMode}
+                onChange={(e) => setEditRepeatMode(e.target.value as any)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
               >
-                <span
-                  className={cn(
-                    "pointer-events-none inline-block size-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
-                    editActive ? "translate-x-4" : "translate-x-0"
-                  )}
-                />
-              </button>
+                <option value="none" className="bg-[#0d0f12]">Run only on this day (No Recurrence)</option>
+                <option value="daily" className="bg-[#0d0f12]">Daily (Repeat everyday)</option>
+                <option value="custom" className="bg-[#0d0f12]">Custom Interval Repeat</option>
+              </select>
             </div>
 
-            {/* Divided Actions: Cancel + Save / Delete Series */}
+            {editRepeatMode === "custom" && (
+              <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
+                <div className="space-y-1.5">
+                  <Label>Repeat Every (Days)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={editRepeatInterval}
+                    onChange={(e) => setEditRepeatInterval(Number(e.target.value))}
+                    className="bg-white/5 border-white/10 text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Total Occurrences</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={editDaysCount}
+                    onChange={(e) => setEditDaysCount(Number(e.target.value))}
+                    className="bg-white/5 border-white/10 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
+            {editRepeatMode === "daily" && (
+              <div className="space-y-1.5 animate-in fade-in duration-200">
+                <Label>Total Repeat Occurrences (Days)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={editDaysCount}
+                  onChange={(e) => setEditDaysCount(Number(e.target.value))}
+                  className="bg-white/5 border-white/10 text-xs"
+                />
+              </div>
+            )}
+
+            {selectedSchedule && (
+              <div className="text-[10px] text-muted-foreground/80 leading-relaxed py-1.5 border-y border-white/5 flex items-center gap-1.5 bg-white/[0.01] px-2 rounded-lg">
+                <Clock className="size-3.5 shrink-0 text-primary" />
+                <span>{getRecurrenceRangeText()}</span>
+              </div>
+            )}
+
+            {/* Separated action dividers */}
             <div className="flex flex-col gap-3 pt-2">
               <div className="flex justify-end gap-2">
                 <Button
@@ -1233,26 +1425,46 @@ export default function AdminSchedulePage() {
                 >
                   Cancel
                 </Button>
+                {selectedSchedule && selectedSchedule.repeat_mode !== "none" && (
+                  <Button
+                    variant="outline"
+                    onClick={handleConfigureException}
+                    className="text-xs font-semibold h-8 text-primary border-primary/20 hover:bg-primary/5"
+                  >
+                    Save Only This Day
+                  </Button>
+                )}
                 <Button
-                  onClick={handleSaveSchedule}
+                  onClick={handleSaveConfigure}
                   className="text-xs font-semibold h-8"
-                  disabled={editDays.length === 0}
                 >
-                  Save Schedule
+                  Save Series
                 </Button>
               </div>
 
               {selectedSchedule && (
                 <div className="pt-3 border-t border-dashed border-white/10 flex items-center justify-between">
                   <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Danger Zone</span>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="text-xs font-semibold h-7"
-                    onClick={() => handleDeleteSchedule(selectedSchedule.id)}
-                  >
-                    Delete Schedule
-                  </Button>
+                  <div className="flex gap-2">
+                    {selectedSchedule.repeat_mode !== "none" && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="text-[10px] font-bold h-7 bg-red-950/40 text-rose-400 border border-rose-900/50 hover:bg-red-900/30"
+                        onClick={handleDeleteScheduleOccurrence}
+                      >
+                        Delete Only This Day
+                      </Button>
+                    )}
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="text-xs font-semibold h-7"
+                      onClick={handleDeleteScheduleSeries}
+                    >
+                      Delete Series
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1261,27 +1473,279 @@ export default function AdminSchedulePage() {
       </Dialog>
 
       {/* ======================================================== */}
-      {/* DIALOG: Overlap Overwrite Confirmation                    */}
+      {/* DIALOG: Bulk Repeat Day Schedules / Copy Actions          */}
       {/* ======================================================== */}
-      <Dialog open={overwriteConfirmOpen} onOpenChange={setOverwriteConfirmOpen}>
+      <Dialog open={bulkRepeatOpen} onOpenChange={setBulkRepeatOpen}>
+        <DialogContent className="sm:max-w-md glass-strong border-white/10">
+          <DialogHeader>
+            <DialogTitle>Configure Day Recurrence</DialogTitle>
+            <DialogDescription>
+              Configure repeat configurations for all layouts scheduled on{" "}
+              <strong>{bulkRepeatDate}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {/* Day Schedules List */}
+            <div className="border border-white/5 rounded-xl overflow-hidden bg-white/[0.01]">
+              <div className="px-3 py-2 bg-white/5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Schedules for this day
+              </div>
+              <div className="divide-y divide-white/5 max-h-[120px] overflow-y-auto custom-scrollbar">
+                {(() => {
+                  const dayInstanceSchedules = instances.filter(i => i.date === bulkRepeatDate);
+                  const dayScheduleIds = Array.from(new Set(dayInstanceSchedules.map(i => i.schedule_id)));
+                  const targetSchedules = schedules.filter(s => dayScheduleIds.includes(s.id));
+
+                  if (targetSchedules.length === 0) {
+                    return <div className="p-3 text-xs italic text-center text-muted-foreground">No templates scheduled on this day</div>;
+                  }
+                  return targetSchedules.map((s) => {
+                    const color = deviceColorMap.get(s.device_id) || "hsl(var(--primary))";
+                    return (
+                      <div key={s.id} className="p-2.5 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: color }} />
+                          <span className="font-semibold text-foreground truncate max-w-[140px]">{s.layout_name}</span>
+                        </div>
+                        <span className="text-muted-foreground font-medium text-[10px]">{s.start_time} - {s.end_time}</span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Recurrence Rule</Label>
+              <select
+                value={bulkRepeatMode}
+                onChange={(e) => setBulkRepeatMode(e.target.value as any)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+              >
+                <option value="none" className="bg-[#0d0f12]">No recurrence</option>
+                <option value="daily" className="bg-[#0d0f12]">Daily (Repeat everyday)</option>
+                <option value="custom" className="bg-[#0d0f12]">Custom Interval Repeat</option>
+              </select>
+            </div>
+
+            {bulkRepeatMode === "custom" && (
+              <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
+                <div className="space-y-1.5">
+                  <Label>Repeat Every (Days)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={bulkRepeatInterval}
+                    onChange={(e) => setBulkRepeatInterval(Number(e.target.value))}
+                    className="bg-white/5 border-white/10 text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Total Occurrences</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={bulkRepeatDaysCount}
+                    onChange={(e) => setBulkRepeatDaysCount(Number(e.target.value))}
+                    className="bg-white/5 border-white/10 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
+            {bulkRepeatMode === "daily" && (
+              <div className="space-y-1.5 animate-in fade-in duration-200">
+                <Label>Total Repeat Occurrences (Days)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={bulkRepeatDaysCount}
+                  onChange={(e) => setBulkRepeatDaysCount(Number(e.target.value))}
+                  className="bg-white/5 border-white/10 text-xs"
+                />
+              </div>
+            )}
+
+            {bulkRepeatDate && (
+              <div className="text-[10px] text-muted-foreground/80 leading-relaxed py-1.5 border-y border-white/5 flex items-center gap-1.5 bg-white/[0.01] px-2 rounded-lg">
+                <Clock className="size-3.5 shrink-0 text-primary" />
+                <span>{getBulkRecurrenceRangeText()}</span>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-8 text-primary border-primary/20 hover:bg-primary/5 flex items-center gap-1.5"
+                onClick={handleOpenCopyDay}
+              >
+                <Copy className="size-3.5" /> Bulk Copy Day...
+              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setBulkRepeatOpen(false)}
+                  className="text-xs h-8 border-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleBulkRecurrenceSave}
+                  className="text-xs h-8 font-semibold"
+                  disabled={bulkRepeatMode === "none"}
+                >
+                  Apply Recurrence
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ======================================================== */}
+      {/* DIALOG: Bulk Copy Day Selection Modal                    */}
+      {/* ======================================================== */}
+      <Dialog open={copyDayOpen} onOpenChange={setCopyDayOpen}>
+        <DialogContent className="sm:max-w-md glass-strong border-white/10">
+          <DialogHeader>
+            <DialogTitle>Bulk Copy Day Schedules</DialogTitle>
+            <DialogDescription>
+              Copy all layout items from <strong>{bulkRepeatDate}</strong> to multiple target dates.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Select Target Dates (comma separated or enter dates)</Label>
+              <div className="flex flex-col gap-2">
+                <Input
+                  placeholder="YYYY-MM-DD, YYYY-MM-DD"
+                  value={copyTargetDates.join(", ")}
+                  onChange={(e) => {
+                    const parsed = e.target.value
+                      .split(",")
+                      .map(s => s.trim())
+                      .filter(Boolean);
+                    setCopyTargetDates(parsed);
+                  }}
+                  className="bg-white/5 border-white/10 text-xs"
+                />
+                <span className="text-[10px] text-muted-foreground leading-normal">
+                  Example: 2026-06-29, 2026-06-30. Past dates will be skipped.
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCopyDayOpen(false)}
+                className="text-xs h-8 border-white/10"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleExecuteCopyDay(false)}
+                className="text-xs h-8 font-semibold"
+                disabled={copyTargetDates.length === 0}
+              >
+                Execute Copy
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ======================================================== */}
+      {/* DIALOG: Drag Move/Resize Exception Split Confirm          */}
+      {/* ======================================================== */}
+      <Dialog open={!!pendingUpdate} onOpenChange={() => setPendingUpdate(null)}>
         <DialogContent className="max-w-sm glass-strong border-white/10">
           <DialogHeader>
-            <DialogTitle>Overwrite Overlapping Schedules?</DialogTitle>
+            <DialogTitle>Adjust Recurring Occurrence</DialogTitle>
             <DialogDescription>
-              This time slot overlaps with other active schedules. Would you like to overwrite those conflicting slots?
+              You are adjusting a layout occurrence that is part of a recurring series. Would you like to save this day as a standalone slot or apply it to the entire series?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button
+              onClick={handleExecuteOccurrenceUpdate}
+              className="w-full text-xs font-semibold h-8 text-primary border border-primary/20 hover:bg-primary/5 bg-transparent"
+            >
+              Save Only This Day (Detach)
+            </Button>
+            <Button
+              onClick={handleExecuteSeriesUpdate}
+              className="w-full text-xs font-semibold h-8"
+            >
+              Apply to Entire Series
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setPendingUpdate(null)}
+              className="w-full text-xs border-white/10 h-8"
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ======================================================== */}
+      {/* DIALOG: Overwrite Recurrence Conflicts                    */}
+      {/* ======================================================== */}
+      <Dialog open={bulkOverwriteDates !== null} onOpenChange={() => setBulkOverwriteDates(null)}>
+        <DialogContent className="max-w-sm glass-strong border-white/10">
+          <DialogHeader>
+            <DialogTitle>Overwrite Existing Schedules?</DialogTitle>
+            <DialogDescription>
+              Schedules already exist on some of the target dates. Do you want to overwrite them?
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2 pt-2">
             <Button
               variant="destructive"
-              onClick={() => overwritePayload && executeOverwrite(overwritePayload)}
+              onClick={executeRepeatOverwrite}
               className="w-full text-xs font-semibold h-8"
             >
               Yes, Overwrite Conflicts
             </Button>
             <Button
               variant="outline"
-              onClick={() => setOverwriteConfirmOpen(false)}
+              onClick={() => setBulkOverwriteDates(null)}
+              className="w-full text-xs border-white/10 h-8"
+            >
+              No, Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ======================================================== */}
+      {/* DIALOG: Overwrite Copy-Day Conflicts                       */}
+      {/* ======================================================== */}
+      <Dialog open={copyOverwriteOpen} onOpenChange={setCopyOverwriteOpen}>
+        <DialogContent className="max-w-sm glass-strong border-white/10">
+          <DialogHeader>
+            <DialogTitle>Overwrite Existing Schedules?</DialogTitle>
+            <DialogDescription>
+              Schedules already exist on some of the target dates. Do you want to overwrite them and copy anyway?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button
+              variant="destructive"
+              onClick={() => handleExecuteCopyDay(true)}
+              className="w-full text-xs font-semibold h-8"
+            >
+              Yes, Overwrite and Copy
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setCopyOverwriteOpen(false)}
               className="w-full text-xs border-white/10 h-8"
             >
               No, Cancel

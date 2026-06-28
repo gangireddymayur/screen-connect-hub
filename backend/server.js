@@ -19,6 +19,67 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toIS
       await db.query("ALTER TABLE devices ADD COLUMN schedules_enabled TINYINT(1) DEFAULT 1");
       console.log("[db] Added schedules_enabled column to devices table.");
     }
+
+    const [tableExist] = await db.query("SHOW TABLES LIKE 'schedule_instances'");
+    if (tableExist.length === 0) {
+      console.log("[db] Initializing advanced schedules database tables...");
+      
+      // Drop legacy schedules table if it exists
+      await db.query("DROP TABLE IF EXISTS schedules");
+      
+      // Create schedules parent table
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS schedules (
+          id          INT AUTO_INCREMENT PRIMARY KEY,
+          device_id   CHAR(36) NOT NULL,
+          layout_id   CHAR(36) NOT NULL,
+          company_id  CHAR(36) NOT NULL,
+          start_time  TIME NOT NULL,
+          end_time    TIME NOT NULL,
+          start_date  DATE NOT NULL,
+          created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          CONSTRAINT fk_schedules_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
+          CONSTRAINT fk_schedules_layout FOREIGN KEY (layout_id) REFERENCES layouts(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      // Create schedule_recurrences table
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS schedule_recurrences (
+          id              INT AUTO_INCREMENT PRIMARY KEY,
+          schedule_id     INT NOT NULL UNIQUE,
+          repeat_mode     ENUM('none', 'daily', 'custom') NOT NULL DEFAULT 'none',
+          repeat_interval INT DEFAULT 1,
+          days_count      INT DEFAULT 1,
+          CONSTRAINT fk_recurrences_schedule FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      // Create schedule_instances table
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS schedule_instances (
+          id              INT AUTO_INCREMENT PRIMARY KEY,
+          schedule_id     INT NOT NULL,
+          device_id       CHAR(36) NOT NULL,
+          layout_id       CHAR(36) NOT NULL,
+          date            DATE NOT NULL,
+          start_time      TIME NOT NULL,
+          end_time        TIME NOT NULL,
+          start_datetime  DATETIME NOT NULL,
+          end_datetime    DATETIME NOT NULL,
+          CONSTRAINT fk_instances_schedule FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE,
+          CONSTRAINT fk_instances_device   FOREIGN KEY (device_id)   REFERENCES devices(id)   ON DELETE CASCADE,
+          CONSTRAINT fk_instances_layout   FOREIGN KEY (layout_id)   REFERENCES layouts(id)   ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+
+      // Create index for fast device query
+      await db.query(`
+        CREATE INDEX idx_instances_device_time ON schedule_instances (device_id, start_datetime, end_datetime);
+      `);
+      console.log("[db] Advanced schedules database tables initialized successfully.");
+    }
   } catch (err) {
     console.error("[db] Startup migration failed:", err);
   }
@@ -46,7 +107,7 @@ try {
   app.use('/api/devices',    authRequired, crud('devices'));
   app.use('/api/layouts',    authRequired, crud('layouts'));
   app.use('/api/content',    authRequired, crud('content'));
-  app.use('/api/schedules',  authRequired, crud('schedules'));
+  app.use('/api/schedules',  authRequired, require('./src/routes/schedules'));
 } catch (err) {
   console.error('ROUTE_LOAD_ERROR:', err.stack || err);
   app.use('/api', (_req, res) =>
