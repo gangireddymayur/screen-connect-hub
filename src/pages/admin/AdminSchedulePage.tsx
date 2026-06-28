@@ -203,10 +203,6 @@ export default function AdminSchedulePage() {
   const [bulkRepeatInterval, setBulkRepeatInterval] = useState(1);
   const [bulkRepeatDaysCount, setBulkRepeatDaysCount] = useState(6);
 
-  // Day replication copy states
-  const [copyDayOpen, setCopyDayOpen] = useState(false);
-  const [copyTargetDates, setCopyTargetDates] = useState<string[]>([]);
-  const [copyOverwriteOpen, setCopyOverwriteOpen] = useState(false);
 
   // Overwrite validation confirmations
   const [bulkOverwriteDates, setBulkOverwriteDates] = useState<string[] | null>(null);
@@ -689,17 +685,47 @@ export default function AdminSchedulePage() {
 
   // Overwrite recurrence conflicts handler
   const executeRepeatOverwrite = async () => {
-    if (!repeatOverwritePayload || !selectedDeviceId) return;
+    if (!bulkRepeatDate || !selectedDeviceId) return;
+
+    if (repeatOverwritePayload) {
+      try {
+        await apiFetch("POST", "/schedules/repeat", {
+          ...repeatOverwritePayload,
+          overwrite: true,
+        });
+        toast.success("Conflicts purged. Recurrence set!");
+        setRepeatOverwritePayload(null);
+        setBulkOverwriteDates(null);
+        setBulkRepeatOpen(false);
+        setEditPopupOpen(false);
+        fetchSchedules(selectedDeviceId);
+      } catch (err: any) {
+        toast.error(err.message || "Failed to override recurrence");
+      }
+      return;
+    }
+
+    const targetDates: string[] = [];
+    const baseDate = new Date(bulkRepeatDate + "T00:00:00");
+    const occurrences = bulkRepeatMode === "none" ? 1 : bulkRepeatDaysCount;
+    const interval = bulkRepeatMode === "custom" ? bulkRepeatInterval : 1;
+
+    for (let i = 1; i < occurrences; i++) {
+      const nextD = new Date(baseDate.getTime());
+      nextD.setDate(baseDate.getDate() + i * interval);
+      targetDates.push(toISO(nextD));
+    }
+
     try {
-      await apiFetch("POST", "/schedules/repeat", {
-        ...repeatOverwritePayload,
+      await apiFetch("POST", "/schedules/copy-day", {
+        device_id: selectedDeviceId,
+        source_date: bulkRepeatDate,
+        target_dates: targetDates,
         overwrite: true,
       });
-      toast.success("Conflicts purged. Recurrence set!");
-      setRepeatOverwritePayload(null);
+      toast.success("Conflicts overridden. Recurrence set!");
       setBulkOverwriteDates(null);
       setBulkRepeatOpen(false);
-      setEditPopupOpen(false);
       fetchSchedules(selectedDeviceId);
     } catch (err: any) {
       toast.error(err.message || "Failed to override recurrence");
@@ -738,39 +764,46 @@ export default function AdminSchedulePage() {
 
   // Recurrence configuration checks
   const handleBulkRecurrenceSave = async () => {
+    if (!bulkRepeatDate || !selectedDeviceId) return;
     const dayInstanceSchedules = instances.filter(i => i.date === bulkRepeatDate);
-    const dayScheduleIds = Array.from(new Set(dayInstanceSchedules.map(i => i.schedule_id)));
-    const targetSchedules = schedules.filter(s => dayScheduleIds.includes(s.id));
+    if (dayInstanceSchedules.length === 0) {
+      toast.error("No schedules to repeat on this day");
+      return;
+    }
 
-    if (targetSchedules.length === 0) return;
+    const targetDates: string[] = [];
+    const baseDate = new Date(bulkRepeatDate + "T00:00:00");
+    const occurrences = bulkRepeatMode === "none" ? 1 : bulkRepeatDaysCount;
+    const interval = bulkRepeatMode === "custom" ? bulkRepeatInterval : 1;
+
+    for (let i = 1; i < occurrences; i++) {
+      const nextD = new Date(baseDate.getTime());
+      nextD.setDate(baseDate.getDate() + i * interval);
+      targetDates.push(toISO(nextD));
+    }
+
+    if (targetDates.length === 0) {
+      toast.error("Please select a repeat pattern greater than 1 day");
+      return;
+    }
 
     try {
-      for (const s of targetSchedules) {
-        await apiFetch("POST", "/schedules/repeat", {
-          schedule_id: s.id,
-          repeat_mode: bulkRepeatMode,
-          repeat_interval: bulkRepeatInterval,
-          days_count: bulkRepeatDaysCount,
-        });
-      }
-      toast.success("Bulk recurrence configured!");
-      setBulkRepeatOpen(false);
-      fetchSchedules(selectedDeviceId!);
-    } catch (err: any) {
-      if (err.message && err.message.includes("Overlap")) {
-        // Find first schedule to repeat
-        const firstS = targetSchedules[0];
-        setRepeatOverwritePayload({
-          schedule_id: firstS.id,
-          start_date: bulkRepeatDate!,
-          repeat_mode: bulkRepeatMode,
-          repeat_interval: bulkRepeatInterval,
-          days_count: bulkRepeatDaysCount,
-        });
-        setBulkOverwriteDates([]); // trigger overlap dialog
+      const res = await apiFetch("POST", "/schedules/copy-day", {
+        device_id: selectedDeviceId,
+        source_date: bulkRepeatDate,
+        target_dates: targetDates,
+        overwrite: false,
+      });
+
+      if (res.has_existing) {
+        setBulkOverwriteDates(res.existing_dates || []);
       } else {
-        toast.error(err.message || "Failed to set recurrence");
+        toast.success("Bulk recurrence configured successfully!");
+        setBulkRepeatOpen(false);
+        fetchSchedules(selectedDeviceId);
       }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to configure recurrence");
     }
   };
 
@@ -1353,59 +1386,87 @@ export default function AdminSchedulePage() {
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label>Recurrence Rule</Label>
+                <Label className="text-xs text-muted-foreground font-semibold">Repeat Pattern</Label>
                 {selectedSchedule && (
                   <span className="text-[10px] text-muted-foreground font-semibold">
                     Series Start: {selectedSchedule.start_date}
                   </span>
                 )}
               </div>
-              <select
-                value={editRepeatMode}
-                onChange={(e) => setEditRepeatMode(e.target.value as any)}
-                className="w-full bg-background border border-input rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
-              >
-                <option value="none" className="bg-popover text-foreground">Run only on this day (No Recurrence)</option>
-                <option value="daily" className="bg-popover text-foreground">Daily (Repeat everyday)</option>
-                <option value="custom" className="bg-popover text-foreground">Custom Interval Repeat</option>
-              </select>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    ["none", "No Repeat"],
+                    ["daily", "Daily"],
+                    ["custom", "Every X Days"],
+                  ] as Array<["none" | "daily" | "custom", string]>
+                ).map(([k, l]) => (
+                  <button
+                    key={k}
+                    onClick={() => setEditRepeatMode(k)}
+                    className={cn(
+                      "py-2 rounded-xl text-xs border font-medium transition-all",
+                      editRepeatMode === k
+                        ? "bg-primary/20 border-primary/40 text-foreground"
+                        : "bg-muted/40 border-border hover:bg-muted text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
             </div>
 
+            {/* Custom Interval settings */}
             {editRepeatMode === "custom" && (
-              <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
-                <div className="space-y-1.5">
-                  <Label>Repeat Every (Days)</Label>
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                <Label className="text-xs text-muted-foreground font-semibold">Repeat Interval</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Every</span>
                   <Input
                     type="number"
                     min={1}
+                    max={90}
                     value={editRepeatInterval}
-                    onChange={(e) => setEditRepeatInterval(Number(e.target.value))}
-                    className="bg-background border-input text-xs"
+                    onChange={(e) => setEditRepeatInterval(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-20 bg-background border-input h-8 text-center text-xs"
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Total Occurrences</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={editDaysCount}
-                    onChange={(e) => setEditDaysCount(Number(e.target.value))}
-                    className="bg-background border-input text-xs"
-                  />
+                  <span className="text-xs text-muted-foreground">days</span>
                 </div>
               </div>
             )}
 
-            {editRepeatMode === "daily" && (
+            {/* Occurrences / Days count limit presets */}
+            {editRepeatMode !== "none" && (
               <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-                <Label>Total Repeat Occurrences (Days)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={editDaysCount}
-                  onChange={(e) => setEditDaysCount(Number(e.target.value))}
-                  className="bg-background border-input text-xs"
-                />
+                <Label className="text-xs text-muted-foreground font-semibold">Repeat For</Label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[1, 6, 12, 30].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => setEditDaysCount(num)}
+                      className={cn(
+                        "px-3 py-1 rounded-md text-xs border transition-colors",
+                        editDaysCount === num
+                          ? "bg-primary/20 border-primary/40 text-foreground"
+                          : "bg-muted/40 border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
+                    >
+                      {num} day{num > 1 ? "s" : ""}
+                    </button>
+                  ))}
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <span className="text-xs text-muted-foreground">Custom:</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={editDaysCount}
+                      onChange={(e) => setEditDaysCount(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-16 bg-background border-input h-8 text-center text-xs"
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1517,53 +1578,81 @@ export default function AdminSchedulePage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Recurrence Rule</Label>
-              <select
-                value={bulkRepeatMode}
-                onChange={(e) => setBulkRepeatMode(e.target.value as any)}
-                className="w-full bg-background border border-input rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
-              >
-                <option value="none" className="bg-popover text-foreground">No recurrence</option>
-                <option value="daily" className="bg-popover text-foreground">Daily (Repeat everyday)</option>
-                <option value="custom" className="bg-popover text-foreground">Custom Interval Repeat</option>
-              </select>
+              <Label className="text-xs text-muted-foreground font-semibold">Repeat Pattern</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    ["none", "No Repeat"],
+                    ["daily", "Daily"],
+                    ["custom", "Every X Days"],
+                  ] as Array<["none" | "daily" | "custom", string]>
+                ).map(([k, l]) => (
+                  <button
+                    key={k}
+                    onClick={() => setBulkRepeatMode(k)}
+                    className={cn(
+                      "py-2 rounded-xl text-xs border font-medium transition-all",
+                      bulkRepeatMode === k
+                        ? "bg-primary/20 border-primary/40 text-foreground"
+                        : "bg-muted/40 border-border hover:bg-muted text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
             </div>
 
+            {/* Custom Interval settings */}
             {bulkRepeatMode === "custom" && (
-              <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
-                <div className="space-y-1.5">
-                  <Label>Repeat Every (Days)</Label>
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                <Label className="text-xs text-muted-foreground font-semibold">Repeat Interval</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Every</span>
                   <Input
                     type="number"
                     min={1}
+                    max={90}
                     value={bulkRepeatInterval}
-                    onChange={(e) => setBulkRepeatInterval(Number(e.target.value))}
-                    className="bg-background border-input text-xs"
+                    onChange={(e) => setBulkRepeatInterval(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-20 bg-background border-input h-8 text-center text-xs"
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Total Occurrences</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={bulkRepeatDaysCount}
-                    onChange={(e) => setBulkRepeatDaysCount(Number(e.target.value))}
-                    className="bg-background border-input text-xs"
-                  />
+                  <span className="text-xs text-muted-foreground">days</span>
                 </div>
               </div>
             )}
 
-            {bulkRepeatMode === "daily" && (
-              <div className="space-y-1.5 animate-in fade-in duration-200">
-                <Label>Total Repeat Occurrences (Days)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={bulkRepeatDaysCount}
-                  onChange={(e) => setBulkRepeatDaysCount(Number(e.target.value))}
-                  className="bg-background border-input text-xs"
-                />
+            {/* Occurrences / Days count limit presets */}
+            {bulkRepeatMode !== "none" && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                <Label className="text-xs text-muted-foreground font-semibold">Repeat For</Label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[1, 6, 12, 30].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => setBulkRepeatDaysCount(num)}
+                      className={cn(
+                        "px-3 py-1 rounded-md text-xs border transition-colors",
+                        bulkRepeatDaysCount === num
+                          ? "bg-primary/20 border-primary/40 text-foreground"
+                          : "bg-muted/40 border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
+                    >
+                      {num} day{num > 1 ? "s" : ""}
+                    </button>
+                  ))}
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <span className="text-xs text-muted-foreground">Custom:</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={bulkRepeatDaysCount}
+                      onChange={(e) => setBulkRepeatDaysCount(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-16 bg-background border-input h-8 text-center text-xs"
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1574,91 +1663,29 @@ export default function AdminSchedulePage() {
               </div>
             )}
 
-            <div className="flex justify-between items-center pt-2">
+            <div className="flex justify-end gap-2 pt-2">
               <Button
                 variant="outline"
                 size="sm"
-                className="text-xs h-8 text-primary border-primary/20 hover:bg-primary/5 flex items-center gap-1.5"
-                onClick={handleOpenCopyDay}
-              >
-                <Copy className="size-3.5" /> Bulk Copy Day...
-              </Button>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setBulkRepeatOpen(false)}
-                  className="text-xs h-8 border-border"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleBulkRecurrenceSave}
-                  className="text-xs h-8 font-semibold"
-                  disabled={bulkRepeatMode === "none"}
-                >
-                  Apply Recurrence
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ======================================================== */}
-      {/* DIALOG: Bulk Copy Day Selection Modal                    */}
-      {/* ======================================================== */}
-      <Dialog open={copyDayOpen} onOpenChange={setCopyDayOpen}>
-        <DialogContent className="sm:max-w-md border border-border">
-          <DialogHeader>
-            <DialogTitle>Bulk Copy Day Schedules</DialogTitle>
-            <DialogDescription>
-              Copy all layout items from <strong>{bulkRepeatDate}</strong> to multiple target dates.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label>Select Target Dates (comma separated or enter dates)</Label>
-              <div className="flex flex-col gap-2">
-                <Input
-                  placeholder="YYYY-MM-DD, YYYY-MM-DD"
-                  value={copyTargetDates.join(", ")}
-                  onChange={(e) => {
-                    const parsed = e.target.value
-                      .split(",")
-                      .map(s => s.trim())
-                      .filter(Boolean);
-                    setCopyTargetDates(parsed);
-                  }}
-                  className="bg-background border-input text-xs"
-                />
-                <span className="text-[10px] text-muted-foreground leading-normal">
-                  Example: 2026-06-29, 2026-06-30. Past dates will be skipped.
-                </span>
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCopyDayOpen(false)}
+                onClick={() => setBulkRepeatOpen(false)}
                 className="text-xs h-8 border-border"
               >
                 Cancel
               </Button>
               <Button
                 size="sm"
-                onClick={() => handleExecuteCopyDay(false)}
+                onClick={handleBulkRecurrenceSave}
                 className="text-xs h-8 font-semibold"
-                disabled={copyTargetDates.length === 0}
+                disabled={bulkRepeatMode === "none"}
               >
-                Execute Copy
+                Apply Recurrence
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+
 
       {/* ======================================================== */}
       {/* DIALOG: Drag Move/Resize Exception Split Confirm          */}
@@ -1725,35 +1752,7 @@ export default function AdminSchedulePage() {
         </DialogContent>
       </Dialog>
 
-      {/* ======================================================== */}
-      {/* DIALOG: Overwrite Copy-Day Conflicts                       */}
-      {/* ======================================================== */}
-      <Dialog open={copyOverwriteOpen} onOpenChange={setCopyOverwriteOpen}>
-        <DialogContent className="max-w-sm border border-border">
-          <DialogHeader>
-            <DialogTitle>Overwrite Existing Schedules?</DialogTitle>
-            <DialogDescription>
-              Schedules already exist on some of the target dates. Do you want to overwrite them and copy anyway?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-2 pt-2">
-            <Button
-              variant="destructive"
-              onClick={() => handleExecuteCopyDay(true)}
-              className="w-full text-xs font-semibold h-8"
-            >
-              Yes, Overwrite and Copy
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setCopyOverwriteOpen(false)}
-              className="w-full text-xs border-border h-8"
-            >
-              No, Cancel
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+
     </AdminLayout>
   );
 }
