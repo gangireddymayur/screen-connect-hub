@@ -17,6 +17,7 @@ function normalizePayload(table, input = {}) {
 
   if (table === 'devices') {
     if (typeof payload.is_paired === 'boolean') payload.is_paired = payload.is_paired ? 1 : 0;
+    if (typeof payload.schedules_enabled === 'boolean') payload.schedules_enabled = payload.schedules_enabled ? 1 : 0;
   }
 
   if (table === 'companies' && typeof payload.max_screens === 'string') {
@@ -37,6 +38,7 @@ function normalizeRow(table, row) {
   }
   if (table === 'devices') {
     out.is_paired = !!out.is_paired;
+    out.schedules_enabled = out.schedules_enabled !== 0 ? 1 : 0;
   }
   if (table === 'schedules') {
     out.is_active = !!out.is_active;

@@ -53,20 +53,26 @@ async function getActiveLayout(device) {
   const day = now.getDay();
   const time = now.toTimeString().slice(0, 8);
 
-  const [scheduledLayouts] = await db.query(
-    `SELECT l.*
-     FROM schedules s
-     JOIN layouts l ON l.id = s.layout_id
-     WHERE s.device_id = :device_id
-       AND s.company_id = :company_id
-       AND s.is_active = 1
-       AND FIND_IN_SET(:day, s.days_of_week)
-       AND s.start_time <= :time
-       AND s.end_time >= :time
-     ORDER BY s.start_time DESC
-     LIMIT 1`,
-    { device_id: device.id, company_id: device.company_id, day, time }
-  );
+  const schedulesEnabled = device.schedules_enabled ?? 1;
+  let scheduledLayouts = [];
+
+  if (schedulesEnabled) {
+    const [rows] = await db.query(
+      `SELECT l.*
+       FROM schedules s
+       JOIN layouts l ON l.id = s.layout_id
+       WHERE s.device_id = :device_id
+         AND s.company_id = :company_id
+         AND s.is_active = 1
+         AND FIND_IN_SET(:day, s.days_of_week)
+         AND s.start_time <= :time
+         AND s.end_time >= :time
+       ORDER BY s.start_time DESC
+       LIMIT 1`,
+      { device_id: device.id, company_id: device.company_id, day, time }
+    );
+    scheduledLayouts = rows;
+  }
   if (scheduledLayouts[0]) return normalizeLayout(scheduledLayouts[0]);
 
   if (!device.layout_id) return null;

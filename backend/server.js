@@ -10,6 +10,19 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json({ limit: '25mb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+// Run startup database migrations to ensure devices table column exists
+(async () => {
+  try {
+    const db = require('./src/lib/db');
+    const [cols] = await db.query("SHOW COLUMNS FROM devices LIKE 'schedules_enabled'");
+    if (cols.length === 0) {
+      await db.query("ALTER TABLE devices ADD COLUMN schedules_enabled TINYINT(1) DEFAULT 1");
+      console.log("[db] Added schedules_enabled column to devices table.");
+    }
+  } catch (err) {
+    console.error("[db] Startup migration failed:", err);
+  }
+})();
 
 try {
   const { authRequired } = require('./src/lib/auth');

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
@@ -395,8 +396,24 @@ export default function AdminDevicesPage() {
                       </TableCell>
                       <TableCell>
                         {(() => {
+                          const schedulesEnabled = d.schedules_enabled !== 0;
                           const hasActiveSched = activeScheduleDeviceIds.has(d.id);
                           const needsLayout = d.is_paired && !d.layout_id && !hasActiveSched;
+
+                          if (d.is_paired && schedulesEnabled) {
+                            return (
+                              <div className="space-y-1">
+                                <a
+                                  href="/admin/schedule"
+                                  className="text-xs font-semibold text-primary hover:underline flex items-center gap-1.5"
+                                >
+                                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                                  Managed via Schedule
+                                </a>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div className="space-y-1">
                               <Select
@@ -404,7 +421,10 @@ export default function AdminDevicesPage() {
                                 onValueChange={(v) => handleAssignLayout(d.id, v === "none" ? null : v)}
                               >
                                 <SelectTrigger
-                                  className={`h-8 text-xs w-40 ${needsLayout ? "border-amber-500 ring-1 ring-amber-500/40" : ""}`}
+                                  className={cn(
+                                    "h-8 text-xs w-40",
+                                    needsLayout && "border-amber-500 ring-1 ring-amber-500/40"
+                                  )}
                                 >
                                   <SelectValue placeholder={needsLayout ? "Required — select layout" : "No layout"} />
                                 </SelectTrigger>
@@ -415,14 +435,14 @@ export default function AdminDevicesPage() {
                                   ))}
                                 </SelectContent>
                               </Select>
-                              {needsLayout && (
-                                <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight max-w-[10rem]">
-                                  Assign a default layout, or create an active schedule for this device.
+                              {!schedulesEnabled && (
+                                <p className="text-[10px] text-amber-500 font-medium leading-tight max-w-[10rem]">
+                                  Schedules Disabled (Playing Fallback)
                                 </p>
                               )}
-                              {!needsLayout && hasActiveSched && !d.layout_id && (
-                                <p className="text-[10px] text-muted-foreground leading-tight max-w-[10rem]">
-                                  Using active schedule
+                              {schedulesEnabled && needsLayout && (
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight max-w-[10rem]">
+                                  Assign a default layout, or create an active schedule for this device.
                                 </p>
                               )}
                             </div>
