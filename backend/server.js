@@ -7,7 +7,7 @@ process.on('unhandledRejection', (err) => console.error('UNHANDLED:', err.stack 
 
 const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '100mb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 // Run startup database migrations to ensure devices table column exists
