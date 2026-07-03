@@ -81,15 +81,6 @@ export default function AdminDashboardPage() {
   const storagePct = Math.min(100, (storageBytes / storageQuota) * 100);
   const screenPct = maxScreens > 0 ? Math.min(100, (totalDevices / maxScreens) * 100) : 0;
 
-  const checklist = [
-    { label: "Pair your first device", done: devices.some((d) => d.is_paired), href: "/admin/devices" },
-    { label: "Upload content", done: contentCount > 0, href: "/admin/content" },
-    { label: "Create a layout", done: layoutCount > 0, href: "/admin/layouts" },
-    { label: "Schedule content", done: scheduleCount > 0, href: "/admin/schedule" },
-  ];
-  const completedSteps = checklist.filter((c) => c.done).length;
-  const showOnboarding = completedSteps < checklist.length;
-
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -112,36 +103,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         </div>
-
-        {showOnboarding && (
-          <Card className="border-primary/30 bg-primary/5">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Get started</CardTitle>
-                <Badge variant="secondary">{completedSteps} of {checklist.length} complete</Badge>
-              </div>
-              <Progress value={(completedSteps / checklist.length) * 100} className="h-2 mt-2" />
-            </CardHeader>
-            <CardContent className="grid gap-2 sm:grid-cols-2">
-              {checklist.map((step) => (
-                <Link
-                  key={step.label}
-                  to={step.href}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                    step.done ? "text-muted-foreground line-through" : "hover:bg-primary/10"
-                  }`}
-                >
-                  {step.done ? (
-                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                  ) : (
-                    <Circle className="h-4 w-4 text-muted-foreground shrink-0" />
-                  )}
-                  {step.label}
-                </Link>
-              ))}
-            </CardContent>
-          </Card>
-        )}
 
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
           <Card>
