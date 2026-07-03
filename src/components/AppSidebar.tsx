@@ -89,15 +89,6 @@ export function AppSidebar() {
             <p className="text-[10px] text-sidebar-foreground/50 truncate">{user?.email}</p>
           </div>
         )}
-        <Button
-          variant="ghost"
-          size={collapsed ? "icon" : "sm"}
-          className="w-full text-sidebar-foreground/60 hover:text-sidebar-foreground"
-          onClick={signOut}
-        >
-          <LogOut className="h-4 w-4" />
-          {!collapsed && <span className="ml-2">Sign Out</span>}
-        </Button>
       </SidebarFooter>
     </Sidebar>
   );
