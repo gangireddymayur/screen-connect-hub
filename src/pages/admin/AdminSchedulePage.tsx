@@ -967,9 +967,9 @@ export default function AdminSchedulePage() {
           {/* Week Calendar Board */}
           <GlassCard className="p-0 overflow-hidden flex flex-col select-none border-border">
             {/* Headers row */}
-            <div className="grid grid-cols-[60px_1fr] border-b border-border/60 bg-muted/20 pr-2">
-              <div className="h-10 border-r border-border/60" />
-              <div className="grid grid-cols-7 h-10 divide-x divide-border/60">
+            <div className="grid grid-cols-[60px_1fr] border-b border-border/60 bg-muted/20 pr-[5px]">
+              <div className="h-14 border-r border-border/60" />
+              <div className="grid grid-cols-7 h-14 divide-x divide-border/60">
                 {weekDates.map((date, idx) => {
                   const dateIso = toISO(date);
                   const isSelected = selectedDate === dateIso;
@@ -1044,7 +1044,7 @@ export default function AdminSchedulePage() {
 
             {/* Scrollable Timeline */}
             <div
-              className="grid grid-cols-[60px_1fr] relative overflow-y-scroll max-h-[620px]"
+              className="grid grid-cols-[60px_1fr] relative overflow-y-scroll max-h-[620px] custom-scrollbar"
             >
               {/* Hour scale vertical labels */}
               <div className="flex flex-col text-[10px] text-muted-foreground bg-muted/10">
