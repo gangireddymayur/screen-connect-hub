@@ -7,13 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -23,30 +16,6 @@ import {
 import { Building2, Upload, X, LogOut, Edit2, Save, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-const COMMON_TIMEZONES = [
-  "UTC",
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Toronto",
-  "America/Sao_Paulo",
-  "Europe/London",
-  "Europe/Paris",
-  "Europe/Berlin",
-  "Europe/Madrid",
-  "Europe/Moscow",
-  "Africa/Cairo",
-  "Africa/Johannesburg",
-  "Asia/Dubai",
-  "Asia/Kolkata",
-  "Asia/Shanghai",
-  "Asia/Tokyo",
-  "Asia/Singapore",
-  "Australia/Sydney",
-  "Pacific/Auckland",
-];
 
 export default function AdminSettingsPage() {
   const { user, signOut } = useAuth();
@@ -61,7 +30,6 @@ export default function AdminSettingsPage() {
   // Company settings fields
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("");
-  const [timezone, setTimezone] = useState("UTC");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [showBrandHeader, setShowBrandHeader] = useState(0);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -78,7 +46,6 @@ export default function AdminSettingsPage() {
   const [originalData, setOriginalData] = useState<{
     fullName: string;
     companyName: string;
-    timezone: string;
     logoUrl: string | null;
     showBrandHeader: number;
   } | null>(null);
@@ -93,17 +60,15 @@ export default function AdminSettingsPage() {
           setEmail(profile.email ?? "");
           if (profile.company_id) {
             setCompanyId(profile.company_id);
-            const { data: company } = await supabase.from("companies").select("name, timezone, logo_url, show_brand_header").eq("id", profile.company_id).single();
+            const { data: company } = await supabase.from("companies").select("name, logo_url, show_brand_header").eq("id", profile.company_id).single();
             if (company) {
               setCompanyName(company.name ?? "");
-              setTimezone((company as any).timezone ?? "UTC");
               setLogoUrl((company as any).logo_url ?? null);
               setShowBrandHeader((company as any).show_brand_header ?? 0);
 
               setOriginalData({
                 fullName: profile.full_name ?? "",
                 companyName: company.name ?? "",
-                timezone: (company as any).timezone ?? "UTC",
                 logoUrl: (company as any).logo_url ?? null,
                 showBrandHeader: (company as any).show_brand_header ?? 0,
               });
@@ -124,11 +89,10 @@ export default function AdminSettingsPage() {
     return (
       fullName !== originalData.fullName ||
       companyName !== originalData.companyName ||
-      timezone !== originalData.timezone ||
       logoUrl !== originalData.logoUrl ||
       showBrandHeader !== originalData.showBrandHeader
     );
-  }, [fullName, companyName, timezone, logoUrl, showBrandHeader, originalData]);
+  }, [fullName, companyName, logoUrl, showBrandHeader, originalData]);
 
   const handleSaveSettings = async () => {
     if (!user || !companyId) return;
@@ -141,16 +105,15 @@ export default function AdminSettingsPage() {
         if (profileError) throw profileError;
       }
 
-      // 2. Save company configurations
+      // 2. Save company configurations (timezone defaults to Asia/Kolkata for India)
       if (
         companyName !== originalData?.companyName ||
-        timezone !== originalData?.timezone ||
         logoUrl !== originalData?.logoUrl ||
         showBrandHeader !== originalData?.showBrandHeader
       ) {
         const { error: companyError } = await supabase.from("companies").update({
           name: companyName,
-          timezone,
+          timezone: "Asia/Kolkata",
           logo_url: logoUrl,
           show_brand_header: showBrandHeader,
         } as any).eq("id", companyId);
@@ -162,7 +125,6 @@ export default function AdminSettingsPage() {
       setOriginalData({
         fullName,
         companyName,
-        timezone,
         logoUrl,
         showBrandHeader,
       });
@@ -178,7 +140,6 @@ export default function AdminSettingsPage() {
     if (originalData) {
       setFullName(originalData.fullName);
       setCompanyName(originalData.companyName);
-      setTimezone(originalData.timezone);
       setLogoUrl(originalData.logoUrl);
       setShowBrandHeader(originalData.showBrandHeader);
     }
@@ -362,21 +323,6 @@ export default function AdminSettingsPage() {
               placeholder="Your company/org name"
               className={cn("md:col-span-2", !isEditing ? "bg-white/[0.02] border-white/5 opacity-80" : "")}
             />
-
-            <div className="space-y-1.5 md:col-span-2">
-              <Label className="text-xs font-medium text-muted-foreground">Timezone</Label>
-              <Select value={timezone} onValueChange={setTimezone} disabled={!isEditing}>
-                <SelectTrigger className={cn("bg-white/5 border-white/10 text-xs h-9", !isEditing && "opacity-80 cursor-not-allowed")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-950 border-zinc-800 text-foreground">
-                  {COMMON_TIMEZONES.map((tz) => (
-                    <SelectItem key={tz} value={tz}>{tz}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[10px] text-muted-foreground pt-0.5">Used for scheduling content correctly across your signage terminals.</p>
-            </div>
           </div>
 
           {/* Logo upload and preview */}
