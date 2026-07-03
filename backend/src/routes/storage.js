@@ -2,7 +2,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const router = require('express').Router();
 
-const uploadRoot = path.resolve(__dirname, '../../../App_Data/uploads');
+const uploadRoot = path.resolve(__dirname, '../../uploads');
 
 const safePath = (value) => {
   const cleaned = String(value || '')
