@@ -1,15 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Upload, X } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Building2, Upload, X, LogOut, Edit2, Save, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const COMMON_TIMEZONES = [
   "UTC",
@@ -36,194 +48,410 @@ const COMMON_TIMEZONES = [
 ];
 
 export default function AdminSettingsPage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Profile fields
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+
+  // Company settings fields
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [timezone, setTimezone] = useState("UTC");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingCompany, setSavingCompany] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
 
+  // Password fields
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Original load state to track modifications
+  const [originalData, setOriginalData] = useState<{
+    fullName: string;
+    companyName: string;
+    timezone: string;
+    logoUrl: string | null;
+  } | null>(null);
+
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const { data: profile } = await supabase.from("profiles").select("full_name, email, company_id").eq("id", user.id).single();
-      if (profile) {
-        setFullName(profile.full_name ?? "");
-        setEmail(profile.email ?? "");
-        if (profile.company_id) {
-          setCompanyId(profile.company_id);
-          const { data: company } = await supabase.from("companies").select("name, timezone, logo_url").eq("id", profile.company_id).single();
-          if (company) {
-            setCompanyName(company.name ?? "");
-            setTimezone((company as any).timezone ?? "UTC");
-            setLogoUrl((company as any).logo_url ?? null);
+      try {
+        const { data: profile } = await supabase.from("profiles").select("full_name, email, company_id").eq("id", user.id).single();
+        if (profile) {
+          setFullName(profile.full_name ?? "");
+          setEmail(profile.email ?? "");
+          if (profile.company_id) {
+            setCompanyId(profile.company_id);
+            const { data: company } = await supabase.from("companies").select("name, timezone, logo_url").eq("id", profile.company_id).single();
+            if (company) {
+              setCompanyName(company.name ?? "");
+              setTimezone((company as any).timezone ?? "UTC");
+              setLogoUrl((company as any).logo_url ?? null);
+
+              setOriginalData({
+                fullName: profile.full_name ?? "",
+                companyName: company.name ?? "",
+                timezone: (company as any).timezone ?? "UTC",
+                logoUrl: (company as any).logo_url ?? null,
+              });
+            }
           }
         }
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      } finally {
+        setLoading(false);
       }
     };
     load();
   }, [user]);
 
-  const handleSaveProfile = async () => {
-    if (!user) return;
-    setSavingProfile(true);
-    const { error } = await supabase.from("profiles").update({ full_name: fullName }).eq("id", user.id);
-    setSavingProfile(false);
-    if (error) toast.error(error.message);
-    else toast.success("Profile updated!");
+  const hasChanges = useMemo(() => {
+    if (!originalData) return false;
+    return (
+      fullName !== originalData.fullName ||
+      companyName !== originalData.companyName ||
+      timezone !== originalData.timezone ||
+      logoUrl !== originalData.logoUrl
+    );
+  }, [fullName, companyName, timezone, logoUrl, originalData]);
+
+  const handleSaveSettings = async () => {
+    if (!user || !companyId) return;
+    setSavingSettings(true);
+
+    try {
+      // 1. Save profile full_name
+      if (fullName !== originalData?.fullName) {
+        const { error: profileError } = await supabase.from("profiles").update({ full_name: fullName }).eq("id", user.id);
+        if (profileError) throw profileError;
+      }
+
+      // 2. Save company configurations
+      if (
+        companyName !== originalData?.companyName ||
+        timezone !== originalData?.timezone ||
+        logoUrl !== originalData?.logoUrl
+      ) {
+        const { error: companyError } = await supabase.from("companies").update({
+          name: companyName,
+          timezone,
+          logo_url: logoUrl,
+        } as any).eq("id", companyId);
+        if (companyError) throw companyError;
+      }
+
+      toast.success("Settings saved successfully");
+      setIsEditing(false);
+      setOriginalData({
+        fullName,
+        companyName,
+        timezone,
+        logoUrl,
+      });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save settings");
+    } finally {
+      setSavingSettings(false);
+    }
   };
 
-  const handleSaveCompany = async () => {
-    if (!companyId) return;
-    setSavingCompany(true);
-    const { error } = await supabase.from("companies").update({
-      name: companyName,
-      timezone,
-      logo_url: logoUrl,
-    } as any).eq("id", companyId);
-    setSavingCompany(false);
-    if (error) toast.error(error.message);
-    else toast.success("Company settings updated!");
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    if (originalData) {
+      setFullName(originalData.fullName);
+      setCompanyName(originalData.companyName);
+      setTimezone(originalData.timezone);
+      setLogoUrl(originalData.logoUrl);
+    }
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !companyId) return;
     setUploadingLogo(true);
-    const ext = file.name.split(".").pop();
-    const path = `${companyId}/logo-${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage.from("content").upload(path, file, { upsert: true });
-    if (uploadError) {
-      toast.error("Failed to upload logo");
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${companyId}/logo-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("content").upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from("content").getPublicUrl(path);
+      setLogoUrl(urlData.publicUrl);
+      toast.success("Logo uploaded! Remember to click Save Changes.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload logo");
+    } finally {
       setUploadingLogo(false);
-      return;
     }
-    const { data: urlData } = supabase.storage.from("content").getPublicUrl(path);
-    setLogoUrl(urlData.publicUrl);
-    setUploadingLogo(false);
-    toast.success("Logo uploaded! Don't forget to save.");
   };
 
   const handleChangePassword = async () => {
-    if (newPassword.length < 6) { toast.error("Password must be at least 6 characters"); return; }
-    if (newPassword !== confirmPassword) { toast.error("Passwords do not match"); return; }
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
     setChangingPassword(true);
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setChangingPassword(false);
-    if (error) toast.error(error.message);
-    else {
+    if (error) {
+      toast.error(error.message);
+    } else {
       toast.success("Password updated!");
       setNewPassword("");
       setConfirmPassword("");
     }
   };
 
+  const handleLogout = async () => {
+    setLogoutOpen(false);
+    await signOut();
+  };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <PageHeader title="Settings" />
+        <div className="flex h-96 items-center justify-center">
+          <RefreshCw className="size-8 text-primary animate-spin" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout>
-      <div className="max-w-2xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage your profile and company preferences</p>
-        </div>
+      <PageHeader
+        title="Settings"
+        description="Profile, branding preferences, and security options."
+      />
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">Company Profile</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Company Logo</Label>
-              <div className="flex items-center gap-4">
-                <div className="h-20 w-20 rounded-lg border bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                  {logoUrl ? (
-                    <img src={logoUrl} alt="Company logo" className="h-full w-full object-contain" />
-                  ) : (
-                    <Building2 className="h-8 w-8 text-muted-foreground" />
-                  )}
-                </div>
-                <div className="flex flex-col gap-2 flex-1">
-                  <Label htmlFor="logo-upload" className="cursor-pointer">
-                    <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md border bg-background hover:bg-accent text-sm font-medium transition-colors">
-                      <Upload className="h-4 w-4" />
-                      {uploadingLogo ? "Uploading..." : logoUrl ? "Replace logo" : "Upload logo"}
-                    </div>
-                    <input id="logo-upload" type="file" accept="image/*" onChange={handleLogoUpload} disabled={uploadingLogo} className="hidden" />
-                  </Label>
-                  {logoUrl && (
-                    <Button variant="ghost" size="sm" onClick={() => setLogoUrl(null)} className="self-start text-destructive hover:text-destructive">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Profile and Branding Settings Card */}
+        <GlassCard className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <div>
+              <h3 className="font-semibold text-lg">Profile & Branding</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Manage organization info and logo asset settings.</p>
+            </div>
+            {!isEditing ? (
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8 border-white/10 text-xs">
+                <Edit2 className="size-3.5 mr-1.5" /> Edit Info
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={handleCancelEdit} className="h-8 text-xs text-muted-foreground">
+                  <X className="size-3.5 mr-1.5" /> Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveSettings}
+                  disabled={!hasChanges || savingSettings}
+                  className="h-8 text-xs font-semibold bg-primary hover:bg-primary/90"
+                >
+                  <Save className="size-3.5 mr-1.5" /> Save Changes
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field
+              label="Full Name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              disabled={!isEditing}
+              className={!isEditing ? "bg-white/[0.02] border-white/5 opacity-80" : ""}
+            />
+            <Field
+              label="Email Address"
+              value={email}
+              disabled
+              className="bg-white/5 border-white/5 opacity-70 cursor-not-allowed"
+            />
+            <Field
+              label="Company Name"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              disabled={!isEditing}
+              placeholder="Your company/org name"
+              className={cn("md:col-span-2", !isEditing ? "bg-white/[0.02] border-white/5 opacity-80" : "")}
+            />
+
+            <div className="space-y-1.5 md:col-span-2">
+              <Label className="text-xs font-medium text-muted-foreground">Timezone</Label>
+              <Select value={timezone} onValueChange={setTimezone} disabled={!isEditing}>
+                <SelectTrigger className={cn("bg-white/5 border-white/10 text-xs h-9", !isEditing && "opacity-80 cursor-not-allowed")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-950 border-zinc-800 text-foreground">
+                  {COMMON_TIMEZONES.map((tz) => (
+                    <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground pt-0.5">Used for scheduling content correctly across your signage terminals.</p>
+            </div>
+          </div>
+
+          {/* Logo upload and preview */}
+          <div className="space-y-3 pt-3 border-t border-white/5">
+            <Label className="text-xs font-semibold text-muted-foreground">Company Logo</Label>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="size-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt="Company logo preview"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <Building2 className="size-8 text-muted-foreground" />
+                )}
+                {uploadingLogo && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <Loader2 className="size-5 animate-spin text-primary" />
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2 text-center sm:text-left">
+                <p className="text-[11px] text-muted-foreground">
+                  Recommended size: 250x250 pixels. PNG or JPG format.
+                </p>
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      disabled={!isEditing || uploadingLogo}
+                      className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                      id="logo-file-input"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs border-white/10"
+                      disabled={!isEditing || uploadingLogo}
+                    >
+                      Choose Image
+                    </Button>
+                  </div>
+                  {logoUrl && isEditing && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLogoUrl(null)}
+                      className="h-8 text-xs text-destructive hover:bg-destructive/10"
+                    >
                       <X className="h-4 w-4 mr-1" /> Remove
                     </Button>
                   )}
                 </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Company Name</Label>
-              <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Timezone</Label>
-              <Select value={timezone} onValueChange={setTimezone}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {COMMON_TIMEZONES.map((tz) => (
-                    <SelectItem key={tz} value={tz}>{tz}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Used for scheduling content correctly across your devices.</p>
-            </div>
-            <div className="flex justify-end">
-              <Button onClick={handleSaveCompany} disabled={savingCompany}>
-                {savingCompany ? "Saving..." : "Save Company Settings"}
+          </div>
+        </GlassCard>
+
+        {/* Security Password Card */}
+        <div className="space-y-6">
+          <GlassCard>
+            <h3 className="font-semibold text-lg mb-1">Security</h3>
+            <p className="text-xs text-muted-foreground mb-4">Update your account password.</p>
+            <div className="space-y-4">
+              <Field
+                label="New Password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="At least 6 characters"
+              />
+              <Field
+                label="Confirm New Password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter new password"
+              />
+              <Button
+                className="w-full mt-2 h-9 text-xs"
+                onClick={handleChangePassword}
+                disabled={changingPassword || !newPassword}
+              >
+                {changingPassword ? "Updating…" : "Update Password"}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </GlassCard>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">Your Profile</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Full Name</Label>
-              <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input value={email} disabled className="bg-muted" />
-            </div>
-            <div className="flex justify-end">
-              <Button onClick={handleSaveProfile} disabled={savingProfile}>{savingProfile ? "Saving..." : "Save Profile"}</Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Change Password</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>New Password</Label>
-              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 6 characters" />
-            </div>
-            <div className="space-y-2">
-              <Label>Confirm New Password</Label>
-              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter new password" />
-            </div>
-            <div className="flex justify-end">
-              <Button onClick={handleChangePassword} disabled={changingPassword || !newPassword}>
-                {changingPassword ? "Updating..." : "Update Password"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Session Management / Log Out Card */}
+          <GlassCard className="border-red-500/20 bg-red-500/[0.01]">
+            <h3 className="font-semibold text-red-400 text-lg mb-1">Session</h3>
+            <p className="text-xs text-muted-foreground mb-4">Log out of your current session on this device.</p>
+            <Button variant="destructive" className="w-full h-9 text-xs" onClick={() => setLogoutOpen(true)}>
+              <LogOut className="size-4 mr-2" /> Log Out
+            </Button>
+          </GlassCard>
+        </div>
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <DialogContent className="max-w-sm bg-zinc-950 border-zinc-800 text-foreground">
+          <DialogHeader>
+            <DialogTitle>Confirm Log Out</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-xs pt-1">
+              Are you sure you want to log out? You will need to enter your credentials to access the dashboard again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-3 border-t border-white/5 mt-4">
+            <Button variant="outline" size="sm" onClick={() => setLogoutOpen(false)} className="h-8 text-xs border-white/10">
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleLogout} className="h-8 text-xs font-semibold">
+              Log Out
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
+  );
+}
+
+function GlassCard({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn("bg-card/40 backdrop-blur-md border rounded-2xl shadow-sm p-4", className)} {...props}>
+      {children}
+    </div>
+  );
+}
+
+function PageHeader({ title, description }: { title: string; description?: string }) {
+  return (
+    <div className="space-y-1 mb-6">
+      <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+      {description && <p className="text-sm text-muted-foreground">{description}</p>}
+    </div>
+  );
+}
+
+function Field({ label, className, ...props }: { label: string } & React.ComponentProps<typeof Input>) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+      <Input {...props} className={cn("bg-white/5 border-white/10 text-xs h-9", className)} />
+    </div>
   );
 }

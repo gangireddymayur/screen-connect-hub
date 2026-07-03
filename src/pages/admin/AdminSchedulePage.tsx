@@ -1,91 +1,106 @@
 import * as React from "react";
-import { useEffect, useState, useMemo, useRef } from "react";
-import { AdminLayout } from "@/components/AdminLayout";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Search,
   ChevronLeft,
   ChevronRight,
+  Plus,
+  Trash2,
+  Calendar,
+  Search,
+  RefreshCw,
+  Clock,
+  Layout,
+  Repeat,
+  Move,
   Info,
   SlidersHorizontal,
-  Move,
-  Trash2,
-  CalendarDays,
-  Copy,
-  Clock,
-  ExternalLink,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { AdminLayout } from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
-// --- API client fetch helper ---
-const apiFetch = async (method: string, path: string, body?: any) => {
-  const token = localStorage.getItem("sh_token");
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
+const HOURS = 24;
+const PX_PER_HOUR = 60; // 1 hour = 60px
+const PX_PER_MIN = PX_PER_HOUR / 60; // 1 min = 1px
 
-  const res = await fetch(`/api${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
-  const json = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(json?.error || `${res.status} ${res.statusText}`);
-  }
-  return json;
-};
+const PALETTE = [
+  "oklch(0.76 0.17 210)", // Soft Teal
+  "oklch(0.72 0.21 330)", // Soft Violet
+  "oklch(0.80 0.15 150)", // Soft Emerald
+  "oklch(0.82 0.16 70)",  // Soft Orange
+  "oklch(0.74 0.19 15)",  // Soft Rose
+  "oklch(0.78 0.16 270)", // Soft Lavender
+];
 
-interface ApiScheduleInstance {
-  id: number;
-  schedule_id: number;
-  device_id: string;
-  layout_id: string;
-  layout_name: string | null;
-  date: string;
-  start_time: string;
-  end_time: string;
-  start_datetime: string;
-  end_datetime: string;
+// Helper: Format Date to YYYY-MM-DD
+function toISO(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
-interface ApiSchedule {
-  id: number;
-  device_id: string;
-  layout_id: string;
-  layout_name: string | null;
-  start_time: string;
-  end_time: string;
-  start_date: string;
-  repeat_mode: "none" | "daily" | "custom";
-  repeat_interval: number;
-  days_count: number;
+// Helper: Parse YYYY-MM-DD safely into a local Date object
+function parseISODate(s: string) {
+  if (!s) return new Date();
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
-interface Device {
-  id: string;
-  name: string;
-  location: string | null;
-  status: "online" | "offline" | "pending";
-  layout_id: string | null;
-  schedules_enabled?: number;
+// Helper: Convert time string "HH:MM:SS" or "HH:MM" to minutes of day
+function parseHHMM(s: string) {
+  if (!s) return 0;
+  const [h, m] = s.split(":").map(Number);
+  return h * 60 + m;
 }
 
-interface LayoutOption {
-  id: string;
-  name: string;
+// Helper: Convert minutes of day to time string "HH:MM"
+function toHHMM(mins: number) {
+  const m = Math.max(0, Math.min(24 * 60, mins));
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
 }
 
-interface DragState {
+// Helper: Get Monday of the week for a given date
+function getMonday(d: Date) {
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+  return new Date(d.setDate(diff));
+}
+
+// Helper: Format minutes to AM/PM string
+function formatMinsAMPM(mins: number) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const displayH = h % 12 === 0 ? 12 : h % 12;
+  const displayM = String(m).padStart(2, "0");
+  return `${displayH}:${displayM} ${ampm}`;
+}
+
+type DragState = {
   action: "idle" | "move" | "resize-top" | "resize-bottom";
-  blockId: number | null; // schedule_id
+  blockId: number | null;
   originalDate: string;
   originalStartMins: number;
   originalEndMins: number;
@@ -94,55 +109,6 @@ interface DragState {
   currentDate: string;
   currentStartMins: number;
   currentEndMins: number;
-}
-
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
-
-const HOUR_HEIGHT = 48; // px per hour
-const PX_PER_MIN = HOUR_HEIGHT / 60;
-
-const DEVICE_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(200 80% 55%)",
-  "hsl(280 65% 60%)",
-  "hsl(35 85% 55%)",
-  "hsl(150 60% 45%)",
-  "hsl(340 75% 55%)",
-];
-
-const timeToMinutes = (t: string) => {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-};
-
-const toHHMM = (mins: number) => {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-};
-
-const formatMinsAMPM = (mins: number) => {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  const ampm = h >= 12 ? "PM" : "AM";
-  const displayH = h % 12 === 0 ? 12 : h % 12;
-  return `${displayH}:${String(m).padStart(2, "0")} ${ampm}`;
-};
-
-const toISO = (d: Date) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-};
-
-const parseISODate = (s: string) => {
-  if (!s) return new Date();
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d);
 };
 
 const initialDragState: DragState = {
@@ -158,44 +124,125 @@ const initialDragState: DragState = {
   currentEndMins: 0,
 };
 
-const GlassCard = ({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("glass-card rounded-2xl", className)} {...props}>
-    {children}
-  </div>
-);
+export type RepeatMode = "none" | "daily" | "custom";
+
+export type ApiScheduleInstance = {
+  id: number;
+  schedule_id: number;
+  device_id: string;
+  layout_id: string;
+  layout_name: string | null;
+  date: string; // YYYY-MM-DD
+  start_time: string; // HH:MM
+  end_time: string;   // HH:MM
+  start_datetime: string;
+  end_datetime: string;
+};
+
+export type ApiSchedule = {
+  id: number;
+  device_id: string;
+  layout_id: string;
+  layout_name: string | null;
+  start_time: string; // HH:MM
+  end_time: string;   // HH:MM
+  start_date: string; // YYYY-MM-DD
+  repeat_mode: RepeatMode;
+  repeat_interval: number;
+  days_count: number;
+};
+
+// Express Custom Schedules API client
+const shApi = async (method: string, endpoint: string, body?: any) => {
+  const token = localStorage.getItem("sh_token");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const res = await fetch(`/api${endpoint}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || `${res.status} ${res.statusText}`);
+  }
+  return json;
+};
+
+const SchedulesApi = {
+  list: (deviceId: string) => shApi("GET", `/schedules/device/${deviceId}`),
+  create: (body: any) => shApi("POST", "/schedules", body),
+  update: (id: number, body: any) => shApi("PUT", `/schedules/${id}`, body),
+  remove: (id: number, date?: string) => shApi("DELETE", date ? `/schedules/${id}?date=${date}` : `/schedules/${id}`),
+  repeat: (body: any) => shApi("POST", "/schedules/repeat", body),
+  exception: (body: any) => shApi("POST", "/schedules/exception", body),
+  copyDay: (body: any) => shApi("POST", "/schedules/copy-day", body),
+  clearDay: (body: any) => shApi("POST", "/schedules/clear-day", body),
+};
 
 export default function AdminSchedulePage() {
   const { user } = useAuth();
-  const [schedules, setSchedules] = useState<ApiSchedule[]>([]);
-  const [instances, setInstances] = useState<ApiScheduleInstance[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [layouts, setLayouts] = useState<LayoutOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [companyId, setCompanyId] = useState<string | null>(null);
+  const qc = useQueryClient();
 
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
-  const [deviceSearch, setDeviceSearch] = useState("");
-  const [layoutSearch, setLayoutSearch] = useState("");
-  const [selectedDate, setSelectedDate] = useState<string>(toISO(new Date()));
-  const [currentWeekDate, setCurrentWeekDate] = useState<string>(toISO(new Date()));
+  const [companyId, setCompanyId] = React.useState<string | null>(null);
 
-  // Drag-and-drop state
-  const [dragState, setDragState] = useState<DragState>(initialDragState);
-  const weekGridRef = useRef<HTMLDivElement | null>(null);
-  const [colWidth, setColWidth] = useState(120);
+  React.useEffect(() => {
+    if (!user) return;
+    supabase.from("profiles").select("company_id").eq("id", user.id).single()
+      .then(({ data }) => {
+        if (data?.company_id) {
+          setCompanyId(data.company_id);
+        }
+      });
+  }, [user]);
 
-  // Active configure popup state
-  const [selectedSchedule, setSelectedSchedule] = useState<ApiSchedule | null>(null);
-  const [editPopupOpen, setEditPopupOpen] = useState(false);
-  const [editRepeatMode, setEditRepeatMode] = useState<"none" | "daily" | "custom">("none");
-  const [editRepeatInterval, setEditRepeatInterval] = useState(1);
-  const [editDaysCount, setEditDaysCount] = useState(6);
-  const [editStartTime, setEditStartTime] = useState("09:00");
-  const [editEndTime, setEditEndTime] = useState("17:00");
-  const [editLayout, setEditLayout] = useState("");
+  const devicesQ = useQuery({
+    queryKey: ["devices", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("devices").select("*").eq("company_id", companyId!);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!companyId,
+  });
 
-  // Edit occurrence vs series confirmation
-  const [pendingUpdate, setPendingUpdate] = useState<{
+  const layoutsQ = useQuery({
+    queryKey: ["layouts", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("layouts").select("id, name").eq("company_id", companyId!).order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!companyId,
+  });
+
+  const devices = devicesQ.data ?? [];
+  const layouts = layoutsQ.data ?? [];
+
+  const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(null);
+  const [deviceSearch, setDeviceSearch] = React.useState("");
+  const [layoutSearch, setLayoutSearch] = React.useState("");
+  const [selectedDate, setSelectedDate] = React.useState<string>(toISO(new Date()));
+  const [currentWeekDate, setCurrentWeekDate] = React.useState<string>(toISO(new Date()));
+
+  const selectedDevice = devices.find((d) => d.id === selectedDeviceId);
+  const schedulesEnabled = selectedDevice ? (selectedDevice.schedules_enabled !== 0) : true;
+
+  // Active schedule editing state
+  const [selectedSchedule, setSelectedSchedule] = React.useState<ApiSchedule | null>(null);
+  const [editPopupOpen, setEditPopupOpen] = React.useState(false);
+  const [editRepeatMode, setEditRepeatMode] = React.useState<RepeatMode>("none");
+  const [editRepeatInterval, setEditRepeatInterval] = React.useState(1);
+  const [editDaysCount, setEditDaysCount] = React.useState(6);
+  const [editStartTime, setEditStartTime] = React.useState("09:00");
+  const [editEndTime, setEditEndTime] = React.useState("17:00");
+
+  // Edit occurrence vs series confirmation state
+  const [pendingUpdate, setPendingUpdate] = React.useState<{
     id: number;
     date: string;
     start_time: string;
@@ -203,49 +250,17 @@ export default function AdminSchedulePage() {
     layout_id: string;
   } | null>(null);
 
-  // Bulk copy operations states
-  const [bulkRepeatOpen, setBulkRepeatOpen] = useState(false);
-  const [bulkRepeatDate, setBulkRepeatDate] = useState<string | null>(null);
-  const [bulkRepeatMode, setBulkRepeatMode] = useState<"none" | "daily" | "custom">("none");
-  const [bulkRepeatInterval, setBulkRepeatInterval] = useState(1);
-  const [bulkRepeatDaysCount, setBulkRepeatDaysCount] = useState(6);
+  // Bulk repeat day schedules state
+  const [bulkRepeatOpen, setBulkRepeatOpen] = React.useState(false);
+  const [bulkRepeatDate, setBulkRepeatDate] = React.useState<string | null>(null);
+  const [bulkRepeatMode, setBulkRepeatMode] = React.useState<RepeatMode>("none");
+  const [bulkRepeatInterval, setBulkRepeatInterval] = React.useState(1);
+  const [bulkRepeatDaysCount, setBulkRepeatDaysCount] = React.useState(6);
 
+  // Overwrite state variables
+  const [bulkOverwriteDates, setBulkOverwriteDates] = React.useState<string[] | null>(null);
+  const [repeatOverwritePayload, setRepeatOverwritePayload] = React.useState<any | null>(null);
 
-  // Overwrite validation confirmations
-  const [bulkOverwriteDates, setBulkOverwriteDates] = useState<string[] | null>(null);
-  const [repeatOverwritePayload, setRepeatOverwritePayload] = useState<{
-    schedule_id: number;
-    start_date: string;
-    repeat_mode: "none" | "daily" | "custom";
-    repeat_interval?: number;
-    days_count?: number;
-    start_time?: string;
-    end_time?: string;
-  } | null>(null);
-
-  // Month Switcher for Mini Calendar
-  const [calendarMonth, setCalendarMonth] = useState(new Date());
-
-  const selectedDevice = devices.find((d) => d.id === selectedDeviceId);
-  const schedulesEnabled = selectedDevice ? (selectedDevice.schedules_enabled !== 0) : true;
-
-  // Retrieve current week date range starting on Monday
-  const weekDates = useMemo(() => {
-    const current = parseISODate(currentWeekDate);
-    const day = current.getDay();
-    // Monday is index 0 in our weekly rendering headers
-    const distanceToMon = day === 0 ? -6 : 1 - day;
-    const monday = new Date(current.getTime());
-    monday.setDate(current.getDate() + distanceToMon);
-
-    return Array.from({ length: 7 }).map((_, idx) => {
-      const d = new Date(monday.getTime());
-      d.setDate(monday.getDate() + idx);
-      return d;
-    });
-  }, [currentWeekDate]);
-
-  // Compute bulk copy date ranges to display helper text
   const getBulkRecurrenceRangeText = () => {
     if (!bulkRepeatDate) return "";
     const start = parseISODate(bulkRepeatDate);
@@ -258,7 +273,9 @@ export default function AdminSchedulePage() {
     const startStr = start.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
     const endStr = end.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
-    if (bulkRepeatMode === "none") return `Occurs only on ${startStr}`;
+    if (bulkRepeatMode === "none") {
+      return `Occurs only on ${startStr}`;
+    }
     return `Repeats from ${startStr} to ${endStr} (${totalDays} occurrences)`;
   };
 
@@ -274,100 +291,213 @@ export default function AdminSchedulePage() {
     const startStr = start.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
     const endStr = end.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
-    if (editRepeatMode === "none") return `Occurs only on ${startStr}`;
+    if (editRepeatMode === "none") {
+      return `Occurs only on ${startStr}`;
+    }
     return `Repeats from ${startStr} to ${endStr} (${totalDays} occurrences)`;
   };
 
-  // Measure Columns widths dynamically
-  useEffect(() => {
-    const handleResize = () => {
-      if (weekGridRef.current) {
-        const gridCols = weekGridRef.current.querySelector(".grid-cols-7");
-        if (gridCols) {
-          setColWidth(gridCols.clientWidth / 7);
-        }
-      }
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [loading]);
+  // Drag and drop / resize state
+  const [dragState, setDragState] = React.useState<DragState>(initialDragState);
+  const weekGridRef = React.useRef<HTMLDivElement | null>(null);
+  const [colWidth, setColWidth] = React.useState(120);
 
-  useEffect(() => {
-    if (!user) return;
-    supabase.from("profiles").select("company_id").eq("id", user.id).single()
-      .then(({ data }) => {
-        if (data?.company_id) {
-          setCompanyId(data.company_id);
-          fetchDevicesAndLayouts(data.company_id);
-        } else setLoading(false);
-      });
-  }, [user]);
-
-  const fetchDevicesAndLayouts = async (cId: string) => {
-    const [devicesRes, layoutsRes] = await Promise.all([
-      supabase.from("devices").select("*").eq("company_id", cId),
-      supabase.from("layouts").select("id, name").eq("company_id", cId).order("name"),
-    ]);
-
-    const devs = devicesRes.data ?? [];
-    setDevices(devs);
-    setLayouts(layoutsRes.data ?? []);
-
-    if (devs.length > 0) {
-      setSelectedDeviceId(devs[0].id);
-      fetchSchedules(devs[0].id);
-    } else {
-      setLoading(false);
+  // Set default selected device on load
+  React.useEffect(() => {
+    if (selectedDeviceId === null && devices.length > 0) {
+      setSelectedDeviceId(devices[0].id);
     }
-  };
+  }, [devices, selectedDeviceId]);
 
-  const fetchSchedules = async (deviceId: string) => {
-    setLoading(true);
-    try {
-      const data = await apiFetch("GET", `/schedules/device/${deviceId}`);
-      setSchedules(data.schedules || []);
-      setInstances(data.instances || []);
-    } catch (err: any) {
-      toast.error("Failed to load schedules: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Load schedules and instances for the selected device
+  const schedulesQ = useQuery({
+    queryKey: ["schedules", selectedDeviceId],
+    queryFn: () => SchedulesApi.list(selectedDeviceId!),
+    enabled: selectedDeviceId !== null,
+  });
 
-  const deviceColorMap = useMemo(() => {
+  const schedules: ApiSchedule[] = schedulesQ.data?.schedules ?? [];
+  const instances: ApiScheduleInstance[] = schedulesQ.data?.instances ?? [];
+
+  // Track layout colors
+  const layoutColor = React.useMemo(() => {
     const m = new Map<string, string>();
-    devices.forEach((d, i) => m.set(d.id, DEVICE_COLORS[i % DEVICE_COLORS.length]));
+    layouts.forEach((t, i) => m.set(t.id, PALETTE[i % PALETTE.length]));
     return m;
-  }, [devices]);
+  }, [layouts]);
 
-  // Handle Schedules bypass status updates
-  const updateDeviceSchedulesMode = async (enabled: boolean) => {
-    if (!selectedDeviceId || !companyId) return;
-    try {
+  // Calculations for dates of the current week view
+  const weekDates = React.useMemo(() => {
+    const base = getMonday(parseISODate(currentWeekDate));
+    return Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date(base.getTime());
+      d.setDate(base.getDate() + i);
+      return d;
+    });
+  }, [currentWeekDate]);
+
+  // Live clock for time indicator
+  const [nowTime, setNowTime] = React.useState(new Date());
+  React.useEffect(() => {
+    const timer = setInterval(() => setNowTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Update column width on resize
+  React.useEffect(() => {
+    if (!weekGridRef.current) return;
+    const updateWidth = () => {
+      const colEl = weekGridRef.current?.querySelector(".day-column");
+      if (colEl) setColWidth(colEl.getBoundingClientRect().width);
+    };
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, [currentWeekDate, selectedDeviceId]);
+
+  // Mutations
+  const createMut = useMutation({
+    mutationFn: (body: any) => SchedulesApi.create(body),
+    onSuccess: () => {
+      toast.success("Schedule created successfully");
+      qc.invalidateQueries({ queryKey: ["schedules", selectedDeviceId] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: any }) =>
+      SchedulesApi.update(id, body),
+    onSuccess: () => {
+      toast.success("Schedule updated");
+      qc.invalidateQueries({ queryKey: ["schedules", selectedDeviceId] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: ({ id, date }: { id: number; date?: string }) => SchedulesApi.remove(id, date),
+    onSuccess: () => {
+      toast.success("Schedule deleted");
+      setSelectedSchedule(null);
+      setEditPopupOpen(false);
+      qc.invalidateQueries({ queryKey: ["schedules", selectedDeviceId] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const repeatMut = useMutation({
+    mutationFn: (body: any) => SchedulesApi.repeat(body),
+    onSuccess: () => {
+      toast.success("Recurrence updated");
+      setEditPopupOpen(false);
+      setRepeatOverwritePayload(null);
+      qc.invalidateQueries({ queryKey: ["schedules", selectedDeviceId] });
+    },
+    onError: (e: any) => {
+      if (e.body && e.body.has_overlap) {
+        setRepeatOverwritePayload({
+          schedule_id: selectedSchedule!.id,
+          repeat_mode: editRepeatMode,
+          repeat_interval: editRepeatMode === "custom" ? editRepeatInterval : 1,
+          days_count: editRepeatMode === "none" ? 1 : editDaysCount,
+          start_time: editStartTime,
+          end_time: editEndTime,
+        });
+      } else {
+        toast.error(e.message || "An error occurred");
+      }
+    },
+  });
+
+  const bulkRepeatMut = useMutation({
+    mutationFn: async (payload: {
+      source_date: string;
+      target_dates: string[];
+      overwrite?: boolean;
+    }) =>
+      SchedulesApi.copyDay({
+        device_id: selectedDeviceId!,
+        source_date: payload.source_date,
+        target_dates: payload.target_dates,
+        overwrite: payload.overwrite,
+      }),
+    onSuccess: (data) => {
+      if (data && data.has_existing) {
+        setBulkOverwriteDates(data.existing_dates || []);
+      } else {
+        toast.success("Day schedules replicated successfully");
+        setBulkRepeatOpen(false);
+        setBulkOverwriteDates(null);
+        qc.invalidateQueries({ queryKey: ["schedules", selectedDeviceId] });
+      }
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const clearDayMut = useMutation({
+    mutationFn: () => SchedulesApi.clearDay({ device_id: selectedDeviceId!, date: bulkRepeatDate! }),
+    onSuccess: () => {
+      toast.success("Day schedules cleared");
+      setBulkRepeatOpen(false);
+      qc.invalidateQueries({ queryKey: ["schedules", selectedDeviceId] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateOccurrenceMut = useMutation({
+    mutationFn: async (payload: {
+      id: number;
+      date: string;
+      start_time: string;
+      end_time: string;
+      layout_id: string;
+    }) => {
+      await SchedulesApi.exception({
+        schedule_id: payload.id,
+        date: payload.date,
+        start_time: payload.start_time,
+        end_time: payload.end_time,
+        layout_id: payload.layout_id,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Updated schedule for this day only");
+      setPendingUpdate(null);
+      setEditPopupOpen(false);
+      qc.invalidateQueries({ queryKey: ["schedules", selectedDeviceId] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const updateDeviceSchedulesMode = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (!selectedDeviceId) return;
       const { error } = await supabase.from("devices").update({ schedules_enabled: enabled ? 1 : 0 }).eq("id", selectedDeviceId);
       if (error) throw error;
-      toast.success("Device schedules mode updated");
-      fetchDevicesAndLayouts(companyId);
-    } catch (e: any) {
-      toast.error("Failed to update schedules mode: " + (e as Error).message);
-    }
-  };
+    },
+    onSuccess: () => {
+      toast.success("Device schedule mode updated");
+      qc.invalidateQueries({ queryKey: ["devices", companyId] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
 
-  const updateDeviceDefaultLayout = async (layoutId: string | null) => {
-    if (!selectedDeviceId || !companyId) return;
-    try {
+  const updateDeviceDefaultLayout = useMutation({
+    mutationFn: async (layoutId: string | null) => {
+      if (!selectedDeviceId) return;
       const { error } = await supabase.from("devices").update({ layout_id: layoutId }).eq("id", selectedDeviceId);
       if (error) throw error;
+    },
+    onSuccess: () => {
       toast.success("Device default layout updated");
-      fetchDevicesAndLayouts(companyId);
-    } catch (e: any) {
-      toast.error("Failed to update default layout: " + (e as Error).message);
-    }
-  };
+      qc.invalidateQueries({ queryKey: ["devices", companyId] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
 
-  // Drag-move and drag-resize mouse listener hooks
-  useEffect(() => {
+  // Handle global mouse move & mouse up for Drag-Move / Drag-Resize gestures
+  React.useEffect(() => {
     if (dragState.action === "idle") return;
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -381,6 +511,7 @@ export default function AdminSchedulePage() {
         let newStart = dragState.originalStartMins + deltaMins;
         let newEnd = dragState.originalEndMins + deltaMins;
 
+        // Constraint boundaries
         if (newStart < 0) {
           newEnd -= newStart;
           newStart = 0;
@@ -416,7 +547,7 @@ export default function AdminSchedulePage() {
       }
     };
 
-    const handleMouseUp = async () => {
+    const handleMouseUp = () => {
       const { blockId, currentDate, currentStartMins, currentEndMins } = dragState;
       setDragState(initialDragState);
 
@@ -445,17 +576,14 @@ export default function AdminSchedulePage() {
             layout_id: parent.layout_id,
           });
         } else {
-          try {
-            await apiFetch("PUT", `/schedules/${blockId}`, {
+          updateMut.mutate({
+            id: blockId,
+            body: {
               start_date: currentDate,
               start_time: startTimeStr,
               end_time: endTimeStr,
-            });
-            toast.success("Schedule adjusted successfully!");
-            if (selectedDeviceId) fetchSchedules(selectedDeviceId);
-          } catch (err: any) {
-            toast.error(err.message || "Failed to update schedule block");
-          }
+            },
+          });
         }
       }
     };
@@ -466,14 +594,46 @@ export default function AdminSchedulePage() {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [dragState, colWidth]);
+  }, [dragState, colWidth, schedules]);
 
-  // Click on active timeline block
+  // Sidebar Filtered Lists
+  const filteredDevices = devices.filter(
+    (d: any) =>
+      d.name.toLowerCase().includes(deviceSearch.toLowerCase()) ||
+      (d.location && d.location.toLowerCase().includes(deviceSearch.toLowerCase()))
+  );
+
+  const filteredLayouts = layouts.filter((t: any) =>
+    t.name.toLowerCase().includes(layoutSearch.toLowerCase())
+  );
+
+  // Month Switcher for Mini Calendar
+  const [calendarMonth, setCalendarMonth] = React.useState(new Date());
+
+  const calendarCells = React.useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const first = new Date(year, month, 1);
+    // Adjust first weekday: Mon=0, Sun=6
+    let firstDayIndex = first.getDay() - 1;
+    if (firstDayIndex === -1) firstDayIndex = 6;
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: Array<{ date: Date; isCurrent: boolean } | null> = [];
+
+    for (let i = 0; i < firstDayIndex; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({ date: new Date(year, month, d), isCurrent: true });
+    }
+
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [calendarMonth]);
+
   const handleBlockClick = (scheduleId: number) => {
     const parent = schedules.find((s) => s.id === scheduleId);
     if (parent) {
       setSelectedSchedule(parent);
-      setEditLayout(parent.layout_id);
       setEditRepeatMode(parent.repeat_mode);
       setEditRepeatInterval(parent.repeat_interval || 1);
       setEditDaysCount(parent.days_count || 6);
@@ -483,15 +643,29 @@ export default function AdminSchedulePage() {
     }
   };
 
-  // Drag layouts onto columns handlers
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleBlockMouseDown = (
+    e: React.MouseEvent,
+    inst: ApiScheduleInstance,
+    actionType: DragState["action"]
+  ) => {
+    e.stopPropagation();
     e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
+    setDragState({
+      action: actionType,
+      blockId: inst.schedule_id,
+      originalDate: inst.date,
+      originalStartMins: parseHHMM(inst.start_time),
+      originalEndMins: parseHHMM(inst.end_time),
+      startY: e.clientY,
+      startX: e.clientX,
+      currentDate: inst.date,
+      currentStartMins: parseHHMM(inst.start_time),
+      currentEndMins: parseHHMM(inst.end_time),
+    });
   };
 
-  const handleDropNew = async (e: React.DragEvent, dateStr: string) => {
+  const handleGridDrop = (e: React.DragEvent, dateStr: string) => {
     e.preventDefault();
-    if (!schedulesEnabled || !selectedDeviceId) return;
 
     const todayStr = toISO(new Date());
     if (dateStr < todayStr) {
@@ -499,8 +673,8 @@ export default function AdminSchedulePage() {
       return;
     }
 
-    const layoutId = e.dataTransfer.getData("text/plain");
-    if (!layoutId) return;
+    const layoutIdStr = e.dataTransfer.getData("text/plain");
+    if (!layoutIdStr) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
@@ -508,56 +682,16 @@ export default function AdminSchedulePage() {
     const startMins = Math.round(droppedMins / 15) * 15;
     const endMins = Math.min(24 * 60, startMins + 8 * 60); // 8 Hours default
 
-    try {
-      await apiFetch("POST", "/schedules", {
-        device_id: selectedDeviceId,
-        layout_id: layoutId,
-        start_time: toHHMM(startMins),
-        end_time: toHHMM(endMins),
-        start_date: dateStr,
-        repeat_mode: "none",
-      });
-      toast.success("Schedule block added!");
-      fetchSchedules(selectedDeviceId);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to drop layout");
-    }
-  };
-
-  const handleBlockMouseDown = (
-    e: React.MouseEvent,
-    instance: ApiScheduleInstance,
-    action: DragState["action"]
-  ) => {
-    e.stopPropagation();
-    e.preventDefault();
-
-    if (!schedulesEnabled) return;
-
-    const todayStr = toISO(new Date());
-    if (instance.date < todayStr) {
-      toast.error("Completed slots are locked");
-      return;
-    }
-
-    const startMins = timeToMinutes(instance.start_time);
-    const endMins = timeToMinutes(instance.end_time);
-
-    setDragState({
-      action,
-      blockId: instance.schedule_id,
-      originalDate: instance.date,
-      originalStartMins: startMins,
-      originalEndMins: endMins,
-      startY: e.clientY,
-      startX: e.clientX,
-      currentDate: instance.date,
-      currentStartMins: startMins,
-      currentEndMins: endMins,
+    createMut.mutate({
+      device_id: selectedDeviceId!,
+      layout_id: layoutIdStr,
+      start_time: toHHMM(startMins),
+      end_time: toHHMM(endMins),
+      start_date: dateStr,
+      repeat_mode: "none",
     });
   };
 
-  // Navigations
   const handlePrevWeek = () => {
     const d = parseISODate(currentWeekDate);
     d.setDate(d.getDate() - 7);
@@ -577,1167 +711,1057 @@ export default function AdminSchedulePage() {
     setCalendarMonth(new Date());
   };
 
-  // Configure Schedule submissions
-  const handleSaveConfigure = async () => {
-    if (!selectedSchedule || !selectedDeviceId) return;
-
-    const payload = {
-      layout_id: editLayout,
-      start_time: editStartTime,
-      end_time: editEndTime,
-      start_date: selectedSchedule.start_date,
-      repeat_mode: editRepeatMode,
-      repeat_interval: editRepeatInterval,
-      days_count: editDaysCount,
-    };
-
-    try {
-      await apiFetch("PUT", `/schedules/${selectedSchedule.id}`, payload);
-      toast.success("Schedule series updated successfully!");
-      setEditPopupOpen(false);
-      fetchSchedules(selectedDeviceId);
-    } catch (err: any) {
-      if (err.message && err.message.includes("Overlap")) {
-        setRepeatOverwritePayload({
-          schedule_id: selectedSchedule.id,
-          start_date: selectedSchedule.start_date,
-          repeat_mode: editRepeatMode,
-          repeat_interval: editRepeatInterval,
-          days_count: editDaysCount,
-          start_time: editStartTime,
-          end_time: editEndTime,
-        });
-        setBulkOverwriteDates([]); // trigger overlap flow
-      } else {
-        toast.error(err.message || "Failed to update series");
-      }
-    }
-  };
-
-  const handleConfigureException = async () => {
-    if (!selectedSchedule || !selectedDeviceId) return;
-    try {
-      await apiFetch("POST", "/schedules/exception", {
-        schedule_id: selectedSchedule.id,
-        date: selectedDate,
-        start_time: editStartTime,
-        end_time: editEndTime,
-        layout_id: editLayout,
-      });
-      toast.success("Exceptions saved for this day successfully!");
-      setEditPopupOpen(false);
-      fetchSchedules(selectedDeviceId);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save exception");
-    }
-  };
-
-  const handleDeleteScheduleSeries = async () => {
-    if (!selectedSchedule || !selectedDeviceId) return;
-    try {
-      await apiFetch("DELETE", `/schedules/${selectedSchedule.id}`);
-      toast.success("Schedule series deleted successfully");
-      setEditPopupOpen(false);
-      fetchSchedules(selectedDeviceId);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete series");
-    }
-  };
-
-  const handleDeleteScheduleOccurrence = async () => {
-    if (!selectedSchedule || !selectedDeviceId) return;
-    try {
-      await apiFetch("DELETE", `/schedules/${selectedSchedule.id}?date=${selectedDate}`);
-      toast.success("Schedule occurrence deleted successfully");
-      setEditPopupOpen(false);
-      fetchSchedules(selectedDeviceId);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete occurrence");
-    }
-  };
-
-  // Re-save drag exception adjustments
-  const handleExecuteOccurrenceUpdate = async () => {
-    if (!pendingUpdate || !selectedDeviceId) return;
-    try {
-      await apiFetch("POST", "/schedules/exception", {
-        schedule_id: pendingUpdate.id,
-        date: pendingUpdate.date,
-        start_time: pendingUpdate.start_time,
-        end_time: pendingUpdate.end_time,
-        layout_id: pendingUpdate.layout_id,
-      });
-      toast.success("Occurrence detached successfully!");
-      setPendingUpdate(null);
-      fetchSchedules(selectedDeviceId);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to split occurrence");
-    }
-  };
-
-  const handleExecuteSeriesUpdate = async () => {
-    if (!pendingUpdate || !selectedDeviceId) return;
-    try {
-      await apiFetch("PUT", `/schedules/${pendingUpdate.id}`, {
-        start_date: pendingUpdate.date,
-        start_time: pendingUpdate.start_time,
-        end_time: pendingUpdate.end_time,
-      });
-      toast.success("Entire series updated!");
-      setPendingUpdate(null);
-      fetchSchedules(selectedDeviceId);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to adjust series");
-    }
-  };
-
-  // Overwrite recurrence conflicts handler
-  const executeRepeatOverwrite = async () => {
-    if (!bulkRepeatDate || !selectedDeviceId) return;
-
-    if (repeatOverwritePayload) {
-      try {
-        await apiFetch("POST", "/schedules/repeat", {
-          ...repeatOverwritePayload,
-          overwrite: true,
-        });
-        toast.success("Conflicts purged. Recurrence set!");
-        setRepeatOverwritePayload(null);
-        setBulkOverwriteDates(null);
-        setBulkRepeatOpen(false);
-        setEditPopupOpen(false);
-        fetchSchedules(selectedDeviceId);
-      } catch (err: any) {
-        toast.error(err.message || "Failed to override recurrence");
-      }
-      return;
-    }
-
-    const targetDates: string[] = [];
-    const baseDate = new Date(bulkRepeatDate + "T00:00:00");
-    const occurrences = bulkRepeatMode === "none" ? 1 : bulkRepeatDaysCount;
-    const interval = bulkRepeatMode === "custom" ? bulkRepeatInterval : 1;
-
-    for (let i = 1; i < occurrences; i++) {
-      const nextD = new Date(baseDate.getTime());
-      nextD.setDate(baseDate.getDate() + i * interval);
-      targetDates.push(toISO(nextD));
-    }
-
-    try {
-      await apiFetch("POST", "/schedules/copy-day", {
-        device_id: selectedDeviceId,
-        source_date: bulkRepeatDate,
-        target_dates: targetDates,
-        overwrite: true,
-      });
-      toast.success("Conflicts overridden. Recurrence set!");
-      setBulkOverwriteDates(null);
-      setBulkRepeatOpen(false);
-      fetchSchedules(selectedDeviceId);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to override recurrence");
-    }
-  };
-
-  // Bulk copy target day operations
-  const handleOpenCopyDay = () => {
-    setCopyTargetDates([]);
-    setCopyDayOpen(true);
-  };
-
-  const handleExecuteCopyDay = async (overwriteApprove = false) => {
-    if (!selectedDeviceId || !bulkRepeatDate) return;
-    try {
-      const res = await apiFetch("POST", "/schedules/copy-day", {
-        device_id: selectedDeviceId,
-        source_date: bulkRepeatDate,
-        target_dates: copyTargetDates,
-        overwrite: overwriteApprove,
-      });
-
-      if (res.has_existing) {
-        setCopyOverwriteOpen(true);
-      } else {
-        toast.success(`Copied successfully to target days!`);
-        setCopyDayOpen(false);
-        setCopyOverwriteOpen(false);
-        setBulkRepeatOpen(false);
-        fetchSchedules(selectedDeviceId);
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to copy day schedules");
-    }
-  };
-
-  // Recurrence configuration checks
-  const handleBulkRecurrenceSave = async () => {
-    if (!bulkRepeatDate || !selectedDeviceId) return;
-    const dayInstanceSchedules = instances.filter(i => i.date === bulkRepeatDate);
-    if (dayInstanceSchedules.length === 0) {
-      toast.error("No schedules to repeat on this day");
-      return;
-    }
-
-    const targetDates: string[] = [];
-    const baseDate = new Date(bulkRepeatDate + "T00:00:00");
-    const occurrences = bulkRepeatMode === "none" ? 1 : bulkRepeatDaysCount;
-    const interval = bulkRepeatMode === "custom" ? bulkRepeatInterval : 1;
-
-    for (let i = 1; i < occurrences; i++) {
-      const nextD = new Date(baseDate.getTime());
-      nextD.setDate(baseDate.getDate() + i * interval);
-      targetDates.push(toISO(nextD));
-    }
-
-    if (targetDates.length === 0) {
-      toast.error("Please select a repeat pattern greater than 1 day");
-      return;
-    }
-
-    try {
-      const res = await apiFetch("POST", "/schedules/copy-day", {
-        device_id: selectedDeviceId,
-        source_date: bulkRepeatDate,
-        target_dates: targetDates,
-        overwrite: false,
-      });
-
-      if (res.has_existing) {
-        setBulkOverwriteDates(res.existing_dates || []);
-      } else {
-        toast.success("Bulk recurrence configured successfully!");
-        setBulkRepeatOpen(false);
-        fetchSchedules(selectedDeviceId);
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to configure recurrence");
-    }
-  };
-
-  // Sidebar Filtered lists
-  const filteredDevices = devices.filter(
-    (d) =>
-      d.name.toLowerCase().includes(deviceSearch.toLowerCase()) ||
-      (d.location && d.location.toLowerCase().includes(deviceSearch.toLowerCase()))
-  );
-
-  const filteredLayouts = layouts.filter((l) =>
-    l.name.toLowerCase().includes(layoutSearch.toLowerCase())
-  );
+  if (devicesQ.isLoading || layoutsQ.isLoading) {
+    return (
+      <AdminLayout>
+        <PageHeader title="Schedule Planner" />
+        <div className="flex h-96 items-center justify-center">
+          <RefreshCw className="size-8 text-primary animate-spin" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Schedule Planner</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Schedule layout playlists to show up at specific days and hours on your screens. Drag-and-drop, resize, and custom repeat rules.
-          </p>
-        </div>
+      <PageHeader
+        title="Schedule Planner"
+        description="Schedule layouts to show up at specific days and hours on your signage terminals. Support drag-and-drop, resize, and custom repeat rules."
+      />
 
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_260px] gap-6 items-start">
-          {/* ======================================================== */}
-          {/* LEFT SIDEBAR: Device list & Mini calendar                 */}
-          {/* ======================================================== */}
-          <div className="space-y-6">
-            {/* Device Selector */}
-            <GlassCard className="p-4 flex flex-col gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
-                Devices
-              </h2>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Search devices..."
-                  value={deviceSearch}
-                  onChange={(e) => setDeviceSearch(e.target.value)}
-                  className="pl-8 bg-white/5 border-white/10 text-xs h-8 animate-in"
-                />
-              </div>
-              <div className="space-y-1 max-h-[195px] overflow-y-auto pr-1 custom-scrollbar">
-                {filteredDevices.map((d) => {
-                  const isSelected = d.id === selectedDeviceId;
-                  return (
-                    <button
-                      key={d.id}
-                      onClick={() => {
-                        setSelectedDeviceId(d.id);
-                        fetchSchedules(d.id);
-                      }}
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_260px] gap-6 items-start">
+        {/* ======================================================== */}
+        {/* LEFT SIDEBAR: Device list & Mini calendar                 */}
+        {/* ======================================================== */}
+        <div className="space-y-6">
+          {/* Device Selector */}
+          <GlassCard className="p-4 flex flex-col gap-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
+              Devices
+            </h2>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search devices..."
+                value={deviceSearch}
+                onChange={(e) => setDeviceSearch(e.target.value)}
+                className="pl-8 bg-zinc-900/40 border-white/10 text-xs h-8 focus:ring-1 focus:ring-primary/45"
+              />
+            </div>
+            <div className="space-y-1 max-h-[195px] overflow-y-auto pr-1 custom-scrollbar">
+              {filteredDevices.map((d: any) => {
+                const isSelected = d.id === selectedDeviceId;
+                return (
+                  <button
+                    key={d.id}
+                    onClick={() => setSelectedDeviceId(d.id)}
+                    className={cn(
+                      "w-full text-left p-2 rounded-xl text-xs flex items-center justify-between border transition-all duration-200",
+                      isSelected
+                        ? "bg-primary/10 border-primary/30 text-foreground font-medium"
+                        : "bg-transparent border-transparent hover:bg-white/5 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <div className="truncate">
+                      <div>{d.name}</div>
+                      {d.location && <div className="text-[10px] opacity-75">{d.location}</div>}
+                    </div>
+                    <span
                       className={cn(
-                        "w-full text-left p-2 rounded-xl text-xs flex items-center justify-between border transition-all duration-200",
-                        isSelected
-                          ? "bg-primary/10 border-primary/30 text-foreground font-medium"
-                          : "bg-transparent border-transparent hover:bg-white/5 text-muted-foreground hover:text-foreground"
+                        "size-1.5 rounded-full shrink-0 ml-1.5",
+                        d.status === "online"
+                          ? "bg-emerald-400 animate-pulse"
+                          : d.status === "paused"
+                            ? "bg-amber-400"
+                            : "bg-muted-foreground/30"
                       )}
-                    >
-                      <div className="truncate">
-                        <div>{d.name}</div>
-                        {d.location && <div className="text-[10px] opacity-75">{d.location}</div>}
-                      </div>
-                      <span
-                        className={cn(
-                          "size-1.5 rounded-full shrink-0 ml-1.5",
-                          d.status === "online"
-                            ? "bg-emerald-400 animate-pulse"
-                            : d.status === "pending"
-                              ? "bg-amber-400"
-                              : "bg-muted-foreground/30"
-                        )}
-                      />
-                    </button>
-                  );
-                })}
-                {filteredDevices.length === 0 && (
-                  <div className="text-xs text-muted-foreground italic text-center py-2">
-                    No matching devices
-                  </div>
-                )}
-              </div>
-            </GlassCard>
-
-            {/* Mini Calendar Picker */}
-            <GlassCard className="p-4 flex flex-col gap-3 select-none">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  {MONTHS[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
-                </span>
-                <div className="flex gap-0.5">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6 rounded-md hover:bg-white/5"
-                    onClick={() => {
-                      const m = new Date(calendarMonth);
-                      m.setMonth(m.getMonth() - 1);
-                      setCalendarMonth(m);
-                    }}
-                  >
-                    <ChevronLeft className="size-3.5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6 rounded-md hover:bg-white/5"
-                    onClick={() => {
-                      const m = new Date(calendarMonth);
-                      m.setMonth(m.getMonth() + 1);
-                      setCalendarMonth(m);
-                    }}
-                  >
-                    <ChevronRight className="size-3.5" />
-                  </Button>
+                    />
+                  </button>
+                );
+              })}
+              {filteredDevices.length === 0 && (
+                <div className="text-xs text-muted-foreground italic text-center py-2">
+                  No matching devices
                 </div>
+              )}
+            </div>
+          </GlassCard>
+
+          {/* Mini Calendar */}
+          <GlassCard className="p-4 flex flex-col gap-3 select-none">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                {MONTHS[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
+              </span>
+              <div className="flex gap-0.5">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-6 rounded-md hover:bg-white/5"
+                  onClick={() => {
+                    const m = new Date(calendarMonth);
+                    m.setMonth(m.getMonth() - 1);
+                    setCalendarMonth(m);
+                  }}
+                >
+                  <ChevronLeft className="size-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-6 rounded-md hover:bg-white/5"
+                  onClick={() => {
+                    const m = new Date(calendarMonth);
+                    m.setMonth(m.getMonth() + 1);
+                    setCalendarMonth(m);
+                  }}
+                >
+                  <ChevronRight className="size-3.5" />
+                </Button>
               </div>
+            </div>
 
-              <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-bold text-muted-foreground/70">
-                {["M", "T", "W", "T", "F", "S", "S"].map((day, idx) => (
-                  <div key={idx}>{day}</div>
-                ))}
-              </div>
+            <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-bold text-muted-foreground/70">
+              {["M", "T", "W", "T", "F", "S", "S"].map((day, idx) => (
+                <div key={idx}>{day}</div>
+              ))}
+            </div>
 
-              <div className="grid grid-cols-7 gap-0.5">
-                {React.useMemo(() => {
-                  const year = calendarMonth.getFullYear();
-                  const month = calendarMonth.getMonth();
-                  const first = new Date(year, month, 1);
-                  let firstDayIndex = first.getDay() - 1;
-                  if (firstDayIndex === -1) firstDayIndex = 6;
+            <div className="grid grid-cols-7 gap-0.5">
+              {calendarCells.map((cell, idx) => {
+                if (cell === null) return <div key={idx} className="aspect-square" />;
 
-                  const daysInMonth = new Date(year, month + 1, 0).getDate();
-                  const cells: Array<{ date: Date; isCurrent: boolean } | null> = [];
+                const cellIso = toISO(cell.date);
+                const isSelected = selectedDate === cellIso;
+                const isToday = toISO(new Date()) === cellIso;
+                const hasSchedules = instances.some((i) => i.date === cellIso);
 
-                  for (let i = 0; i < firstDayIndex; i++) cells.push(null);
-                  for (let d = 1; d <= daysInMonth; d++) {
-                    cells.push({ date: new Date(year, month, d), isCurrent: true });
-                  }
-
-                  while (cells.length % 7 !== 0) cells.push(null);
-                  return cells;
-                }, [calendarMonth]).map((cell, idx) => {
-                  if (cell === null) return <div key={idx} className="aspect-square" />;
-
-                  const cellIso = toISO(cell.date);
-                  const isSelected = selectedDate === cellIso;
-                  const isToday = toISO(new Date()) === cellIso;
-                  const hasSchedules = instances.some((i) => i.date === cellIso);
-
-                  return (
-                    <button
-                      key={idx}
+                return (
+                  <button
+                    key={idx}
                     onClick={() => {
                       setSelectedDate(cellIso);
                       setCurrentWeekDate(cellIso);
                     }}
-                      className={cn(
-                        "aspect-square text-[10px] rounded-md transition-colors relative flex flex-col items-center justify-center font-medium",
-                        isSelected
-                          ? "bg-primary text-primary-foreground font-semibold"
-                          : isToday
-                            ? "bg-white/10 text-foreground"
-                            : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                      )}
-                    >
-                      <span>{cell.date.getDate()}</span>
-                      {hasSchedules && (
-                        <span className="absolute bottom-1 size-1 rounded-full bg-rose-500" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full text-xs h-7 border-border bg-muted/30 hover:bg-muted"
-                onClick={handleToday}
-              >
-                Today
-              </Button>
-            </GlassCard>
-
-            {/* Schedule Mode control panel */}
-            {selectedDevice && (
-              <GlassCard className="p-4 flex flex-col gap-3">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
-                  Schedule Mode
-                </h2>
-                
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs font-medium text-foreground">Disable Schedule</span>
-                    <span className="text-[10px] text-muted-foreground">Use a default layout for everything</span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      const nextVal = selectedDevice.schedules_enabled === 0;
-                      updateDeviceSchedulesMode(nextVal);
-                    }}
                     className={cn(
-                      "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-primary/40 focus:ring-offset-1 focus:ring-offset-background",
-                      selectedDevice.schedules_enabled === 0 ? "bg-amber-600 border-amber-500/50" : "bg-muted border-border"
+                      "aspect-square text-[10px] rounded-md transition-colors relative flex flex-col items-center justify-center font-medium",
+                      isSelected
+                        ? "bg-primary text-primary-foreground font-semibold"
+                        : isToday
+                          ? "bg-white/10 text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                     )}
                   >
-                    <span
-                      className={cn(
-                        "pointer-events-none inline-block size-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
-                        selectedDevice.schedules_enabled === 0 ? "translate-x-4" : "translate-x-0"
-                      )}
-                    />
-                  </button>
-                </div>
-
-                {selectedDevice.schedules_enabled === 0 && (
-                  <div className="space-y-1.5 pt-2 border-t border-border animate-in fade-in slide-in-from-top-1 duration-150">
-                    <Label className="text-[10px] text-muted-foreground font-semibold">Default Fallback Layout</Label>
-                    <select
-                      value={selectedDevice.layout_id || ""}
-                      onChange={(e) => updateDeviceDefaultLayout(e.target.value || null)}
-                      className="w-full bg-background border border-input rounded-xl h-8 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
-                    >
-                      <option value="" disabled className="bg-popover text-muted-foreground">Select a default layout...</option>
-                      {layouts.map((l) => (
-                        <option key={l.id} value={l.id} className="bg-popover text-foreground">
-                          {l.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </GlassCard>
-            )}
-          </div>
-
-          {/* ======================================================== */}
-          {/* MAIN AREA: Interactive calendar week view grid            */}
-          {/* ======================================================== */}
-          <div className="flex flex-col gap-4" ref={weekGridRef}>
-            {/* Week Selector navigation bar */}
-            <div className="flex items-center justify-between bg-muted/20 border border-border rounded-2xl px-4 py-2.5 shadow-sm">
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 rounded-full border border-border hover:bg-muted"
-                  onClick={handlePrevWeek}
-                >
-                  <ChevronLeft className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 rounded-full border border-border hover:bg-muted"
-                  onClick={handleNextWeek}
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-                <span className="text-sm font-semibold tracking-tight ml-2">
-                  Week of{" "}
-                  {weekDates[0].toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
-              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                <Info className="size-3.5" /> Drag layouts onto target date columns
-              </span>
-            </div>
-
-            {/* Main timeline hours board container */}
-            {loading ? (
-              <Card>
-                <CardContent className="py-12 flex justify-center">
-                  <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full" />
-                </CardContent>
-              </Card>
-            ) : (
-              <GlassCard className="p-0 overflow-hidden flex flex-col select-none">
-                {/* Header days row */}
-                <div className="grid grid-cols-[60px_1fr] border-b border-border bg-muted/20 pr-2">
-                  <div className="h-10 border-r border-border" />
-                  <div className="grid grid-cols-7 h-10 divide-x divide-border">
-                    {weekDates.map((date, idx) => {
-                      const dateIso = toISO(date);
-                      const isSelected = selectedDate === dateIso;
-                      const isCurrent = dateIso === toISO(new Date());
-                      const isPast = parseISODate(dateIso).getTime() < parseISODate(toISO(new Date())).getTime();
-                      const formattedDay = date.toLocaleDateString(undefined, { day: "numeric" });
-                      
-                      return (
-                        <div
-                          key={idx}
-                          onClick={() => {
-                            if (!schedulesEnabled) return;
-                            setSelectedDate(dateIso);
-                            setCurrentWeekDate(dateIso);
-                            
-                            if (isPast) {
-                              toast.error("Past days cannot be repeated or duplicated.");
-                              return;
-                            }
-                            
-                            const dayInstances = instances.filter((i) => i.date === dateIso);
-                            if (dayInstances.length > 0) {
-                              setBulkRepeatDate(dateIso);
-                              setBulkRepeatMode("none");
-                              setBulkRepeatInterval(1);
-                              setBulkRepeatDaysCount(6);
-                              setBulkRepeatOpen(true);
-                            } else {
-                              toast.info("No layouts scheduled on this day to repeat.");
-                            }
-                          }}
-                          className={cn(
-                            "flex flex-col items-center justify-center text-center py-1 transition-colors relative",
-                            !schedulesEnabled
-                              ? "opacity-40 cursor-not-allowed pointer-events-none"
-                              : "cursor-pointer hover:bg-muted",
-                            isSelected && "bg-primary/5",
-                            isCurrent && "bg-primary/5"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "text-[10px] font-semibold",
-                              isSelected
-                                ? "text-primary"
-                                : isPast
-                                  ? "text-rose-400/90"
-                                  : "text-muted-foreground"
-                            )}
-                          >
-                            {date.toLocaleDateString(undefined, { weekday: "short" })}
-                          </span>
-                          <span
-                            className={cn(
-                              "text-xs font-bold mt-0.5",
-                              isCurrent
-                                ? "text-primary"
-                                : isPast
-                                  ? "text-rose-400/80"
-                                  : "text-foreground"
-                            )}
-                          >
-                            {formattedDay}
-                          </span>
-                          {instances.some((i) => i.date === dateIso) && (
-                            <span className="absolute bottom-1 size-1 rounded-full bg-primary" />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Vertical board content area */}
-                <div className="grid grid-cols-[60px_1fr] relative overflow-y-scroll max-h-[700px] custom-scrollbar">
-                  {/* Hours timeline side gutter */}
-                  <div className="bg-muted/10 border-r border-border select-none text-[10px] text-muted-foreground pr-2 pt-1.5 text-right font-medium">
-                    {Array.from({ length: 24 }).map((_, h) => (
-                      <div key={h} style={{ height: HOUR_HEIGHT }} className="border-b border-border select-none pr-1">
-                        {String(h).padStart(2, "0")}:00
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Day columns */}
-                  <div className="grid grid-cols-7 relative divide-x divide-border bg-card/10">
-                    {!schedulesEnabled && (
-                      <div
-                        onClick={() => {
-                          toast.info(`Device is running fallback default layout: ${selectedDevice?.layout_id ? layouts.find((l) => l.id === selectedDevice.layout_id)?.name || "Layout" : "None"}. Turn on "Enable Scheduling" in the sidebar to configure the timeline.`);
-                        }}
-                        className="absolute inset-0 bg-black/75 backdrop-blur-[1px] z-[60] flex flex-col items-center justify-center text-center p-4 select-none cursor-pointer"
-                      >
-                        <SlidersHorizontal className="size-8 text-amber-500/80 mb-2 animate-pulse" />
-                        <h4 className="text-sm font-semibold text-foreground">Schedules Disabled</h4>
-                        <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">
-                          This device is configured to display its default fallback layout 24/7. Turn on "Enable Scheduling" in the sidebar to configure the timeline.
-                        </p>
-                      </div>
+                    <span>{cell.date.getDate()}</span>
+                    {hasSchedules && (
+                      <span className="absolute bottom-1 size-1 rounded-full bg-rose-500" />
                     )}
+                  </button>
+                );
+              })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs h-7 border-white/10 bg-white/5 hover:bg-white/10"
+              onClick={handleToday}
+            >
+              Today
+            </Button>
+          </GlassCard>
 
-                    {/* Horizontal hour lines */}
-                    {Array.from({ length: 24 }).map((_, h) => (
-                      <div
-                        key={h}
-                        className="absolute left-0 right-0 border-b border-border/40 pointer-events-none"
-                        style={{ top: (h + 1) * HOUR_HEIGHT - 1, height: 1 }}
-                      />
-                    ))}
-
-                    {/* Date-specific columns grid */}
-                    {weekDates.map((date, colIdx) => {
-                      const dateIso = toISO(date);
-                      const isSelected = selectedDate === dateIso;
-                      const isPast = parseISODate(dateIso).getTime() < parseISODate(toISO(new Date())).getTime();
-
-                      const dayInstances = instances.filter((i) => i.date === dateIso);
-
-                      return (
-                        <div
-                          key={dateIso}
-                          onDragOver={handleDragOver}
-                          onDrop={(e) => handleDropNew(e, dateIso)}
-                          className={cn(
-                            "relative h-full flex flex-col transition-colors min-h-[1152px]",
-                            isSelected && "bg-primary/[0.01]",
-                            isPast && "bg-muted/20"
-                          )}
-                        >
-                          {/* Render schedule instances */}
-                          {dayInstances.map((inst) => {
-                            const isDraggingThis = dragState.blockId === inst.schedule_id && dragState.currentDate === dateIso;
-                            const startMins = isDraggingThis ? dragState.currentStartMins : timeToMinutes(inst.start_time);
-                            const endMins = isDraggingThis ? dragState.currentEndMins : timeToMinutes(inst.end_time);
-
-                            const top = startMins * PX_PER_MIN;
-                            const height = (endMins - startMins) * PX_PER_MIN;
-                            const color = deviceColorMap.get(inst.device_id) || "styled";
-
-                            const shouldDisplay = !isDraggingThis || (dragState.action !== "move" || dragState.currentDate === dateIso);
-                            if (!shouldDisplay) return null;
-
-                            return (
-                              <div
-                                key={inst.id}
-                                draggable="false"
-                                onClick={() => handleBlockClick(inst.schedule_id)}
-                                className={cn(
-                                  "absolute left-1 right-1 rounded-xl p-2 text-[10px] overflow-hidden group shadow-md transition-shadow hover:shadow-lg border-l-4 cursor-pointer",
-                                  isPast && "opacity-60 cursor-not-allowed",
-                                  isDraggingThis && "opacity-90 shadow-2xl scale-[0.98] ring-1 ring-primary/40"
-                                )}
-                                style={{
-                                  top,
-                                  height,
-                                  background: `color-mix(in oklch, ${color} 12%, hsl(var(--card)))`,
-                                  borderColor: color,
-                                  color: `color-mix(in oklch, ${color} 50%, hsl(var(--foreground)))`
-                                }}
-                              >
-                                {/* Resize Handle Top */}
-                                {!isPast && (
-                                  <div
-                                    className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize z-10"
-                                    onMouseDown={(e) => handleBlockMouseDown(e, inst, "resize-top")}
-                                  />
-                                )}
-
-                                {/* Content area */}
-                                <div className="flex flex-col h-full pointer-events-none select-none relative">
-                                  <div className="font-semibold text-foreground truncate flex items-center gap-1">
-                                    <span className="size-1.5 rounded-full shrink-0" style={{ background: color }} />
-                                    {inst.layout_name}
-                                  </div>
-                                  <div className="text-muted-foreground text-[9px] mt-0.5 font-medium">
-                                    {formatMinsAMPM(startMins)} - {formatMinsAMPM(endMins)}
-                                  </div>
-                                  {isPast && (
-                                    <span className="absolute top-0 right-0 text-[8px] bg-white/10 text-muted-foreground/60 px-1 py-0.5 rounded font-semibold uppercase">Completed</span>
-                                  )}
-                                  {!isPast && (
-                                    <div className="mt-auto ml-auto opacity-0 group-hover:opacity-60 transition-opacity">
-                                      <Move className="size-3 text-muted-foreground" />
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Resize Handle Bottom */}
-                                {!isPast && (
-                                  <div
-                                    className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize z-10"
-                                    onMouseDown={(e) => handleBlockMouseDown(e, inst, "resize-bottom")}
-                                  />
-                                )}
-
-                                {/* Drag-move handle center zone */}
-                                {!isPast && (
-                                  <div
-                                    className="absolute inset-x-2 inset-y-2 cursor-grab active:cursor-grabbing"
-                                    onMouseDown={(e) => handleBlockMouseDown(e, inst, "move")}
-                                  />
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </GlassCard>
-            )}
-          </div>
-
-          {/* ======================================================== */}
-          {/* RIGHT SIDEBAR: Draggable layouts list                     */}
-          {/* ======================================================== */}
-          <div className="space-y-4">
+          {/* Schedule Mode control panel */}
+          {selectedDevice && (
             <GlassCard className="p-4 flex flex-col gap-3">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
-                Layouts
+                Schedule Mode
               </h2>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Search layouts..."
-                  value={layoutSearch}
-                  onChange={(e) => setLayoutSearch(e.target.value)}
-                  className="pl-8 bg-background border-input text-xs h-8"
-                />
+              
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-medium text-foreground">Disable Schedule</span>
+                  <span className="text-[10px] text-muted-foreground">Use default layout 24/7</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const nextVal = selectedDevice.schedules_enabled === 0;
+                    updateDeviceSchedulesMode.mutate(nextVal);
+                  }}
+                  disabled={updateDeviceSchedulesMode.isPending}
+                  className={cn(
+                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-primary/40 focus:ring-offset-1 focus:ring-offset-background",
+                    selectedDevice.schedules_enabled === 0 ? "bg-amber-600/70 border-amber-500/50" : "bg-white/10 border-white/5"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block size-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
+                      selectedDevice.schedules_enabled === 0 ? "translate-x-4" : "translate-x-0"
+                    )}
+                  />
+                </button>
               </div>
-              <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar animate-in">
-                {filteredLayouts.map((l) => {
-                  const color = "hsl(var(--primary))";
+
+              {selectedDevice.schedules_enabled === 0 && (
+                <div className="space-y-1.5 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <Label className="text-[10px] text-muted-foreground font-semibold">Default 24/7 Layout</Label>
+                  <select
+                    value={selectedDevice.layout_id || ""}
+                    onChange={(e) => {
+                      const val = e.target.value ? e.target.value : null;
+                      updateDeviceDefaultLayout.mutate(val);
+                    }}
+                    disabled={updateDeviceDefaultLayout.isPending}
+                    className="w-full bg-[#0d0f12] border border-white/10 rounded-xl h-8 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                  >
+                    <option value="" disabled className="bg-[#0d0f12] text-muted-foreground">Select default layout...</option>
+                    {layouts.map((t) => (
+                      <option key={t.id} value={t.id} className="bg-[#0d0f12] text-foreground">
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </GlassCard>
+          )}
+        </div>
+
+        {/* ======================================================== */}
+        {/* MAIN AREA: Google Calendar Week View Scheduler            */}
+        {/* ======================================================== */}
+        <div className="flex flex-col gap-4" ref={weekGridRef}>
+          {/* Week Selector bar */}
+          <div className="flex items-center justify-between bg-zinc-900/30 border border-white/5 rounded-2xl px-4 py-2.5 shadow-sm">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-full border border-white/5 hover:bg-white/5"
+                onClick={handlePrevWeek}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-full border border-white/5 hover:bg-white/5"
+                onClick={handleNextWeek}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+              <span className="text-sm font-semibold tracking-tight ml-2">
+                Week of{" "}
+                {weekDates[0].toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
+            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+              <Info className="size-3.5" /> Drag layouts here
+            </span>
+          </div>
+
+          {/* Week Calendar Board */}
+          <GlassCard className="p-0 overflow-hidden flex flex-col select-none">
+            {/* Headers row */}
+            <div className="grid grid-cols-[60px_1fr] border-b border-white/5 bg-white/[0.02] pr-2">
+              <div className="h-10 border-r border-white/5" />
+              <div className="grid grid-cols-7 h-10 divide-x divide-white/5">
+                {weekDates.map((date, idx) => {
+                  const dateIso = toISO(date);
+                  const isSelected = selectedDate === dateIso;
+                  const isCurrent = dateIso === toISO(new Date());
+                  const isPast = parseISODate(dateIso).getTime() < parseISODate(toISO(new Date())).getTime();
+                  const formattedDay = date.toLocaleDateString(undefined, { day: "numeric" });
+                  
                   return (
                     <div
-                      key={l.id}
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("text/plain", l.id);
-                        e.dataTransfer.effectAllowed = "copy";
+                      key={idx}
+                      onClick={() => {
+                        if (!schedulesEnabled) return;
+                        setSelectedDate(dateIso);
+                        setCurrentWeekDate(dateIso);
+                        
+                        if (isPast) {
+                          toast.error("Past days cannot be repeated or duplicated.");
+                          return;
+                        }
+                        
+                        const dayInstances = instances.filter((i) => i.date === dateIso);
+                        if (dayInstances.length > 0) {
+                          setBulkRepeatDate(dateIso);
+                          setBulkRepeatMode("none");
+                          setBulkRepeatInterval(1);
+                          setBulkRepeatDaysCount(6);
+                          setBulkRepeatOpen(true);
+                        } else {
+                          toast.info("No layouts scheduled on this day to repeat.");
+                        }
                       }}
-                      className="p-3 rounded-xl border border-border bg-card hover:bg-muted active:scale-[0.98] transition-all cursor-grab active:cursor-grabbing flex flex-col gap-1.5 shadow-sm group select-none"
-                      style={{ borderLeftWidth: 3, borderLeftColor: color }}
+                      className={cn(
+                        "flex flex-col items-center justify-center text-center py-1 transition-colors",
+                        !schedulesEnabled
+                          ? "opacity-40 cursor-not-allowed pointer-events-none"
+                          : "cursor-pointer hover:bg-white/5",
+                        isSelected && "bg-emerald-500/5",
+                        isCurrent && "bg-primary/5"
+                      )}
                     >
-                      <div className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors truncate">
-                        {l.name}
-                      </div>
+                      <span
+                        className={cn(
+                          "text-[10px] font-semibold",
+                          isSelected
+                            ? "text-emerald-400"
+                            : isPast
+                              ? "text-rose-400/90"
+                              : "text-muted-foreground"
+                        )}
+                      >
+                        {WEEKDAYS[idx]}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-xs font-bold leading-none mt-0.5 flex items-center justify-center size-6 rounded-full transition-all",
+                          isSelected
+                            ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30"
+                            : isCurrent
+                              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                              : isPast
+                                ? "bg-rose-500/10 border border-rose-500/20 text-rose-400"
+                                : "text-foreground"
+                        )}
+                      >
+                        {formattedDay}
+                      </span>
                     </div>
                   );
                 })}
-                {filteredLayouts.length === 0 && (
-                  <div className="text-xs text-muted-foreground italic text-center py-2">
-                    No matching layouts
+              </div>
+            </div>
+
+            {/* Scrollable Timeline */}
+            <div
+              className="grid grid-cols-[60px_1fr] relative overflow-y-scroll max-h-[620px]"
+            >
+              {/* Hour scale vertical labels */}
+              <div className="flex flex-col text-[10px] text-muted-foreground/60 bg-white/[0.01]">
+                {Array.from({ length: HOURS }).map((_, h) => (
+                  <div
+                    key={h}
+                    style={{ height: PX_PER_HOUR }}
+                    className="border-r border-b border-white/5 pr-2 pt-1 text-right select-none"
+                  >
+                    {String(h).padStart(2, "0")}:00
+                  </div>
+                ))}
+              </div>
+
+              {/* Day Columns containing blocks */}
+              <div className="grid grid-cols-7 relative divide-x divide-white/5 min-h-[1440px] bg-white/[0.005]">
+                {!schedulesEnabled && (
+                  <div
+                    onClick={() => {
+                      toast.info(`Device is running default layout: ${selectedDevice?.layout_id ? layouts.find(t => t.id === selectedDevice.layout_id)?.name || 'Layout' : 'None'}. Turn on "Enable Scheduling" in the sidebar to configure.`);
+                    }}
+                    className="absolute inset-0 bg-black/75 backdrop-blur-[1px] z-[60] flex flex-col items-center justify-center text-center p-4 select-none cursor-pointer"
+                  >
+                    <SlidersHorizontal className="size-8 text-amber-500/80 mb-2 animate-pulse" />
+                    <h4 className="text-sm font-semibold text-foreground">Schedules Disabled</h4>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">
+                      This device is configured to display its default layout 24/7. Turn on "Enable Scheduling" in the sidebar to configure the timeline.
+                    </p>
                   </div>
                 )}
+                {/* Horizontal row line guide overlays */}
+                {Array.from({ length: HOURS }).map((_, h) => (
+                  <div
+                    key={h}
+                    className="absolute left-0 right-0 border-b border-white/[0.04] pointer-events-none"
+                    style={{ top: (h + 1) * PX_PER_HOUR - 1, height: 1 }}
+                  />
+                ))}
+
+                {/* Day Columns */}
+                {weekDates.map((date, idx) => {
+                  const dateIso = toISO(date);
+                  const isCurrent = dateIso === toISO(new Date());
+
+                  // Get active schedule instances running on this date
+                  const dayInstances = instances.filter((i) => i.date === dateIso);
+
+                  // Calculate Time Indicator Line
+                  const timeMins = nowTime.getHours() * 60 + nowTime.getMinutes();
+                  const indicatorTop = timeMins * PX_PER_MIN;
+
+                  return (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "day-column relative h-full select-none cursor-copy transition-colors duration-200 hover:bg-white/[0.01]",
+                        isCurrent && "bg-primary/[0.01]"
+                      )}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => handleGridDrop(e, dateIso)}
+                    >
+                      {/* Day Column Area */}
+
+                      {/* Render dropped/saved instances */}
+                      {dayInstances.map((inst) => {
+                        const isDraggingThis = dragState.blockId === inst.schedule_id;
+
+                        // Calculate visual parameters
+                        const startMins = isDraggingThis ? dragState.currentStartMins : parseHHMM(inst.start_time);
+                        const endMins = isDraggingThis ? dragState.currentEndMins : parseHHMM(inst.end_time);
+
+                        // Position mapping (1px = 1 min)
+                        const top = startMins * PX_PER_MIN;
+                        const height = (endMins - startMins) * PX_PER_MIN;
+                        const color = layoutColor.get(inst.layout_id) || "oklch(0.76 0.17 210)";
+
+                        const todayStr = toISO(new Date());
+                        const isPastDay = dateIso < todayStr;
+
+                        const isTargetDate = isDraggingThis && dragState.currentDate === dateIso;
+                        const shouldDisplay = !isDraggingThis || isTargetDate;
+
+                        if (!shouldDisplay) return null;
+
+                        return (
+                          <div
+                            key={inst.id}
+                            draggable="false"
+                            onClick={() => !isPastDay && handleBlockClick(inst.schedule_id)}
+                            className={cn(
+                              "absolute left-1 right-1 rounded-xl p-2 text-[10px] overflow-hidden group shadow-md transition-shadow hover:shadow-lg border-l-4",
+                              isPastDay 
+                                ? "opacity-50 blur-[0.5px] cursor-not-allowed pointer-events-none" 
+                                : "cursor-pointer",
+                              isDraggingThis && "opacity-90 shadow-2xl scale-[0.98] ring-1 ring-primary/40"
+                            )}
+                            style={{
+                              top,
+                              height,
+                              background: `color-mix(in oklch, ${color} 15%, #0d0f12)`,
+                              borderColor: color,
+                            }}
+                          >
+                            {/* Resize Handle Top */}
+                            {!isPastDay && (
+                              <div
+                                className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize z-10"
+                                onMouseDown={(e) => handleBlockMouseDown(e, inst, "resize-top")}
+                              />
+                            )}
+
+                            {/* Block Content */}
+                            <div className="flex flex-col h-full pointer-events-none select-none relative">
+                              <div className="font-semibold text-foreground truncate flex items-center gap-1">
+                                <span className="size-1.5 rounded-full shrink-0" style={{ background: color }} />
+                                {inst.layout_name}
+                              </div>
+                              <div className="text-muted-foreground text-[9px] mt-0.5 font-medium">
+                                {formatMinsAMPM(startMins)} - {formatMinsAMPM(endMins)}
+                              </div>
+                              {isPastDay ? (
+                                <div className="mt-auto mr-auto text-[8px] bg-white/5 text-muted-foreground px-1 py-0.5 rounded border border-white/5 font-semibold tracking-wide uppercase">
+                                  Completed
+                                </div>
+                              ) : (
+                                /* Drag handle decorator icon */
+                                <div className="mt-auto ml-auto opacity-0 group-hover:opacity-60 transition-opacity">
+                                  <Move className="size-3 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Resize Handle Bottom */}
+                            {!isPastDay && (
+                              <div
+                                className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize z-10"
+                                onMouseDown={(e) => handleBlockMouseDown(e, inst, "resize-bottom")}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
               </div>
-            </GlassCard>
-          </div>
+            </div>
+          </GlassCard>
+        </div>
+
+        {/* ======================================================== */}
+        {/* RIGHT SIDEBAR: Draggable layouts list                  */}
+        {/* ======================================================== */}
+        <div className="space-y-4">
+          <GlassCard className="p-4 flex flex-col gap-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
+              Layouts
+            </h2>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search layouts..."
+                value={layoutSearch}
+                onChange={(e) => setLayoutSearch(e.target.value)}
+                className="pl-8 bg-zinc-900/40 border-white/10 text-xs h-8 focus:ring-1 focus:ring-primary/45"
+              />
+            </div>
+
+            <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
+              {filteredLayouts.map((t: any) => {
+                const color = layoutColor.get(t.id) || "oklch(0.76 0.17 210)";
+                return (
+                  <div
+                    key={t.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", t.id);
+                      e.dataTransfer.effectAllowed = "copy";
+                    }}
+                    className="p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] active:scale-[0.98] transition-all cursor-grab active:cursor-grabbing flex flex-col gap-1.5 shadow-sm group select-none"
+                    style={{ borderLeftWidth: 3, borderLeftColor: color }}
+                  >
+                    <div className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors truncate">
+                      {t.name}
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredLayouts.length === 0 && (
+                <div className="text-xs text-muted-foreground italic text-center py-2">
+                  No active layouts
+                </div>
+              )}
+            </div>
+          </GlassCard>
         </div>
       </div>
 
       {/* ======================================================== */}
-      {/* DIALOG: Edit / Configure Schedule Details                 */}
+      {/* DIALOG: Edit repeat configuration / delete schedule       */}
       {/* ======================================================== */}
       <Dialog open={editPopupOpen} onOpenChange={setEditPopupOpen}>
-        <DialogContent className="sm:max-w-xl border border-border">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Configure Schedule</DialogTitle>
+            <DialogTitle>Configure Recurrence</DialogTitle>
+            <DialogDescription>
+              Modify the start time, end time, layout, or repeat rules for this schedule window.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-1.5">
-              <Label>Layout to display</Label>
-              <select
-                value={editLayout}
-                onChange={(e) => setEditLayout(e.target.value)}
-                className="w-full bg-background border border-input rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
-              >
-                <option value="" className="bg-popover text-foreground">Use device default layout</option>
-                {layouts.map((l) => (
-                  <option key={l.id} value={l.id} className="bg-popover text-foreground">
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Start Time</Label>
-                <Input
-                  type="time"
-                  value={editStartTime}
-                  onChange={(e) => setEditStartTime(e.target.value)}
-                  className="bg-background border-input text-xs"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>End Time</Label>
-                <Input
-                  type="time"
-                  value={editEndTime}
-                  onChange={(e) => setEditEndTime(e.target.value)}
-                  className="bg-background border-input text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs text-muted-foreground font-semibold">Repeat Pattern</Label>
-                {selectedSchedule && (
-                  <span className="text-[10px] text-muted-foreground font-semibold">
-                    Series Start: {selectedSchedule.start_date}
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    ["none", "No Repeat"],
-                    ["daily", "Daily"],
-                    ["custom", "Every X Days"],
-                  ] as Array<["none" | "daily" | "custom", string]>
-                ).map(([k, l]) => (
-                  <button
-                    key={k}
-                    onClick={() => setEditRepeatMode(k)}
-                    className={cn(
-                      "py-2 rounded-xl text-xs border font-medium transition-all",
-                      editRepeatMode === k
-                        ? "bg-primary/20 border-primary/40 text-foreground"
-                        : "bg-muted/40 border-border hover:bg-muted text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom Interval settings */}
-            {editRepeatMode === "custom" && (
-              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-                <Label className="text-xs text-muted-foreground font-semibold">Repeat Interval</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Every</span>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={90}
-                    value={editRepeatInterval}
-                    onChange={(e) => setEditRepeatInterval(Math.max(1, Number(e.target.value) || 1))}
-                    className="w-20 bg-background border-input h-8 text-center text-xs"
+          {selectedSchedule && (
+            <div className="space-y-4 pt-2">
+              {/* Selected Window Summary */}
+              <div className="bg-white/5 border border-white/5 rounded-xl p-3 flex flex-col gap-1">
+                <div className="font-semibold text-sm text-foreground flex items-center gap-1.5">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ background: layoutColor.get(selectedSchedule.layout_id) }}
                   />
-                  <span className="text-xs text-muted-foreground">days</span>
+                  {selectedSchedule.layout_name}
+                </div>
+                <div className="text-xs text-muted-foreground flex items-center gap-3">
+                  <span className="flex items-center gap-1">
+                    <Clock className="size-3.5" />
+                    {selectedSchedule.start_time} - {selectedSchedule.end_time}
+                  </span>
+                  <span>·</span>
+                  <span>Starts {selectedSchedule.start_date}</span>
                 </div>
               </div>
-            )}
 
-            {/* Occurrences / Days count limit presets */}
-            {editRepeatMode !== "none" && (
-              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-                <Label className="text-xs text-muted-foreground font-semibold">Repeat For</Label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {[1, 6, 12, 30].map((num) => (
+              {/* Time Inputs */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-semibold">Start Time</Label>
+                  <Input
+                    type="time"
+                    value={editStartTime}
+                    onChange={(e) => setEditStartTime(e.target.value)}
+                    className="bg-white/5 border-white/10 text-xs h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-semibold">End Time</Label>
+                  <Input
+                    type="time"
+                    value={editEndTime}
+                    onChange={(e) => setEditEndTime(e.target.value)}
+                    className="bg-white/5 border-white/10 text-xs h-9"
+                  />
+                </div>
+              </div>
+
+              {/* Recurrence Mode Selector */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-semibold">Repeat Pattern</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      ["none", "No Repeat"],
+                      ["daily", "Daily"],
+                      ["custom", "Every X Days"],
+                    ] as Array<[RepeatMode, string]>
+                  ).map(([k, l]) => (
                     <button
-                      key={num}
-                      onClick={() => setEditDaysCount(num)}
+                      key={k}
+                      onClick={() => setEditRepeatMode(k)}
                       className={cn(
-                        "px-3 py-1 rounded-md text-xs border transition-colors",
-                        editDaysCount === num
+                        "py-2 rounded-xl text-xs border font-medium transition-all",
+                        editRepeatMode === k
                           ? "bg-primary/20 border-primary/40 text-foreground"
-                          : "bg-muted/40 border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                          : "bg-white/5 border-white/10 hover:bg-white/10 text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      {num} day{num > 1 ? "s" : ""}
+                      {l}
                     </button>
                   ))}
-                  <div className="flex items-center gap-1.5 ml-auto">
-                    <span className="text-xs text-muted-foreground">Custom:</span>
+                </div>
+              </div>
+
+              {/* Custom Interval settings */}
+              {editRepeatMode === "custom" && (
+                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <Label className="text-xs text-muted-foreground font-semibold">Repeat Interval</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Every</span>
                     <Input
                       type="number"
                       min={1}
-                      max={365}
-                      value={editDaysCount}
-                      onChange={(e) => setEditDaysCount(Math.max(1, Number(e.target.value) || 1))}
-                      className="w-16 bg-background border-input h-8 text-center text-xs"
+                      max={90}
+                      value={editRepeatInterval}
+                      onChange={(e) => setEditRepeatInterval(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-20 bg-white/5 border-white/10 h-8 text-center text-xs"
                     />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {selectedSchedule && (
-              <div className="text-[10px] text-muted-foreground/80 leading-relaxed py-1.5 border-y border-border flex items-center gap-1.5 bg-muted/20 px-2 rounded-lg">
-                <Clock className="size-3.5 shrink-0 text-primary" />
-                <span>{getRecurrenceRangeText()}</span>
-              </div>
-            )}
-
-            {/* Separated action dividers */}
-            <div className="flex flex-col gap-3 pt-2">
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setEditPopupOpen(false)}
-                  className="text-xs border-border h-8"
-                >
-                  Cancel
-                </Button>
-                {selectedSchedule && selectedSchedule.repeat_mode !== "none" && (
-                  <Button
-                    variant="outline"
-                    onClick={handleConfigureException}
-                    className="text-xs font-semibold h-8 text-primary border-primary/20 hover:bg-primary/5"
-                  >
-                    Save Only This Day
-                  </Button>
-                )}
-                <Button
-                  onClick={handleSaveConfigure}
-                  className="text-xs font-semibold h-8"
-                >
-                  Save Series
-                </Button>
-              </div>
-
-              {selectedSchedule && (
-                <div className="pt-3 border-t border-dashed border-border flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-destructive uppercase tracking-wider">Danger Zone</span>
-                  <div className="flex gap-2">
-                    {selectedSchedule.repeat_mode !== "none" && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="text-[10px] font-bold h-7 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-rose-400 border border-red-200 dark:border-rose-900/50 hover:bg-red-100 dark:hover:bg-red-900/30"
-                        onClick={handleDeleteScheduleOccurrence}
-                      >
-                        Delete Only This Day
-                      </Button>
-                    )}
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="text-xs font-semibold h-7"
-                      onClick={handleDeleteScheduleSeries}
-                    >
-                      Delete Series
-                    </Button>
+                    <span className="text-xs text-muted-foreground">days</span>
                   </div>
                 </div>
               )}
+
+              {/* Occurrences / Days count limit */}
+              {editRepeatMode !== "none" && (
+                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <Label className="text-xs text-muted-foreground font-semibold">Repeat For</Label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {[1, 6, 12, 30].map((num) => (
+                      <button
+                        key={num}
+                        onClick={() => setEditDaysCount(num)}
+                        className={cn(
+                          "px-3 py-1 rounded-md text-xs border transition-colors",
+                          editDaysCount === num
+                            ? "bg-white/15 border-white/20 text-foreground"
+                            : "bg-white/5 border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10"
+                        )}
+                      >
+                        {num} day{num > 1 ? "s" : ""}
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <span className="text-xs text-muted-foreground">Custom:</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={editDaysCount}
+                        onChange={(e) => setEditDaysCount(Math.max(1, Number(e.target.value) || 1))}
+                        className="w-16 bg-white/5 border-white/10 h-8 text-center text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Dynamic Range Summary */}
+              <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 text-xs text-muted-foreground flex items-center gap-2 mt-2">
+                <Info className="size-4 text-primary shrink-0" />
+                <span>{getRecurrenceRangeText()}</span>
+              </div>
             </div>
+          )}
+
+          <div className="mt-6 pt-4 border-t border-white/5 space-y-4">
+            {/* Save Actions Row */}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                className="border-white/10 text-xs h-9 px-4"
+                onClick={() => setEditPopupOpen(false)}
+              >
+                Cancel
+              </Button>
+
+              {selectedSchedule && selectedSchedule.repeat_mode !== "none" ? (
+                <>
+                  <Button
+                    className="text-xs h-9 bg-emerald-600 hover:bg-emerald-700 text-white px-4"
+                    onClick={() => {
+                      updateOccurrenceMut.mutate({
+                        id: selectedSchedule.id,
+                        date: selectedDate,
+                        start_time: editStartTime,
+                        end_time: editEndTime,
+                        layout_id: selectedSchedule.layout_id,
+                      });
+                    }}
+                    disabled={updateOccurrenceMut.isPending}
+                  >
+                    Save This Day
+                  </Button>
+                  <Button
+                    className="text-xs h-9 bg-primary hover:bg-primary/95 px-4"
+                    onClick={() => {
+                      repeatMut.mutate({
+                        schedule_id: selectedSchedule.id,
+                        repeat_mode: editRepeatMode,
+                        repeat_interval: editRepeatMode === "custom" ? editRepeatInterval : 1,
+                        days_count: editRepeatMode === "none" ? 1 : editDaysCount,
+                        start_time: editStartTime,
+                        end_time: editEndTime,
+                      });
+                    }}
+                    disabled={repeatMut.isPending}
+                  >
+                    Save Entire Series
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  className="text-xs h-9 bg-primary hover:bg-primary/95 px-4"
+                  onClick={() => {
+                    repeatMut.mutate({
+                      schedule_id: selectedSchedule!.id,
+                      repeat_mode: editRepeatMode,
+                      repeat_interval: editRepeatMode === "custom" ? editRepeatInterval : 1,
+                      days_count: editRepeatMode === "none" ? 1 : editDaysCount,
+                      start_time: editStartTime,
+                      end_time: editEndTime,
+                    });
+                  }}
+                  disabled={repeatMut.isPending}
+                >
+                  Save Changes
+                </Button>
+              )}
+            </div>
+
+            {/* Danger Zone Separator & Delete Row */}
+            {selectedSchedule && (
+              <div className="pt-3.5 border-t border-dashed border-white/5 flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold select-none">
+                  Danger Zone
+                </span>
+                <div className="flex gap-2">
+                  {selectedSchedule.repeat_mode !== "none" ? (
+                    <>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="text-[10px] bg-rose-500/10 border border-rose-500/20 text-rose-300 hover:bg-rose-500/20 h-8 px-3"
+                        onClick={() => deleteMut.mutate({ id: selectedSchedule.id, date: selectedDate })}
+                        disabled={deleteMut.isPending}
+                      >
+                        <Trash2 className="size-3.5 mr-1" /> Delete Day
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="text-[10px] bg-rose-500/20 border border-rose-500/30 text-rose-200 hover:bg-rose-500/30 font-semibold h-8 px-3"
+                        onClick={() => deleteMut.mutate({ id: selectedSchedule.id })}
+                        disabled={deleteMut.isPending}
+                      >
+                        <Trash2 className="size-3.5 mr-1" /> Delete Series
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="text-[10px] bg-rose-500/10 border border-rose-500/20 text-rose-300 hover:bg-rose-500/20 h-8 px-3.5"
+                      onClick={() => deleteMut.mutate({ id: selectedSchedule.id })}
+                      disabled={deleteMut.isPending}
+                    >
+                      <Trash2 className="size-3.5 mr-1" /> Delete Schedule
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
 
       {/* ======================================================== */}
-      {/* DIALOG: Bulk Repeat Day Schedules / Copy Actions          */}
+      {/* DIALOG: Bulk Repeat Day Schedules                         */}
       {/* ======================================================== */}
       <Dialog open={bulkRepeatOpen} onOpenChange={setBulkRepeatOpen}>
-        <DialogContent className="sm:max-w-xl border border-border">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Configure Day Recurrence</DialogTitle>
+            <DialogTitle>Repeat Day Schedule</DialogTitle>
             <DialogDescription>
-              Configure repeat configurations for all layouts scheduled on{" "}
-              <strong>{bulkRepeatDate}</strong>.
+              Configure the recurrence rule to copy all layouts scheduled on this date to other days.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
-            {/* Day Schedules List */}
-            <div className="border border-border rounded-xl overflow-hidden bg-card">
-              <div className="px-3 py-2 bg-muted text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Schedules for this day
-              </div>
-              <div className="divide-y divide-border max-h-[120px] overflow-y-auto custom-scrollbar">
+
+          {bulkRepeatDate && (
+            <div className="space-y-4 pt-2">
+              {/* Day Schedules List */}
+              <div className="bg-white/5 border border-white/5 rounded-xl p-3 space-y-2">
+                <div className="text-xs text-muted-foreground font-semibold">
+                  Scheduled Layouts on {parseISODate(bulkRepeatDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}:
+                </div>
+                
                 {(() => {
                   const dayInstanceSchedules = instances.filter(i => i.date === bulkRepeatDate);
                   const dayScheduleIds = Array.from(new Set(dayInstanceSchedules.map(i => i.schedule_id)));
                   const targetSchedules = schedules.filter(s => dayScheduleIds.includes(s.id));
 
                   if (targetSchedules.length === 0) {
-                    return <div className="p-3 text-xs italic text-center text-muted-foreground">No layouts scheduled on this day</div>;
-                  }
-                  return targetSchedules.map((s) => {
-                    const color = deviceColorMap.get(s.device_id) || "hsl(var(--primary))";
                     return (
-                      <div key={s.id} className="p-2.5 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: color }} />
-                          <span className="font-semibold text-foreground truncate max-w-[140px]">{s.layout_name}</span>
-                        </div>
-                        <span className="text-muted-foreground font-medium text-[10px]">{s.start_time} - {s.end_time}</span>
+                      <div className="text-xs text-muted-foreground italic">
+                        No layouts scheduled on this day. Add layouts to the calendar grid first.
                       </div>
                     );
-                  });
+                  }
+
+                  return (
+                    <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                      {targetSchedules.map((s) => {
+                        const color = layoutColor.get(s.layout_id) || "oklch(0.76 0.17 210)";
+                        return (
+                          <div key={s.id} className="flex items-center justify-between text-xs">
+                            <div className="font-medium text-foreground flex items-center gap-1.5">
+                              <span className="size-1.5 rounded-full" style={{ background: color }} />
+                              {s.layout_name}
+                            </div>
+                            <div className="text-muted-foreground font-mono">
+                              {s.start_time.slice(0, 5)} - {s.end_time.slice(0, 5)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
                 })()}
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground font-semibold">Repeat Pattern</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    ["none", "No Repeat"],
-                    ["daily", "Daily"],
-                    ["custom", "Every X Days"],
-                  ] as Array<["none" | "daily" | "custom", string]>
-                ).map(([k, l]) => (
-                  <button
-                    key={k}
-                    onClick={() => setBulkRepeatMode(k)}
-                    className={cn(
-                      "py-2 rounded-xl text-xs border font-medium transition-all",
-                      bulkRepeatMode === k
-                        ? "bg-primary/20 border-primary/40 text-foreground"
-                        : "bg-muted/40 border-border hover:bg-muted text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom Interval settings */}
-            {bulkRepeatMode === "custom" && (
-              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-                <Label className="text-xs text-muted-foreground font-semibold">Repeat Interval</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Every</span>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={90}
-                    value={bulkRepeatInterval}
-                    onChange={(e) => setBulkRepeatInterval(Math.max(1, Number(e.target.value) || 1))}
-                    className="w-20 bg-background border-input h-8 text-center text-xs"
-                  />
-                  <span className="text-xs text-muted-foreground">days</span>
-                </div>
-              </div>
-            )}
-
-            {/* Occurrences / Days count limit presets */}
-            {bulkRepeatMode !== "none" && (
-              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-                <Label className="text-xs text-muted-foreground font-semibold">Repeat For</Label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {[1, 6, 12, 30].map((num) => (
+              {/* Recurrence Mode Selector */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-semibold">Repeat Pattern</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      ["none", "No Repeat"],
+                      ["daily", "Daily"],
+                      ["custom", "Every X Days"],
+                    ] as Array<[RepeatMode, string]>
+                  ).map(([k, l]) => (
                     <button
-                      key={num}
-                      onClick={() => setBulkRepeatDaysCount(num)}
+                      key={k}
+                      onClick={() => setBulkRepeatMode(k)}
                       className={cn(
-                        "px-3 py-1 rounded-md text-xs border transition-colors",
-                        bulkRepeatDaysCount === num
+                        "py-2 rounded-xl text-xs border font-medium transition-all",
+                        bulkRepeatMode === k
                           ? "bg-primary/20 border-primary/40 text-foreground"
-                          : "bg-muted/40 border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                          : "bg-white/5 border-white/10 hover:bg-white/10 text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      {num} day{num > 1 ? "s" : ""}
+                      {l}
                     </button>
                   ))}
-                  <div className="flex items-center gap-1.5 ml-auto">
-                    <span className="text-xs text-muted-foreground">Custom:</span>
+                </div>
+              </div>
+
+              {/* Custom Interval settings */}
+              {bulkRepeatMode === "custom" && (
+                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <Label className="text-xs text-muted-foreground font-semibold">Repeat Interval</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Every</span>
                     <Input
                       type="number"
                       min={1}
-                      max={365}
-                      value={bulkRepeatDaysCount}
-                      onChange={(e) => setBulkRepeatDaysCount(Math.max(1, Number(e.target.value) || 1))}
-                      className="w-16 bg-background border-input h-8 text-center text-xs"
+                      max={90}
+                      value={bulkRepeatInterval}
+                      onChange={(e) => setBulkRepeatInterval(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-20 bg-white/5 border-white/10 h-8 text-center text-xs"
                     />
+                    <span className="text-xs text-muted-foreground">days</span>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {bulkRepeatDate && (
-              <div className="text-[10px] text-muted-foreground/80 leading-relaxed py-1.5 border-y border-border flex items-center gap-1.5 bg-muted/20 px-2 rounded-lg">
-                <Clock className="size-3.5 shrink-0 text-primary" />
+              {/* Occurrences / Days count limit */}
+              {bulkRepeatMode !== "none" && (
+                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <Label className="text-xs text-muted-foreground font-semibold">Repeat For</Label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {[1, 6, 12, 30].map((num) => (
+                      <button
+                        key={num}
+                        onClick={() => setBulkRepeatDaysCount(num)}
+                        className={cn(
+                          "px-3 py-1 rounded-md text-xs border transition-colors",
+                          bulkRepeatDaysCount === num
+                            ? "bg-white/15 border-white/20 text-foreground"
+                            : "bg-white/5 border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10"
+                        )}
+                      >
+                        {num} day{num > 1 ? "s" : ""}
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <span className="text-xs text-muted-foreground">Custom:</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={bulkRepeatDaysCount}
+                        onChange={(e) => setBulkRepeatDaysCount(Math.max(1, Number(e.target.value) || 1))}
+                        className="w-16 bg-white/5 border-white/10 h-8 text-center text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Dynamic Range Summary */}
+              <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 text-xs text-muted-foreground flex items-center gap-2 mt-2">
+                <Info className="size-4 text-primary shrink-0" />
                 <span>{getBulkRecurrenceRangeText()}</span>
               </div>
-            )}
+            </div>
+          )}
 
-            <div className="flex justify-end gap-2 pt-2">
+          <DialogFooter className="mt-4 flex flex-col sm:flex-row gap-2 justify-between">
+            {bulkRepeatDate && instances.some((i) => i.date === bulkRepeatDate) && (
+              <Button
+                variant="destructive"
+                className="bg-rose-500/10 border border-rose-500/20 text-rose-300 hover:bg-rose-500/20 w-full sm:w-auto sm:mr-auto text-xs h-9"
+                onClick={() => {
+                  if (confirm("Are you sure you want to clear all layouts scheduled on this day?")) {
+                    clearDayMut.mutate();
+                  }
+                }}
+                disabled={clearDayMut.isPending}
+              >
+                <Trash2 className="size-3.5 mr-1" /> Delete for This Day
+              </Button>
+            )}
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto justify-end">
               <Button
                 variant="outline"
-                size="sm"
+                className="border-white/10 w-full sm:w-auto text-xs h-9"
                 onClick={() => setBulkRepeatOpen(false)}
-                className="text-xs h-8 border-border"
               >
                 Cancel
               </Button>
               <Button
-                size="sm"
-                onClick={handleBulkRecurrenceSave}
-                className="text-xs h-8 font-semibold"
-                disabled={bulkRepeatMode === "none"}
+                className="w-full sm:w-auto text-xs h-9"
+                onClick={() => {
+                  if (!bulkRepeatDate) return;
+                  const dayInstanceSchedules = instances.filter((i) => i.date === bulkRepeatDate);
+                  if (dayInstanceSchedules.length === 0) {
+                    toast.error("No schedules to repeat on this day");
+                    return;
+                  }
+
+                  // Generate target dates list
+                  const targetDates: string[] = [];
+                  const baseDate = parseISODate(bulkRepeatDate);
+                  const occurrences = bulkRepeatMode === "none" ? 1 : bulkRepeatDaysCount;
+                  const interval = bulkRepeatMode === "custom" ? bulkRepeatInterval : 1;
+
+                  for (let i = 1; i < occurrences; i++) {
+                    const nextD = new Date(baseDate.getTime());
+                    nextD.setDate(baseDate.getDate() + i * interval);
+                    targetDates.push(toISO(nextD));
+                  }
+
+                  if (targetDates.length === 0) {
+                    toast.error("Please select a repeat pattern greater than 1 day");
+                    return;
+                  }
+
+                  bulkRepeatMut.mutate({
+                    source_date: bulkRepeatDate,
+                    target_dates: targetDates,
+                    overwrite: false,
+                  });
+                }}
+                disabled={bulkRepeatMut.isPending}
               >
-                Apply Recurrence
+                <Repeat className="size-3.5 mr-1.5" /> Save Day Recurrence
               </Button>
             </div>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-
-
       {/* ======================================================== */}
-      {/* DIALOG: Drag Move/Resize Exception Split Confirm          */}
+      {/* DIALOG: Save Recurring Change Options                     */}
       {/* ======================================================== */}
-      <Dialog open={!!pendingUpdate} onOpenChange={() => setPendingUpdate(null)}>
-        <DialogContent className="max-w-md border border-border">
+      <Dialog open={pendingUpdate !== null} onOpenChange={(open) => !open && setPendingUpdate(null)}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Adjust Recurring Occurrence</DialogTitle>
+            <DialogTitle>Save Recurring Change</DialogTitle>
             <DialogDescription>
-              You are adjusting a layout occurrence that is part of a recurring series. Would you like to save this day as a standalone slot or apply it to the entire series?
+              This is a recurring schedule window. How would you like to apply this edit?
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2 pt-2">
             <Button
-              onClick={handleExecuteOccurrenceUpdate}
-              className="w-full text-xs font-semibold h-8 text-primary border border-primary/20 hover:bg-primary/5 bg-transparent"
+              onClick={() => {
+                if (pendingUpdate) {
+                  updateOccurrenceMut.mutate(pendingUpdate);
+                }
+              }}
+              disabled={updateOccurrenceMut.isPending}
+              className="w-full text-xs font-semibold"
             >
-              Save Only This Day (Detach)
-            </Button>
-            <Button
-              onClick={handleExecuteSeriesUpdate}
-              className="w-full text-xs font-semibold h-8"
-            >
-              Apply to Entire Series
+              Update Only This Day
             </Button>
             <Button
               variant="outline"
+              onClick={() => {
+                if (pendingUpdate) {
+                  if (selectedSchedule && selectedSchedule.id === pendingUpdate.id) {
+                    repeatMut.mutate({
+                      schedule_id: pendingUpdate.id,
+                      repeat_mode: editRepeatMode,
+                      repeat_interval: editRepeatMode === "custom" ? editRepeatInterval : 1,
+                      days_count: editRepeatMode === "none" ? 1 : editDaysCount,
+                      start_time: pendingUpdate.start_time,
+                      end_time: pendingUpdate.end_time,
+                    });
+                  } else {
+                    updateMut.mutate({
+                      id: pendingUpdate.id,
+                      body: {
+                        start_date: pendingUpdate.date,
+                        start_time: pendingUpdate.start_time,
+                        end_time: pendingUpdate.end_time,
+                      },
+                    });
+                    setPendingUpdate(null);
+                  }
+                }
+              }}
+              disabled={updateMut.isPending || repeatMut.isPending}
+              className="w-full text-xs border-white/10"
+            >
+              Update Entire Series
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => setPendingUpdate(null)}
-              className="w-full text-xs border-border h-8"
+              className="w-full text-xs text-muted-foreground"
             >
               Cancel
             </Button>
@@ -1746,10 +1770,10 @@ export default function AdminSchedulePage() {
       </Dialog>
 
       {/* ======================================================== */}
-      {/* DIALOG: Overwrite Recurrence Conflicts                    */}
+      {/* DIALOG: Confirm Overwrite for Bulk Replication            */}
       {/* ======================================================== */}
-      <Dialog open={bulkOverwriteDates !== null} onOpenChange={() => setBulkOverwriteDates(null)}>
-        <DialogContent className="max-w-md border border-border">
+      <Dialog open={bulkOverwriteDates !== null} onOpenChange={(open) => !open && setBulkOverwriteDates(null)}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Overwrite Existing Schedules?</DialogTitle>
             <DialogDescription>
@@ -1759,15 +1783,35 @@ export default function AdminSchedulePage() {
           <div className="flex flex-col gap-2 pt-2">
             <Button
               variant="destructive"
-              onClick={executeRepeatOverwrite}
-              className="w-full text-xs font-semibold h-8"
+              onClick={() => {
+                if (bulkRepeatDate) {
+                  const targetDates: string[] = [];
+                  const baseDate = parseISODate(bulkRepeatDate);
+                  const occurrences = bulkRepeatMode === "none" ? 1 : bulkRepeatDaysCount;
+                  const interval = bulkRepeatMode === "custom" ? bulkRepeatInterval : 1;
+
+                  for (let i = 1; i < occurrences; i++) {
+                    const nextD = new Date(baseDate.getTime());
+                    nextD.setDate(baseDate.getDate() + i * interval);
+                    targetDates.push(toISO(nextD));
+                  }
+
+                  bulkRepeatMut.mutate({
+                    source_date: bulkRepeatDate,
+                    target_dates: targetDates,
+                    overwrite: true,
+                  });
+                }
+              }}
+              disabled={bulkRepeatMut.isPending}
+              className="w-full text-xs font-semibold"
             >
-              Yes, Overwrite Conflicts
+              Yes, Overwrite Them
             </Button>
             <Button
               variant="outline"
               onClick={() => setBulkOverwriteDates(null)}
-              className="w-full text-xs border-border h-8"
+              className="w-full text-xs border-white/10"
             >
               No, Cancel
             </Button>
@@ -1775,7 +1819,60 @@ export default function AdminSchedulePage() {
         </DialogContent>
       </Dialog>
 
-
+      {/* ======================================================== */}
+      {/* DIALOG: Confirm Overwrite for Recurrence Edit             */}
+      {/* ======================================================== */}
+      <Dialog open={repeatOverwritePayload !== null} onOpenChange={(open) => !open && setRepeatOverwritePayload(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Overwrite Existing Schedules?</DialogTitle>
+            <DialogDescription>
+              This recurrence pattern overlaps with existing schedules on future dates. Do you want to overwrite those overlapping windows?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (repeatOverwritePayload) {
+                  repeatMut.mutate({
+                    ...repeatOverwritePayload,
+                    overwrite: true,
+                  });
+                }
+              }}
+              disabled={repeatMut.isPending}
+              className="w-full text-xs font-semibold"
+            >
+              Yes, Overwrite Conflicts
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setRepeatOverwritePayload(null)}
+              className="w-full text-xs border-white/10"
+            >
+              No, Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
+  );
+}
+
+function GlassCard({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn("bg-card/40 backdrop-blur-md border rounded-2xl shadow-sm p-4", className)} {...props}>
+      {children}
+    </div>
+  );
+}
+
+function PageHeader({ title, description }: { title: string; description?: string }) {
+  return (
+    <div className="space-y-1 mb-6">
+      <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+      {description && <p className="text-sm text-muted-foreground">{description}</p>}
+    </div>
   );
 }
