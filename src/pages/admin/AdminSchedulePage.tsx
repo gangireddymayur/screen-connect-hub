@@ -745,7 +745,7 @@ export default function AdminSchedulePage() {
                 placeholder="Search devices..."
                 value={deviceSearch}
                 onChange={(e) => setDeviceSearch(e.target.value)}
-                className="pl-8 bg-zinc-900/40 border-white/10 text-xs h-8 focus:ring-1 focus:ring-primary/45"
+                className="pl-8 bg-background border-border text-xs h-8 focus:ring-1 focus:ring-primary/45"
               />
             </div>
             <div className="space-y-1 max-h-[195px] overflow-y-auto pr-1 custom-scrollbar">
@@ -759,7 +759,7 @@ export default function AdminSchedulePage() {
                       "w-full text-left p-2 rounded-xl text-xs flex items-center justify-between border transition-all duration-200",
                       isSelected
                         ? "bg-primary/10 border-primary/30 text-foreground font-medium"
-                        : "bg-transparent border-transparent hover:bg-white/5 text-muted-foreground hover:text-foreground"
+                        : "bg-transparent border-transparent hover:bg-muted text-muted-foreground hover:text-foreground"
                     )}
                   >
                     <div className="truncate">
@@ -797,7 +797,7 @@ export default function AdminSchedulePage() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-6 rounded-md hover:bg-white/5"
+                  className="size-6 rounded-md hover:bg-muted"
                   onClick={() => {
                     const m = new Date(calendarMonth);
                     m.setMonth(m.getMonth() - 1);
@@ -809,7 +809,7 @@ export default function AdminSchedulePage() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-6 rounded-md hover:bg-white/5"
+                  className="size-6 rounded-md hover:bg-muted"
                   onClick={() => {
                     const m = new Date(calendarMonth);
                     m.setMonth(m.getMonth() + 1);
@@ -848,8 +848,8 @@ export default function AdminSchedulePage() {
                       isSelected
                         ? "bg-primary text-primary-foreground font-semibold"
                         : isToday
-                          ? "bg-white/10 text-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     )}
                   >
                     <span>{cell.date.getDate()}</span>
@@ -863,7 +863,7 @@ export default function AdminSchedulePage() {
             <Button
               variant="outline"
               size="sm"
-              className="w-full text-xs h-7 border-white/10 bg-white/5 hover:bg-white/10"
+              className="w-full text-xs h-7 border-border/60 bg-background hover:bg-muted"
               onClick={handleToday}
             >
               Today
@@ -890,7 +890,7 @@ export default function AdminSchedulePage() {
                   disabled={updateDeviceSchedulesMode.isPending}
                   className={cn(
                     "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-primary/40 focus:ring-offset-1 focus:ring-offset-background",
-                    selectedDevice.schedules_enabled === 0 ? "bg-amber-600/70 border-amber-500/50" : "bg-white/10 border-white/5"
+                    selectedDevice.schedules_enabled === 0 ? "bg-amber-600/70 border-amber-500/50" : "bg-muted border-border/40"
                   )}
                 >
                   <span
@@ -903,7 +903,7 @@ export default function AdminSchedulePage() {
               </div>
 
               {selectedDevice.schedules_enabled === 0 && (
-                <div className="space-y-1.5 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="space-y-1.5 pt-2 border-t border-border/40 animate-in fade-in slide-in-from-top-1 duration-150">
                   <Label className="text-[10px] text-muted-foreground font-semibold">Default 24/7 Layout</Label>
                   <select
                     value={selectedDevice.layout_id || ""}
@@ -912,11 +912,11 @@ export default function AdminSchedulePage() {
                       updateDeviceDefaultLayout.mutate(val);
                     }}
                     disabled={updateDeviceDefaultLayout.isPending}
-                    className="w-full bg-[#0d0f12] border border-white/10 rounded-xl h-8 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                    className="w-full bg-background border border-border rounded-xl h-8 px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
                   >
-                    <option value="" disabled className="bg-[#0d0f12] text-muted-foreground">Select default layout...</option>
+                    <option value="" disabled className="bg-background text-muted-foreground">Select default layout...</option>
                     {layouts.map((t) => (
-                      <option key={t.id} value={t.id} className="bg-[#0d0f12] text-foreground">
+                      <option key={t.id} value={t.id} className="bg-background text-foreground">
                         {t.name}
                       </option>
                     ))}
@@ -932,12 +932,12 @@ export default function AdminSchedulePage() {
         {/* ======================================================== */}
         <div className="flex flex-col gap-4" ref={weekGridRef}>
           {/* Week Selector bar */}
-          <div className="flex items-center justify-between bg-zinc-900/30 border border-white/5 rounded-2xl px-4 py-2.5 shadow-sm">
+          <div className="flex items-center justify-between bg-card/40 border border-border/50 rounded-2xl px-4 py-2.5 shadow-sm">
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 rounded-full border border-white/5 hover:bg-white/5"
+                className="size-8 rounded-full border border-border/80 hover:bg-muted"
                 onClick={handlePrevWeek}
               >
                 <ChevronLeft className="size-4" />
@@ -945,7 +945,7 @@ export default function AdminSchedulePage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 rounded-full border border-white/5 hover:bg-white/5"
+                className="size-8 rounded-full border border-border/80 hover:bg-muted"
                 onClick={handleNextWeek}
               >
                 <ChevronRight className="size-4" />
@@ -965,11 +965,11 @@ export default function AdminSchedulePage() {
           </div>
 
           {/* Week Calendar Board */}
-          <GlassCard className="p-0 overflow-hidden flex flex-col select-none">
+          <GlassCard className="p-0 overflow-hidden flex flex-col select-none border-border">
             {/* Headers row */}
-            <div className="grid grid-cols-[60px_1fr] border-b border-white/5 bg-white/[0.02] pr-2">
-              <div className="h-10 border-r border-white/5" />
-              <div className="grid grid-cols-7 h-10 divide-x divide-white/5">
+            <div className="grid grid-cols-[60px_1fr] border-b border-border/60 bg-muted/20 pr-2">
+              <div className="h-10 border-r border-border/60" />
+              <div className="grid grid-cols-7 h-10 divide-x divide-border/60">
                 {weekDates.map((date, idx) => {
                   const dateIso = toISO(date);
                   const isSelected = selectedDate === dateIso;
@@ -1005,7 +1005,7 @@ export default function AdminSchedulePage() {
                         "flex flex-col items-center justify-center text-center py-1 transition-colors",
                         !schedulesEnabled
                           ? "opacity-40 cursor-not-allowed pointer-events-none"
-                          : "cursor-pointer hover:bg-white/5",
+                          : "cursor-pointer hover:bg-muted",
                         isSelected && "bg-emerald-500/5",
                         isCurrent && "bg-primary/5"
                       )}
@@ -1047,12 +1047,12 @@ export default function AdminSchedulePage() {
               className="grid grid-cols-[60px_1fr] relative overflow-y-scroll max-h-[620px]"
             >
               {/* Hour scale vertical labels */}
-              <div className="flex flex-col text-[10px] text-muted-foreground/60 bg-white/[0.01]">
+              <div className="flex flex-col text-[10px] text-muted-foreground bg-muted/10">
                 {Array.from({ length: HOURS }).map((_, h) => (
                   <div
                     key={h}
                     style={{ height: PX_PER_HOUR }}
-                    className="border-r border-b border-white/5 pr-2 pt-1 text-right select-none"
+                    className="border-r border-b border-border/40 pr-2 pt-1 text-right select-none"
                   >
                     {String(h).padStart(2, "0")}:00
                   </div>
@@ -1060,13 +1060,13 @@ export default function AdminSchedulePage() {
               </div>
 
               {/* Day Columns containing blocks */}
-              <div className="grid grid-cols-7 relative divide-x divide-white/5 min-h-[1440px] bg-white/[0.005]">
+              <div className="grid grid-cols-7 relative divide-x divide-border/60 min-h-[1440px] bg-background">
                 {!schedulesEnabled && (
                   <div
                     onClick={() => {
                       toast.info(`Device is running default layout: ${selectedDevice?.layout_id ? layouts.find(t => t.id === selectedDevice.layout_id)?.name || 'Layout' : 'None'}. Turn on "Enable Scheduling" in the sidebar to configure.`);
                     }}
-                    className="absolute inset-0 bg-black/75 backdrop-blur-[1px] z-[60] flex flex-col items-center justify-center text-center p-4 select-none cursor-pointer"
+                    className="absolute inset-0 bg-background/85 backdrop-blur-[1px] z-[60] flex flex-col items-center justify-center text-center p-4 select-none cursor-pointer"
                   >
                     <SlidersHorizontal className="size-8 text-amber-500/80 mb-2 animate-pulse" />
                     <h4 className="text-sm font-semibold text-foreground">Schedules Disabled</h4>
@@ -1079,7 +1079,7 @@ export default function AdminSchedulePage() {
                 {Array.from({ length: HOURS }).map((_, h) => (
                   <div
                     key={h}
-                    className="absolute left-0 right-0 border-b border-white/[0.04] pointer-events-none"
+                    className="absolute left-0 right-0 border-b border-border/30 pointer-events-none"
                     style={{ top: (h + 1) * PX_PER_HOUR - 1, height: 1 }}
                   />
                 ))}
@@ -1100,7 +1100,7 @@ export default function AdminSchedulePage() {
                     <div
                       key={idx}
                       className={cn(
-                        "day-column relative h-full select-none cursor-copy transition-colors duration-200 hover:bg-white/[0.01]",
+                        "day-column relative h-full select-none cursor-copy transition-colors duration-200 hover:bg-muted/30",
                         isCurrent && "bg-primary/[0.01]"
                       )}
                       onDragOver={(e) => e.preventDefault()}
@@ -1144,7 +1144,8 @@ export default function AdminSchedulePage() {
                             style={{
                               top,
                               height,
-                              background: `color-mix(in oklch, ${color} 15%, #0d0f12)`,
+                              background: `color-mix(in oklch, ${color} 12%, hsl(var(--card)))`,
+                              color: `color-mix(in oklch, ${color} 80%, hsl(var(--foreground)))`,
                               borderColor: color,
                             }}
                           >
@@ -1158,21 +1159,21 @@ export default function AdminSchedulePage() {
 
                             {/* Block Content */}
                             <div className="flex flex-col h-full pointer-events-none select-none relative">
-                              <div className="font-semibold text-foreground truncate flex items-center gap-1">
+                              <div className="font-semibold text-current truncate flex items-center gap-1">
                                 <span className="size-1.5 rounded-full shrink-0" style={{ background: color }} />
                                 {inst.layout_name}
                               </div>
-                              <div className="text-muted-foreground text-[9px] mt-0.5 font-medium">
+                              <div className="opacity-80 text-[9px] mt-0.5 font-medium">
                                 {formatMinsAMPM(startMins)} - {formatMinsAMPM(endMins)}
                               </div>
                               {isPastDay ? (
-                                <div className="mt-auto mr-auto text-[8px] bg-white/5 text-muted-foreground px-1 py-0.5 rounded border border-white/5 font-semibold tracking-wide uppercase">
+                                <div className="mt-auto mr-auto text-[8px] bg-foreground/10 text-current px-1 py-0.5 rounded border border-border/20 font-semibold tracking-wide uppercase">
                                   Completed
                                 </div>
                               ) : (
                                 /* Drag handle decorator icon */
                                 <div className="mt-auto ml-auto opacity-0 group-hover:opacity-60 transition-opacity">
-                                  <Move className="size-3 text-muted-foreground" />
+                                  <Move className="size-3 text-current opacity-70" />
                                 </div>
                               )}
                             </div>
@@ -1209,7 +1210,7 @@ export default function AdminSchedulePage() {
                 placeholder="Search layouts..."
                 value={layoutSearch}
                 onChange={(e) => setLayoutSearch(e.target.value)}
-                className="pl-8 bg-zinc-900/40 border-white/10 text-xs h-8 focus:ring-1 focus:ring-primary/45"
+                className="pl-8 bg-background border-border text-xs h-8 focus:ring-1 focus:ring-primary/45"
               />
             </div>
 
@@ -1224,7 +1225,7 @@ export default function AdminSchedulePage() {
                       e.dataTransfer.setData("text/plain", t.id);
                       e.dataTransfer.effectAllowed = "copy";
                     }}
-                    className="p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] active:scale-[0.98] transition-all cursor-grab active:cursor-grabbing flex flex-col gap-1.5 shadow-sm group select-none"
+                    className="p-3 rounded-xl border border-border/60 bg-muted/20 hover:bg-muted/60 active:scale-[0.98] transition-all cursor-grab active:cursor-grabbing flex flex-col gap-1.5 shadow-sm group select-none"
                     style={{ borderLeftWidth: 3, borderLeftColor: color }}
                   >
                     <div className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors truncate">
@@ -1247,7 +1248,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Edit repeat configuration / delete schedule       */}
       {/* ======================================================== */}
       <Dialog open={editPopupOpen} onOpenChange={setEditPopupOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-xl bg-card border-border">
           <DialogHeader>
             <DialogTitle>Configure Recurrence</DialogTitle>
             <DialogDescription>
@@ -1258,7 +1259,7 @@ export default function AdminSchedulePage() {
           {selectedSchedule && (
             <div className="space-y-4 pt-2">
               {/* Selected Window Summary */}
-              <div className="bg-white/5 border border-white/5 rounded-xl p-3 flex flex-col gap-1">
+              <div className="bg-muted/40 border border-border/50 rounded-xl p-3 flex flex-col gap-1">
                 <div className="font-semibold text-sm text-foreground flex items-center gap-1.5">
                   <span
                     className="size-2 rounded-full"
@@ -1284,7 +1285,7 @@ export default function AdminSchedulePage() {
                     type="time"
                     value={editStartTime}
                     onChange={(e) => setEditStartTime(e.target.value)}
-                    className="bg-white/5 border-white/10 text-xs h-9"
+                    className="bg-background border-border text-xs h-9"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -1293,7 +1294,7 @@ export default function AdminSchedulePage() {
                     type="time"
                     value={editEndTime}
                     onChange={(e) => setEditEndTime(e.target.value)}
-                    className="bg-white/5 border-white/10 text-xs h-9"
+                    className="bg-background border-border text-xs h-9"
                   />
                 </div>
               </div>
@@ -1316,7 +1317,7 @@ export default function AdminSchedulePage() {
                         "py-2 rounded-xl text-xs border font-medium transition-all",
                         editRepeatMode === k
                           ? "bg-primary/20 border-primary/40 text-foreground"
-                          : "bg-white/5 border-white/10 hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                          : "bg-background border-border hover:bg-muted text-muted-foreground hover:text-foreground"
                       )}
                     >
                       {l}
@@ -1337,7 +1338,7 @@ export default function AdminSchedulePage() {
                       max={90}
                       value={editRepeatInterval}
                       onChange={(e) => setEditRepeatInterval(Math.max(1, Number(e.target.value) || 1))}
-                      className="w-20 bg-white/5 border-white/10 h-8 text-center text-xs"
+                      className="w-20 bg-background border-border h-8 text-center text-xs"
                     />
                     <span className="text-xs text-muted-foreground">days</span>
                   </div>
@@ -1356,8 +1357,8 @@ export default function AdminSchedulePage() {
                         className={cn(
                           "px-3 py-1 rounded-md text-xs border transition-colors",
                           editDaysCount === num
-                            ? "bg-white/15 border-white/20 text-foreground"
-                            : "bg-white/5 border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10"
+                            ? "bg-muted border-border text-foreground"
+                            : "bg-background border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                         )}
                       >
                         {num} day{num > 1 ? "s" : ""}
@@ -1371,7 +1372,7 @@ export default function AdminSchedulePage() {
                         max={365}
                         value={editDaysCount}
                         onChange={(e) => setEditDaysCount(Math.max(1, Number(e.target.value) || 1))}
-                        className="w-16 bg-white/5 border-white/10 h-8 text-center text-xs"
+                        className="w-16 bg-background border-border h-8 text-center text-xs"
                       />
                     </div>
                   </div>
@@ -1386,12 +1387,12 @@ export default function AdminSchedulePage() {
             </div>
           )}
 
-          <div className="mt-6 pt-4 border-t border-white/5 space-y-4">
+          <div className="mt-6 pt-4 border-t border-border/40 space-y-4">
             {/* Save Actions Row */}
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
-                className="border-white/10 text-xs h-9 px-4"
+                className="border-border text-xs h-9 px-4"
                 onClick={() => setEditPopupOpen(false)}
               >
                 Cancel
@@ -1453,7 +1454,7 @@ export default function AdminSchedulePage() {
 
             {/* Danger Zone Separator & Delete Row */}
             {selectedSchedule && (
-              <div className="pt-3.5 border-t border-dashed border-white/5 flex items-center justify-between">
+              <div className="pt-3.5 border-t border-dashed border-border/60 flex items-center justify-between">
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold select-none">
                   Danger Zone
                 </span>
@@ -1463,7 +1464,7 @@ export default function AdminSchedulePage() {
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="text-[10px] bg-rose-500/10 border border-rose-500/20 text-rose-300 hover:bg-rose-500/20 h-8 px-3"
+                        className="text-[10px] bg-rose-500/10 border border-rose-500/20 text-rose-600 hover:bg-rose-500/20 h-8 px-3"
                         onClick={() => deleteMut.mutate({ id: selectedSchedule.id, date: selectedDate })}
                         disabled={deleteMut.isPending}
                       >
@@ -1472,7 +1473,7 @@ export default function AdminSchedulePage() {
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="text-[10px] bg-rose-500/20 border border-rose-500/30 text-rose-200 hover:bg-rose-500/30 font-semibold h-8 px-3"
+                        className="text-[10px] bg-rose-500/20 border border-rose-500/30 text-rose-600 hover:bg-rose-500/30 font-semibold h-8 px-3"
                         onClick={() => deleteMut.mutate({ id: selectedSchedule.id })}
                         disabled={deleteMut.isPending}
                       >
@@ -1483,7 +1484,7 @@ export default function AdminSchedulePage() {
                     <Button
                       variant="destructive"
                       size="sm"
-                      className="text-[10px] bg-rose-500/10 border border-rose-500/20 text-rose-300 hover:bg-rose-500/20 h-8 px-3.5"
+                      className="text-[10px] bg-rose-500/10 border border-rose-500/20 text-rose-600 hover:bg-rose-500/20 h-8 px-3.5"
                       onClick={() => deleteMut.mutate({ id: selectedSchedule.id })}
                       disabled={deleteMut.isPending}
                     >
@@ -1501,7 +1502,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Bulk Repeat Day Schedules                         */}
       {/* ======================================================== */}
       <Dialog open={bulkRepeatOpen} onOpenChange={setBulkRepeatOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-xl bg-card border-border">
           <DialogHeader>
             <DialogTitle>Repeat Day Schedule</DialogTitle>
             <DialogDescription>
@@ -1512,7 +1513,7 @@ export default function AdminSchedulePage() {
           {bulkRepeatDate && (
             <div className="space-y-4 pt-2">
               {/* Day Schedules List */}
-              <div className="bg-white/5 border border-white/5 rounded-xl p-3 space-y-2">
+              <div className="bg-muted/40 border border-border/50 rounded-xl p-3 space-y-2">
                 <div className="text-xs text-muted-foreground font-semibold">
                   Scheduled Layouts on {parseISODate(bulkRepeatDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}:
                 </div>
@@ -1569,7 +1570,7 @@ export default function AdminSchedulePage() {
                         "py-2 rounded-xl text-xs border font-medium transition-all",
                         bulkRepeatMode === k
                           ? "bg-primary/20 border-primary/40 text-foreground"
-                          : "bg-white/5 border-white/10 hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                          : "bg-background border-border hover:bg-muted text-muted-foreground hover:text-foreground"
                       )}
                     >
                       {l}
@@ -1590,7 +1591,7 @@ export default function AdminSchedulePage() {
                       max={90}
                       value={bulkRepeatInterval}
                       onChange={(e) => setBulkRepeatInterval(Math.max(1, Number(e.target.value) || 1))}
-                      className="w-20 bg-white/5 border-white/10 h-8 text-center text-xs"
+                      className="w-20 bg-background border-border h-8 text-center text-xs"
                     />
                     <span className="text-xs text-muted-foreground">days</span>
                   </div>
@@ -1609,8 +1610,8 @@ export default function AdminSchedulePage() {
                         className={cn(
                           "px-3 py-1 rounded-md text-xs border transition-colors",
                           bulkRepeatDaysCount === num
-                            ? "bg-white/15 border-white/20 text-foreground"
-                            : "bg-white/5 border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10"
+                            ? "bg-muted border-border text-foreground"
+                            : "bg-background border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                         )}
                       >
                         {num} day{num > 1 ? "s" : ""}
@@ -1624,7 +1625,7 @@ export default function AdminSchedulePage() {
                         max={365}
                         value={bulkRepeatDaysCount}
                         onChange={(e) => setBulkRepeatDaysCount(Math.max(1, Number(e.target.value) || 1))}
-                        className="w-16 bg-white/5 border-white/10 h-8 text-center text-xs"
+                        className="w-16 bg-background border-border h-8 text-center text-xs"
                       />
                     </div>
                   </div>
@@ -1643,7 +1644,7 @@ export default function AdminSchedulePage() {
             {bulkRepeatDate && instances.some((i) => i.date === bulkRepeatDate) && (
               <Button
                 variant="destructive"
-                className="bg-rose-500/10 border border-rose-500/20 text-rose-300 hover:bg-rose-500/20 w-full sm:w-auto sm:mr-auto text-xs h-9"
+                className="bg-rose-500/10 border border-rose-500/20 text-rose-600 hover:bg-rose-500/20 w-full sm:w-auto sm:mr-auto text-xs h-9"
                 onClick={() => {
                   if (confirm("Are you sure you want to clear all layouts scheduled on this day?")) {
                     clearDayMut.mutate();
@@ -1657,7 +1658,7 @@ export default function AdminSchedulePage() {
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto justify-end">
               <Button
                 variant="outline"
-                className="border-white/10 w-full sm:w-auto text-xs h-9"
+                className="border-border w-full sm:w-auto text-xs h-9"
                 onClick={() => setBulkRepeatOpen(false)}
               >
                 Cancel
@@ -1708,7 +1709,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Save Recurring Change Options                     */}
       {/* ======================================================== */}
       <Dialog open={pendingUpdate !== null} onOpenChange={(open) => !open && setPendingUpdate(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md bg-card border-border">
           <DialogHeader>
             <DialogTitle>Save Recurring Change</DialogTitle>
             <DialogDescription>
@@ -1754,7 +1755,7 @@ export default function AdminSchedulePage() {
                 }
               }}
               disabled={updateMut.isPending || repeatMut.isPending}
-              className="w-full text-xs border-white/10"
+              className="w-full text-xs border-border"
             >
               Update Entire Series
             </Button>
@@ -1773,7 +1774,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Confirm Overwrite for Bulk Replication            */}
       {/* ======================================================== */}
       <Dialog open={bulkOverwriteDates !== null} onOpenChange={(open) => !open && setBulkOverwriteDates(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md bg-card border-border">
           <DialogHeader>
             <DialogTitle>Overwrite Existing Schedules?</DialogTitle>
             <DialogDescription>
@@ -1811,7 +1812,7 @@ export default function AdminSchedulePage() {
             <Button
               variant="outline"
               onClick={() => setBulkOverwriteDates(null)}
-              className="w-full text-xs border-white/10"
+              className="w-full text-xs border-border"
             >
               No, Cancel
             </Button>
@@ -1823,7 +1824,7 @@ export default function AdminSchedulePage() {
       {/* DIALOG: Confirm Overwrite for Recurrence Edit             */}
       {/* ======================================================== */}
       <Dialog open={repeatOverwritePayload !== null} onOpenChange={(open) => !open && setRepeatOverwritePayload(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md bg-card border-border">
           <DialogHeader>
             <DialogTitle>Overwrite Existing Schedules?</DialogTitle>
             <DialogDescription>
@@ -1849,7 +1850,7 @@ export default function AdminSchedulePage() {
             <Button
               variant="outline"
               onClick={() => setRepeatOverwritePayload(null)}
-              className="w-full text-xs border-white/10"
+              className="w-full text-xs border-border"
             >
               No, Cancel
             </Button>
@@ -1862,7 +1863,7 @@ export default function AdminSchedulePage() {
 
 function GlassCard({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("bg-card/40 backdrop-blur-md border rounded-2xl shadow-sm p-4", className)} {...props}>
+    <div className={cn("bg-card/45 backdrop-blur-md border rounded-2xl shadow-sm p-4", className)} {...props}>
       {children}
     </div>
   );

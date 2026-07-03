@@ -20,6 +20,12 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toIS
       console.log("[db] Added schedules_enabled column to devices table.");
     }
 
+    const [compCols] = await db.query("SHOW COLUMNS FROM companies LIKE 'show_brand_header'");
+    if (compCols.length === 0) {
+      await db.query("ALTER TABLE companies ADD COLUMN show_brand_header TINYINT(1) DEFAULT 0");
+      console.log("[db] Added show_brand_header column to companies table.");
+    }
+
     const [tableExist] = await db.query("SHOW TABLES LIKE 'schedule_instances'");
     if (tableExist.length === 0) {
       console.log("[db] Initializing advanced schedules database tables...");
@@ -108,6 +114,10 @@ try {
   app.use('/api/layouts',    authRequired, crud('layouts'));
   app.use('/api/content',    authRequired, crud('content'));
   app.use('/api/schedules',  authRequired, require('./src/routes/schedules'));
+  
+  const backupRoutes = require('./src/routes/backup');
+  app.use('/api/backup', authRequired, backupRoutes.download);
+  app.use('/api/restore', authRequired, backupRoutes.restore);
 } catch (err) {
   console.error('ROUTE_LOAD_ERROR:', err.stack || err);
   app.use('/api', (_req, res) =>

@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -62,9 +63,11 @@ export default function AdminSettingsPage() {
   const [companyName, setCompanyName] = useState("");
   const [timezone, setTimezone] = useState("UTC");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [showBrandHeader, setShowBrandHeader] = useState(0);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [savingSettings, setSavingSettings] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   // Password fields
   const [newPassword, setNewPassword] = useState("");
@@ -77,6 +80,7 @@ export default function AdminSettingsPage() {
     companyName: string;
     timezone: string;
     logoUrl: string | null;
+    showBrandHeader: number;
   } | null>(null);
 
   useEffect(() => {
@@ -89,17 +93,19 @@ export default function AdminSettingsPage() {
           setEmail(profile.email ?? "");
           if (profile.company_id) {
             setCompanyId(profile.company_id);
-            const { data: company } = await supabase.from("companies").select("name, timezone, logo_url").eq("id", profile.company_id).single();
+            const { data: company } = await supabase.from("companies").select("name, timezone, logo_url, show_brand_header").eq("id", profile.company_id).single();
             if (company) {
               setCompanyName(company.name ?? "");
               setTimezone((company as any).timezone ?? "UTC");
               setLogoUrl((company as any).logo_url ?? null);
+              setShowBrandHeader((company as any).show_brand_header ?? 0);
 
               setOriginalData({
                 fullName: profile.full_name ?? "",
                 companyName: company.name ?? "",
                 timezone: (company as any).timezone ?? "UTC",
                 logoUrl: (company as any).logo_url ?? null,
+                showBrandHeader: (company as any).show_brand_header ?? 0,
               });
             }
           }
@@ -119,9 +125,10 @@ export default function AdminSettingsPage() {
       fullName !== originalData.fullName ||
       companyName !== originalData.companyName ||
       timezone !== originalData.timezone ||
-      logoUrl !== originalData.logoUrl
+      logoUrl !== originalData.logoUrl ||
+      showBrandHeader !== originalData.showBrandHeader
     );
-  }, [fullName, companyName, timezone, logoUrl, originalData]);
+  }, [fullName, companyName, timezone, logoUrl, showBrandHeader, originalData]);
 
   const handleSaveSettings = async () => {
     if (!user || !companyId) return;
@@ -138,12 +145,14 @@ export default function AdminSettingsPage() {
       if (
         companyName !== originalData?.companyName ||
         timezone !== originalData?.timezone ||
-        logoUrl !== originalData?.logoUrl
+        logoUrl !== originalData?.logoUrl ||
+        showBrandHeader !== originalData?.showBrandHeader
       ) {
         const { error: companyError } = await supabase.from("companies").update({
           name: companyName,
           timezone,
           logo_url: logoUrl,
+          show_brand_header: showBrandHeader,
         } as any).eq("id", companyId);
         if (companyError) throw companyError;
       }
@@ -155,6 +164,7 @@ export default function AdminSettingsPage() {
         companyName,
         timezone,
         logoUrl,
+        showBrandHeader,
       });
     } catch (err: any) {
       toast.error(err.message || "Failed to save settings");
@@ -170,6 +180,7 @@ export default function AdminSettingsPage() {
       setCompanyName(originalData.companyName);
       setTimezone(originalData.timezone);
       setLogoUrl(originalData.logoUrl);
+      setShowBrandHeader(originalData.showBrandHeader);
     }
   };
 
@@ -217,6 +228,69 @@ export default function AdminSettingsPage() {
   const handleLogout = async () => {
     setLogoutOpen(false);
     await signOut();
+  };
+
+  const handleDownloadBackup = async () => {
+    try {
+      const token = localStorage.getItem("sh_token");
+      const res = await fetch("/api/backup", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error || "Failed to download backup");
+      }
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `signagehub_backup_${dateStr}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Backup downloaded successfully");
+    } catch (err: any) {
+      toast.error("Failed to generate backup: " + err.message);
+    }
+  };
+
+  const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ok = window.confirm(
+      "WARNING: Restoring backup will import all layouts, content, devices, and schedules from the file. Do you want to proceed?"
+    );
+    if (!ok) return;
+
+    setRestoring(true);
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const token = localStorage.getItem("sh_token");
+      const res = await fetch("/api/restore", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error || "Failed to restore backup");
+      }
+      toast.success("Data restored successfully! Refreshing page...");
+      window.location.reload();
+    } catch (err: any) {
+      toast.error("Failed to restore backup: " + err.message);
+    } finally {
+      setRestoring(false);
+      e.target.value = "";
+    }
   };
 
   if (loading) {
@@ -364,6 +438,19 @@ export default function AdminSettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Brand Header Toggle */}
+          <div className="flex items-center justify-between border-t border-white/5 pt-4">
+            <div>
+              <Label className="text-sm font-semibold text-foreground">Show Brand Header on Devices</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">Display logo, organization name, and local clock on signage screens.</p>
+            </div>
+            <Switch
+              disabled={!isEditing}
+              checked={showBrandHeader === 1}
+              onCheckedChange={(checked) => setShowBrandHeader(checked ? 1 : 0)}
+            />
+          </div>
         </GlassCard>
 
         {/* Security Password Card */}
@@ -393,6 +480,30 @@ export default function AdminSettingsPage() {
               >
                 {changingPassword ? "Updating…" : "Update Password"}
               </Button>
+            </div>
+          </GlassCard>
+
+          {/* Backup & Restore Card */}
+          <GlassCard>
+            <h3 className="font-semibold text-lg mb-1">Backup & Restore</h3>
+            <p className="text-xs text-muted-foreground mb-4">Export or import your complete account data (layouts, content, devices, and schedules).</p>
+            <div className="space-y-3">
+              <Button variant="outline" className="w-full h-9 text-xs border-border" onClick={handleDownloadBackup}>
+                Download Backup
+              </Button>
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleRestoreBackup}
+                  disabled={restoring}
+                  className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                  id="backup-file-input"
+                />
+                <Button variant="outline" className="w-full h-9 text-xs border-border" disabled={restoring}>
+                  {restoring ? "Restoring Data…" : "Upload Backup File"}
+                </Button>
+              </div>
             </div>
           </GlassCard>
 
