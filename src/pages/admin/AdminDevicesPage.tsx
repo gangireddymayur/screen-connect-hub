@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Monitor, MapPin, Search, LogOut, Trash2, Settings, Play, Pause } from "lucide-react";
+import { Plus, Monitor, MapPin, Search, LogOut, Trash2, Settings, Play, Pause, Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -382,6 +383,16 @@ export default function AdminDevicesPage() {
                           <TableCell>
                             {(() => {
                               const needsLayout = !d.layout_id;
+                              if (schedulesEnabled && hasActiveSched) {
+                                return (
+                                  <Link
+                                    to="/admin/schedule"
+                                    className="text-xs text-muted-foreground hover:text-primary transition flex items-center gap-1.5 font-medium"
+                                  >
+                                    <Calendar className="h-3.5 w-3.5 text-primary" /> Managed via Schedule
+                                  </Link>
+                                );
+                              }
                               return (
                                 <div className="flex flex-col gap-1">
                                   <Select
