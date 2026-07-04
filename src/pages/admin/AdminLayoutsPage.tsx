@@ -50,6 +50,10 @@ export default function AdminLayoutsPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLayout, setDeleteLayout] = useState<Layout | null>(null);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("company_id").eq("id", user.id).single()
@@ -83,7 +87,7 @@ export default function AdminLayoutsPage() {
       resolution_width: resWidth,
       resolution_height: resHeight,
     }).select().single();
-    setSubmitting(false);
+    setSubmitting(true);
     if (error) toast.error(error.message);
     else {
       toast.success("Layout created!");
@@ -114,10 +118,25 @@ export default function AdminLayoutsPage() {
     const { error } = await supabase.from("layouts").delete().eq("id", deleteLayout.id);
     setSubmitting(false);
     if (error) toast.error(error.message);
-    else { toast.success("Layout deleted!"); setDeleteOpen(false); setDeleteLayout(null); fetchLayouts(companyId); }
+    else {
+      toast.success("Layout deleted!");
+      setDeleteOpen(false);
+      setDeleteLayout(null);
+      const nextTotalPages = Math.ceil((layouts.length - 1) / itemsPerPage);
+      if (currentPage > nextTotalPages) {
+        setCurrentPage(Math.max(1, nextTotalPages));
+      }
+      fetchLayouts(companyId);
+    }
   };
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  const totalPages = Math.ceil(layouts.length / itemsPerPage);
+  const paginatedLayouts = layouts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <AdminLayout>
@@ -170,52 +189,81 @@ export default function AdminLayoutsPage() {
                 <p className="text-sm">No layouts yet. Create your first layout.</p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Layout</TableHead>
-                    <TableHead>Resolution</TableHead>
-                    <TableHead>Last Modified</TableHead>
-                    <TableHead className="w-44">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {layouts.map((l) => (
-                    <TableRow key={l.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium text-sm">{l.name}</p>
-                          {l.description && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{l.description}</p>}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-sm">{l.resolution_width}×{l.resolution_height}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{formatDate(l.updated_at)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button variant="outline" size="sm" onClick={() => navigate(`/admin/layouts/${l.id}`)}>
-                            Edit Layout
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                            setEditLayout(l); setEditName(l.name); setEditDescription(l.description ?? ""); setEditOpen(true);
-                          }}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => {
-                            setDeleteLayout(l); setDeleteOpen(true);
-                          }}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Layout</TableHead>
+                      <TableHead>Resolution</TableHead>
+                      <TableHead>Last Modified</TableHead>
+                      <TableHead className="w-44">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedLayouts.map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-sm">{l.name}</p>
+                            {l.description && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{l.description}</p>}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-sm">{l.resolution_width}×{l.resolution_height}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{formatDate(l.updated_at)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="outline" size="sm" onClick={() => navigate(`/admin/layouts/${l.id}`)}>
+                              Edit Layout
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                              setEditLayout(l); setEditName(l.name); setEditDescription(l.description ?? ""); setEditOpen(true);
+                            }}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => {
+                              setDeleteLayout(l); setDeleteOpen(true);
+                            }}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between p-4 border-t border-white/5">
+                    <span className="text-xs text-muted-foreground">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="h-8 text-xs border-white/10"
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="h-8 text-xs border-white/10"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

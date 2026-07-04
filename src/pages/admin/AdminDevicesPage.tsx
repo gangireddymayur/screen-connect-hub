@@ -59,6 +59,14 @@ export default function AdminDevicesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "online" | "offline" | "unpaired">("all");
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
+
   // Pair dialog
   const [addOpen, setAddOpen] = useState(false);
   const [pairCode, setPairCode] = useState("");
@@ -311,138 +319,173 @@ export default function AdminDevicesPage() {
                 return <div className="text-center p-12 text-sm text-muted-foreground">No devices found.</div>;
               }
 
+              const totalPages = Math.ceil(filtered.length / itemsPerPage);
+              const paginatedDevices = filtered.slice(
+                (currentPage - 1) * itemsPerPage,
+                currentPage * itemsPerPage
+              );
+
               return (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Screen</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Orientation</TableHead>
-                      <TableHead>Default Layout (24/7)</TableHead>
-                      <TableHead>Created At</TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.map((d) => {
-                      const hasActiveSched = activeScheduleDeviceIds.has(d.id);
-                      const status = getDeviceStatus(d, hasActiveSched);
-                      const schedulesEnabled = d.schedules_enabled !== 0;
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Screen</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Orientation</TableHead>
+                        <TableHead>Default Layout (24/7)</TableHead>
+                        <TableHead>Created At</TableHead>
+                        <TableHead className="w-[80px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedDevices.map((d) => {
+                        const hasActiveSched = activeScheduleDeviceIds.has(d.id);
+                        const status = getDeviceStatus(d, hasActiveSched);
+                        const schedulesEnabled = d.schedules_enabled !== 0;
 
-                      return (
-                        <TableRow key={d.id}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-start gap-2.5">
-                              <Monitor className="h-4 w-4 text-muted-foreground mt-0.5" />
-                              <div>
-                                <span className="text-sm font-semibold">{d.name}</span>
-                                {d.location && (
-                                  <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                                    <MapPin className="h-3 w-3" /> {d.location}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {status === "unpaired" && <Badge variant="secondary">Unpaired</Badge>}
-                            {status === "paused" && (
-                              <Badge variant="outline" className="text-amber-500 border-amber-500/20 bg-amber-500/5">
-                                Paused
-                              </Badge>
-                            )}
-                            {status === "waiting_layout" && (
-                              <Badge variant="outline" className="text-amber-500 border-amber-500/20 bg-amber-500/5">
-                                Assign Layout
-                              </Badge>
-                            )}
-                            {status === "online" && (
-                              <div className="flex flex-col gap-0.5">
-                                <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/5 w-fit">
-                                  Online
-                                </Badge>
-                                {d.last_seen_at && (
-                                  <span className="text-[9px] text-muted-foreground">
-                                    Seen {formatDistanceToNow(new Date(d.last_seen_at))} ago
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                            {status === "offline" && (
-                              <div className="flex flex-col gap-0.5">
-                                <Badge variant="destructive" className="w-fit">Offline</Badge>
-                                {d.last_seen_at && (
-                                  <span className="text-[9px] text-muted-foreground">
-                                    Seen {formatDistanceToNow(new Date(d.last_seen_at))} ago
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm capitalize">{d.orientation}</TableCell>
-                          <TableCell>
-                            {(() => {
-                              const needsLayout = !d.layout_id;
-                              if (schedulesEnabled && hasActiveSched) {
-                                return (
-                                  <Link
-                                    to="/admin/schedule"
-                                    className="text-xs text-muted-foreground hover:text-primary transition flex items-center gap-1.5 font-medium"
-                                  >
-                                    <Calendar className="h-3.5 w-3.5 text-primary" /> Managed via Schedule
-                                  </Link>
-                                );
-                              }
-                              return (
-                                <div className="flex flex-col gap-1">
-                                  <Select
-                                    value={d.layout_id || "none"}
-                                    onValueChange={(val) => handleAssignLayout(d.id, val === "none" ? null : val)}
-                                  >
-                                    <SelectTrigger className="w-[180px] h-8 text-xs">
-                                      <SelectValue placeholder="No default layout assigned" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="none">No Fallback Layout</SelectItem>
-                                      {layouts.map((t) => (
-                                        <SelectItem key={t.id} value={t.id}>
-                                          {t.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-
-                                  {!schedulesEnabled && (
-                                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold leading-tight max-w-[10rem]">
-                                      Schedules Disabled (Playing Fallback)
-                                    </p>
-                                  )}
-                                  {schedulesEnabled && needsLayout && !hasActiveSched && (
-                                    <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight max-w-[10rem]">
-                                      Assign a default layout, or create an active schedule for this device.
-                                    </p>
+                        return (
+                          <TableRow key={d.id}>
+                            <TableCell className="font-medium">
+                              <div className="flex items-start gap-2.5">
+                                <Monitor className="h-4 w-4 text-muted-foreground mt-0.5" />
+                                <div>
+                                  <span className="text-sm font-semibold">{d.name}</span>
+                                  {d.location && (
+                                    <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                      <MapPin className="h-3 w-3" /> {d.location}
+                                    </div>
                                   )}
                                 </div>
-                              );
-                            })()}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{formatDate(d.created_at)}</TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 hover:bg-muted"
-                              onClick={() => openSettings(d)}
-                              title="Device Settings"
-                            >
-                              <Settings className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {status === "unpaired" && <Badge variant="secondary">Unpaired</Badge>}
+                              {status === "paused" && (
+                                <Badge variant="outline" className="text-amber-500 border-amber-500/20 bg-amber-500/5">
+                                  Paused
+                                </Badge>
+                              )}
+                              {status === "waiting_layout" && (
+                                <Badge variant="outline" className="text-amber-500 border-amber-500/20 bg-amber-500/5">
+                                  Assign Layout
+                                </Badge>
+                              )}
+                              {status === "online" && (
+                                <div className="flex flex-col gap-0.5">
+                                  <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/5 w-fit">
+                                    Online
+                                  </Badge>
+                                  {d.last_seen_at && (
+                                    <span className="text-[9px] text-muted-foreground">
+                                      Seen {formatDistanceToNow(new Date(d.last_seen_at))} ago
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {status === "offline" && (
+                                <div className="flex flex-col gap-0.5">
+                                  <Badge variant="destructive" className="w-fit">Offline</Badge>
+                                  {d.last_seen_at && (
+                                    <span className="text-[9px] text-muted-foreground">
+                                      Seen {formatDistanceToNow(new Date(d.last_seen_at))} ago
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm capitalize">{d.orientation}</TableCell>
+                            <TableCell>
+                              {(() => {
+                                const needsLayout = !d.layout_id;
+                                if (schedulesEnabled && hasActiveSched) {
+                                  return (
+                                    <Link
+                                      to="/admin/schedule"
+                                      className="text-xs text-muted-foreground hover:text-primary transition flex items-center gap-1.5 font-medium"
+                                    >
+                                      <Calendar className="h-3.5 w-3.5 text-primary" /> Managed via Schedule
+                                    </Link>
+                                  );
+                                }
+                                return (
+                                  <div className="flex flex-col gap-1">
+                                    <Select
+                                      value={d.layout_id || "none"}
+                                      onValueChange={(val) => handleAssignLayout(d.id, val === "none" ? null : val)}
+                                    >
+                                      <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="No default layout assigned" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">No Fallback Layout</SelectItem>
+                                        {layouts.map((t) => (
+                                          <SelectItem key={t.id} value={t.id}>
+                                            {t.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+
+                                    {!schedulesEnabled && (
+                                      <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold leading-tight max-w-[10rem]">
+                                        Schedules Disabled (Playing Fallback)
+                                      </p>
+                                    )}
+                                    {schedulesEnabled && needsLayout && !hasActiveSched && (
+                                      <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight max-w-[10rem]">
+                                        Assign a default layout, or create an active schedule for this device.
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{formatDate(d.created_at)}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 hover:bg-muted"
+                                onClick={() => openSettings(d)}
+                                title="Device Settings"
+                              >
+                                <Settings className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between p-4 border-t border-white/5">
+                      <span className="text-xs text-muted-foreground">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className="h-8 text-xs border-white/10"
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className="h-8 text-xs border-white/10"
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               );
             })()}
           </CardContent>

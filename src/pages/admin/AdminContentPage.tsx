@@ -56,6 +56,14 @@ export default function AdminContentPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "image" | "video">("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12; // Divisible by 2, 3, and 4 for clean grid alignment
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, typeFilter]);
+
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("company_id").eq("id", user.id).single()
@@ -87,6 +95,18 @@ export default function AdminContentPage() {
     const matchesType = typeFilter === "all" || c.type === typeFilter;
     return matchesSearch && matchesType;
   }), [content, searchQuery, typeFilter]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginatedContent = useMemo(() => {
+    return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    const nextTotalPages = Math.ceil(filtered.length / itemsPerPage);
+    if (currentPage > nextTotalPages && nextTotalPages > 0) {
+      setCurrentPage(nextTotalPages);
+    }
+  }, [filtered, currentPage, itemsPerPage]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -262,48 +282,77 @@ export default function AdminContentPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {filtered.map((item) => {
-              const isSelected = selected.has(item.id);
-              return (
-                <Card key={item.id} className={`overflow-hidden group cursor-pointer transition-all ${isSelected ? "ring-2 ring-primary" : ""}`} onClick={() => setPreviewItem(item)}>
-                  <div className="aspect-video bg-muted relative flex items-center justify-center">
-                    {item.file_url && item.type === "image" ? (
-                      <img src={item.file_url} alt={item.name} className="w-full h-full object-cover" />
-                    ) : item.file_url && item.type === "video" ? (
-                      <video src={item.file_url} className="w-full h-full object-cover" muted preload="metadata"
-                        onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
-                        onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
-                      />
-                    ) : (
-                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}
-                      className={`absolute top-2 left-2 h-6 w-6 rounded flex items-center justify-center transition-opacity ${isSelected ? "bg-primary text-primary-foreground opacity-100" : "bg-black/60 text-white opacity-0 group-hover:opacity-100"}`}
-                    >
-                      {isSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-                    </button>
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="destructive" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setDeleteItem(item); setDeleteOpen(true); }}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+          <>
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {paginatedContent.map((item) => {
+                const isSelected = selected.has(item.id);
+                return (
+                  <Card key={item.id} className={`overflow-hidden group cursor-pointer transition-all ${isSelected ? "ring-2 ring-primary" : ""}`} onClick={() => setPreviewItem(item)}>
+                    <div className="aspect-video bg-muted relative flex items-center justify-center">
+                      {item.file_url && item.type === "image" ? (
+                        <img src={item.file_url} alt={item.name} className="w-full h-full object-cover" />
+                      ) : item.file_url && item.type === "video" ? (
+                        <video src={item.file_url} className="w-full h-full object-cover" muted preload="metadata"
+                          onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
+                          onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
+                        />
+                      ) : (
+                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}
+                        className={`absolute top-2 left-2 h-6 w-6 rounded flex items-center justify-center transition-opacity ${isSelected ? "bg-primary text-primary-foreground opacity-100" : "bg-black/60 text-white opacity-0 group-hover:opacity-100"}`}
+                      >
+                        {isSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                      </button>
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="destructive" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setDeleteItem(item); setDeleteOpen(true); }}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="absolute bottom-2 left-2">
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-black/60 text-white uppercase">{item.type}</span>
+                      </div>
                     </div>
-                    <div className="absolute bottom-2 left-2">
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-black/60 text-white uppercase">{item.type}</span>
-                    </div>
-                  </div>
-                  <CardContent className="p-3">
-                    <p className="text-sm font-medium truncate">{item.name}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs text-muted-foreground">{formatSize(item.file_size)}</span>
-                      <span className="text-xs text-muted-foreground">{item.duration}s</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                    <CardContent className="p-3">
+                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-xs text-muted-foreground">{formatSize(item.file_size)}</span>
+                        <span className="text-xs text-muted-foreground">{item.duration}s</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-white/5 mt-6">
+                <span className="text-xs text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 text-xs border-white/10"
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 text-xs border-white/10"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
