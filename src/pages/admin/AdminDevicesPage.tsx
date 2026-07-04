@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Monitor, MapPin, Search, LogOut, Trash2, Settings } from "lucide-react";
+import { Plus, Monitor, MapPin, Search, LogOut, Trash2, Settings, Play, Pause } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,9 +19,10 @@ import { formatDistanceToNow } from "date-fns";
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
 const isOnline = (lastSeen: string | null) => !!lastSeen && Date.now() - new Date(lastSeen).getTime() < ONLINE_THRESHOLD_MS;
 
-type DeviceStatus = "unpaired" | "waiting_layout" | "online" | "offline";
-const getDeviceStatus = (d: { is_paired: boolean; layout_id: string | null; last_seen_at: string | null }, hasActiveSchedule: boolean): DeviceStatus => {
+type DeviceStatus = "unpaired" | "paused" | "waiting_layout" | "online" | "offline";
+const getDeviceStatus = (d: { is_paired: boolean; layout_id: string | null; last_seen_at: string | null; is_paused: number }, hasActiveSchedule: boolean): DeviceStatus => {
   if (!d.is_paired) return "unpaired";
+  if (d.is_paused === 1) return "paused";
   if (!d.layout_id && !hasActiveSchedule) return "waiting_layout";
   return isOnline(d.last_seen_at) ? "online" : "offline";
 };
@@ -36,6 +37,7 @@ interface Device {
   pairing_code: string | null;
   layout_id: string | null;
   schedules_enabled: number;
+  is_paused: number;
   last_seen_at: string | null;
   created_at: string;
 }
@@ -71,10 +73,7 @@ export default function AdminDevicesPage() {
   const [settingsLocation, setSettingsLocation] = useState("");
   const [settingsOrientation, setSettingsOrientation] = useState("");
   const [settingsSchedulesEnabled, setSettingsSchedulesEnabled] = useState(true);
-
-  // Temp states to trigger the backend functions
-  const [deleteDevice, setDeleteDevice] = useState<Device | null>(null);
-  const [logoutDevice, setLogoutDevice] = useState<Device | null>(null);
+  const [settingsPaused, setSettingsPaused] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -157,6 +156,7 @@ export default function AdminDevicesPage() {
     setSettingsLocation(device.location ?? "");
     setSettingsOrientation(device.orientation ?? "landscape");
     setSettingsSchedulesEnabled(device.schedules_enabled !== 0);
+    setSettingsPaused(device.is_paused === 1);
     setSettingsOpen(true);
   };
 
@@ -180,8 +180,25 @@ export default function AdminDevicesPage() {
     }
   };
 
+  const handleTogglePause = async () => {
+    if (!settingsDevice || !companyId) return;
+    const nextPausedState = !settingsPaused;
+    setSubmitting(true);
+    const { error } = await supabase.from("devices").update({
+      is_paused: nextPausedState ? 1 : 0
+    }).eq("id", settingsDevice.id);
+    setSubmitting(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success(nextPausedState ? "TV playback paused successfully!" : "TV playback resumed successfully!");
+      setSettingsPaused(nextPausedState);
+      fetchDevices(companyId);
+    }
+  };
+
   const handleDelete = async () => {
-    const target = deleteDevice || settingsDevice;
+    const target = settingsDevice;
     if (!target || !companyId) return;
     setSubmitting(true);
     const { data, error } = await supabase.functions.invoke("logout-tv-device", {
@@ -192,27 +209,8 @@ export default function AdminDevicesPage() {
       toast.error((data as any)?.error || error?.message || "Failed to remove device");
       return;
     }
-    toast.success("Device removed. The TV will return to pairing.");
+    toast.success("Device deleted successfully. The TV will return to pairing.");
     setSettingsOpen(false);
-    setDeleteDevice(null);
-    fetchDevices(companyId);
-  };
-
-  const handleLogoutDevice = async () => {
-    const target = logoutDevice || settingsDevice;
-    if (!target || !companyId) return;
-    setSubmitting(true);
-    const { data, error } = await supabase.functions.invoke("logout-tv-device", {
-      body: { device_id: target.id },
-    });
-    setSubmitting(false);
-    if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || "Failed to logout TV");
-      return;
-    }
-    toast.success(`${target.name} logged out. The TV will return to pairing.`);
-    setSettingsOpen(false);
-    setLogoutDevice(null);
     fetchDevices(companyId);
   };
 
@@ -340,6 +338,11 @@ export default function AdminDevicesPage() {
                           </TableCell>
                           <TableCell>
                             {status === "unpaired" && <Badge variant="secondary">Unpaired</Badge>}
+                            {status === "paused" && (
+                              <Badge variant="outline" className="text-amber-500 border-amber-500/20 bg-amber-500/5">
+                                Paused
+                              </Badge>
+                            )}
                             {status === "waiting_layout" && (
                               <Badge variant="outline" className="text-amber-500 border-amber-500/20 bg-amber-500/5">
                                 Assign Layout
@@ -428,7 +431,7 @@ export default function AdminDevicesPage() {
         </Card>
       </div>
 
-      {/* Device Settings Dialog (Consolidated) */}
+      {/* Device Settings Dialog */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent className="max-w-md bg-card border-border">
           <DialogHeader>
@@ -488,7 +491,7 @@ export default function AdminDevicesPage() {
                 />
               </div>
 
-              {/* Save & Troubleshooting Actions */}
+              {/* Action Buttons */}
               <div className="border-t border-border/40 pt-4 flex flex-col gap-2">
                 <Button
                   type="submit"
@@ -501,17 +504,23 @@ export default function AdminDevicesPage() {
                 {settingsDevice.is_paired && (
                   <Button
                     type="button"
-                    variant="outline"
-                    className="w-full text-xs h-9 text-amber-600 hover:text-amber-700 border-amber-600/20 hover:bg-amber-500/10"
-                    onClick={() => {
-                      if (confirm(`Are you sure you want to log out and unpair ${settingsDevice.name}?`)) {
-                        setLogoutDevice(settingsDevice);
-                        handleLogoutDevice();
-                      }
-                    }}
+                    variant={settingsPaused ? "default" : "outline"}
+                    className={cn(
+                      "w-full text-xs h-9 font-semibold",
+                      !settingsPaused && "text-amber-600 hover:text-amber-700 border-amber-600/20 hover:bg-amber-500/10"
+                    )}
+                    onClick={handleTogglePause}
                     disabled={submitting}
                   >
-                    <LogOut className="size-3.5 mr-1.5" /> Logout TV Device
+                    {settingsPaused ? (
+                      <>
+                        <Play className="size-3.5 mr-1.5" /> Resume Playback
+                      </>
+                    ) : (
+                      <>
+                        <Pause className="size-3.5 mr-1.5" /> Pause Playback
+                      </>
+                    )}
                   </Button>
                 )}
 
@@ -521,13 +530,12 @@ export default function AdminDevicesPage() {
                   className="w-full text-xs h-9 font-semibold"
                   onClick={() => {
                     if (confirm(`WARNING: Deleting device ${settingsDevice.name} will unpair it and clear all its schedules. This cannot be undone. Do you want to proceed?`)) {
-                      setDeleteDevice(settingsDevice);
                       handleDelete();
                     }
                   }}
                   disabled={submitting}
                 >
-                  <Trash2 className="size-3.5 mr-1.5" /> Delete Device Completely
+                  <Trash2 className="size-3.5 mr-1.5" /> Delete Screen / Logout
                 </Button>
               </div>
             </form>

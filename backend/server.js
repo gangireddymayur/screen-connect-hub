@@ -26,6 +26,12 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toIS
       console.log("[db] Added show_brand_header column to companies table.");
     }
 
+    const [pausedCols] = await db.query("SHOW COLUMNS FROM devices LIKE 'is_paused'");
+    if (pausedCols.length === 0) {
+      await db.query("ALTER TABLE devices ADD COLUMN is_paused TINYINT(1) DEFAULT 0");
+      console.log("[db] Added is_paused column to devices table.");
+    }
+
     const [tableExist] = await db.query("SHOW TABLES LIKE 'schedule_instances'");
     if (tableExist.length === 0) {
       console.log("[db] Initializing advanced schedules database tables...");

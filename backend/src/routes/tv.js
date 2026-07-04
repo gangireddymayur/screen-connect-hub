@@ -144,9 +144,9 @@ router.post('/poll-status', async (req, res) => {
 
     await db.query(
       'UPDATE devices SET last_seen_at = NOW(), status = :status WHERE id = :id',
-      { status: 'online', id: device.id }
+      { status: device.is_paused === 1 ? 'paused' : 'online', id: device.id }
     );
-    const layout = await getActiveLayout(device);
+    const layout = device.is_paused === 1 ? null : await getActiveLayout(device);
     res.json({
       device: {
         id: device.id,
@@ -155,7 +155,7 @@ router.post('/poll-status', async (req, res) => {
         layout_id: device.layout_id,
         orientation: device.orientation,
         resolution: device.resolution,
-        status: layout ? 'playing' : 'waiting_for_layout',
+        status: device.is_paused === 1 ? 'paused' : (layout ? 'playing' : 'waiting_for_layout'),
       },
       layout,
     });
