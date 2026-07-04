@@ -33,12 +33,10 @@ router.get('/:deviceId', async (req, res) => {
       { status: 'online', id: device.id }
     );
 
+    // Force Indian Standard Time (IST) timezone
     const now = new Date();
-    const y = now.getFullYear();
-    const mo = String(now.getMonth() + 1).padStart(2, "0");
-    const da = String(now.getDate()).padStart(2, "0");
-    const today = `${y}-${mo}-${da}`;
-    const time = now.toTimeString().slice(0, 8);
+    const today = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // "YYYY-MM-DD"
+    const time = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false }); // "HH:MM:SS"
 
     const schedulesEnabled = device.schedules_enabled ?? 1;
     let scheduledLayouts = [];
@@ -70,6 +68,8 @@ router.get('/:deviceId', async (req, res) => {
       source = 'device';
     }
 
+    const isPaused = device.is_paused === 1;
+
     res.json({
       device: {
         id: device.id,
@@ -78,9 +78,10 @@ router.get('/:deviceId', async (req, res) => {
         orientation: device.orientation,
         resolution: device.resolution,
         company_id: device.company_id,
+        is_paused: isPaused,
       },
       source,
-      layout,
+      layout: isPaused ? null : layout,
     });
   } catch (err) {
     console.error('PLAYER_ERROR:', err.stack || err);

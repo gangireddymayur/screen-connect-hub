@@ -17,6 +17,8 @@ interface PlayerLayout {
 export default function PlayerPage() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const [layout, setLayout] = useState<PlayerLayout | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [deviceName, setDeviceName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -30,8 +32,10 @@ export default function PlayerPage() {
         const json = await res.json().catch(() => null);
         if (!res.ok) throw new Error(json?.error || `${res.status} ${res.statusText}`);
         if (!cancelled) {
+          setIsPaused(!!json?.device?.is_paused);
+          setDeviceName(json?.device?.name || "");
           setLayout(json.layout ?? null);
-          setError(json.layout ? "" : "No layout assigned");
+          setError(json.layout ? "" : (json?.device?.is_paused ? "" : "No layout assigned"));
           setLoading(false);
         }
       } catch (err: any) {
@@ -52,6 +56,24 @@ export default function PlayerPage() {
 
   if (loading) {
     return <div className="min-h-screen bg-black text-white flex items-center justify-center text-sm">Loading screen...</div>;
+  }
+
+  if (isPaused) {
+    return (
+      <div className="min-h-screen bg-radial from-[#2C1E14] to-[#0F0A07] text-white flex items-center justify-center p-6 select-none" style={{ background: "radial-gradient(950px at center, #2C1E14 0%, #0F0A07 100%)" }}>
+        <div className="bg-white/5 border border-white/10 rounded-3xl px-14 py-11 max-w-lg w-full text-center space-y-5 backdrop-blur-md">
+          <div className="flex items-center justify-center gap-2.5 text-[#FFB020] font-semibold text-lg">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#FFB020]" />
+            <span>TV paused</span>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">{deviceName || "SignageHub TV"}</h1>
+          <p className="text-xl text-white/80 font-medium">Playback Paused</p>
+          <p className="text-sm text-white/60 leading-relaxed px-2">
+            This screen has been paused from the dashboard. Once resumed, it will instantly display layouts or schedule playlists again.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (error || !layout) {
