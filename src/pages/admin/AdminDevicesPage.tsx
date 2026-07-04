@@ -96,7 +96,7 @@ export default function AdminDevicesPage() {
   };
 
   const fetchActiveSchedules = async (cId: string) => {
-    const { data } = await supabase.from("schedules").select("device_id").eq("company_id", cId).eq("is_active", true);
+    const { data } = await supabase.from("schedules").select("device_id").eq("company_id", cId);
     setActiveScheduleDeviceIds(new Set((data ?? []).map((s: any) => s.device_id).filter(Boolean)));
   };
 

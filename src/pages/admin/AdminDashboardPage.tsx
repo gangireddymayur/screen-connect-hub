@@ -57,7 +57,7 @@ export default function AdminDashboardPage() {
         supabase.from("devices").select("id, name, location, is_paired, last_seen_at").eq("company_id", companyId),
         supabase.from("content").select("id, file_size").eq("company_id", companyId),
         supabase.from("layouts").select("id", { count: "exact", head: true }).eq("company_id", companyId),
-        supabase.from("schedules").select("id, is_active").eq("company_id", companyId),
+        supabase.from("schedules").select("id").eq("company_id", companyId),
       ]);
 
       setCompanyName(companyRes.data?.name ?? "");
@@ -68,7 +68,7 @@ export default function AdminDashboardPage() {
       setStorageBytes((contentRes.data ?? []).reduce((sum, c: any) => sum + (c.file_size || 0), 0));
       setLayoutCount(layoutsRes.count ?? 0);
       setScheduleCount(schedulesRes.data?.length ?? 0);
-      setActiveSchedules((schedulesRes.data ?? []).filter((s: any) => s.is_active).length);
+      setActiveSchedules(schedulesRes.data?.length ?? 0);
       setLoading(false);
     };
 
