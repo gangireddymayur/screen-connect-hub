@@ -1,0 +1,3 @@
+# Ignore content in this directory, except this file
+*
+!.gitkeep
