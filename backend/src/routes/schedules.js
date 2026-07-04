@@ -94,7 +94,7 @@ router.get('/', async (req, res) => {
     const where = deviceId ? "WHERE s.device_id = ? AND s.company_id = ?" : "WHERE s.company_id = ?";
     const params = deviceId ? [deviceId, req.user.company_id] : [req.user.company_id];
     const [rows] = await db.query(
-      `SELECT s.id, s.device_id, s.layout_id, l.name AS layout_name,
+      `SELECT s.id, s.device_id, s.layout_id, s.company_id, l.name AS layout_name,
               TIME_FORMAT(s.start_time,'%H:%i') AS start_time,
               TIME_FORMAT(s.end_time,'%H:%i')   AS end_time,
               DATE_FORMAT(s.start_date,'%Y-%m-%d') AS start_date,
