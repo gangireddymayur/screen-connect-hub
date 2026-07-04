@@ -76,7 +76,15 @@ async function ensureLoaded(table: string) {
   inflight[table] = (async () => {
     try {
       const rows = await api("GET", `/${t}`);
-      cache[table] = Array.isArray(rows) ? rows : [];
+      if (Array.isArray(rows)) {
+        cache[table] = rows;
+      } else if (rows && Array.isArray((rows as any)[table])) {
+        cache[table] = (rows as any)[table];
+      } else if (rows && Array.isArray((rows as any).schedules)) {
+        cache[table] = (rows as any).schedules;
+      } else {
+        cache[table] = [];
+      }
       loaded[table] = true;
     } catch (e) {
       console.warn(`[api] failed to load /${t}:`, (e as any).message);
