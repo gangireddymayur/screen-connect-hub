@@ -1,4 +1,13 @@
-require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
+
+if (fs.existsSync(path.resolve(process.cwd(), '.env'))) {
+  require('dotenv').config();
+} else if (fs.existsSync(path.resolve(__dirname, '../.env'))) {
+  require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+} else {
+  require('dotenv').config();
+}
 const express = require('express');
 const cors = require('cors');
 
@@ -132,7 +141,7 @@ try {
 }
 
 // Serve frontend static files from root dist/
-const path = require('path');
+// path is declared at top
 const distDir = path.join(__dirname, '../dist');
 app.use(express.static(distDir, { maxAge: '1h', index: false }));
 app.get(/^(?!\/api|\/uploads).*/, (_req, res) => {

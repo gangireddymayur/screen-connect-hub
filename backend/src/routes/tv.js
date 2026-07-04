@@ -144,7 +144,7 @@ router.post('/poll-status', async (req, res) => {
 
     await db.query(
       'UPDATE devices SET last_seen_at = NOW(), status = :status WHERE id = :id',
-      { status: device.is_paused === 1 ? 'paused' : 'online', id: device.id }
+      { status: 'online', id: device.id }
     );
     const layout = device.is_paused === 1 ? null : await getActiveLayout(device);
     res.json({
