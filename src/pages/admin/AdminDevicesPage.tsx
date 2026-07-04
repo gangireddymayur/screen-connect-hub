@@ -21,9 +21,9 @@ const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
 const isOnline = (lastSeen: string | null) => !!lastSeen && Date.now() - new Date(lastSeen).getTime() < ONLINE_THRESHOLD_MS;
 
 type DeviceStatus = "unpaired" | "paused" | "waiting_layout" | "online" | "offline";
-const getDeviceStatus = (d: { is_paired: boolean; layout_id: string | null; last_seen_at: string | null; is_paused: number }, hasActiveSchedule: boolean): DeviceStatus => {
+const getDeviceStatus = (d: { is_paired: boolean; layout_id: string | null; last_seen_at: string | null; is_paused: number | boolean }, hasActiveSchedule: boolean): DeviceStatus => {
   if (!d.is_paired) return "unpaired";
-  if (d.is_paused === 1) return "paused";
+  if (!!d.is_paused) return "paused";
   if (!d.layout_id && !hasActiveSchedule) return "waiting_layout";
   return isOnline(d.last_seen_at) ? "online" : "offline";
 };
@@ -164,7 +164,7 @@ export default function AdminDevicesPage() {
     setSettingsLocation(device.location ?? "");
     setSettingsOrientation(device.orientation ?? "landscape");
     setSettingsSchedulesEnabled(device.schedules_enabled !== 0);
-    setSettingsPaused(device.is_paused === 1);
+    setSettingsPaused(!!device.is_paused);
     setSettingsOpen(true);
   };
 

@@ -39,8 +39,8 @@ function normalizeRow(table, row) {
   }
   if (table === 'devices') {
     out.is_paired = !!out.is_paired;
-    out.schedules_enabled = out.schedules_enabled !== 0 ? 1 : 0;
-    out.is_paused = out.is_paused !== 0 ? 1 : 0;
+    out.schedules_enabled = !!out.schedules_enabled ? 1 : 0;
+    out.is_paused = !!out.is_paused ? 1 : 0;
   }
   if (table === 'schedules') {
     out.is_active = !!out.is_active;

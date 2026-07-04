@@ -68,7 +68,7 @@ router.get('/:deviceId', async (req, res) => {
       source = 'device';
     }
 
-    const isPaused = device.is_paused === 1;
+    const isPaused = !!device.is_paused;
 
     res.json({
       device: {
