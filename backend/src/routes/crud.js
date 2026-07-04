@@ -18,6 +18,7 @@ function normalizePayload(table, input = {}) {
   if (table === 'devices') {
     if (typeof payload.is_paired === 'boolean') payload.is_paired = payload.is_paired ? 1 : 0;
     if (typeof payload.schedules_enabled === 'boolean') payload.schedules_enabled = payload.schedules_enabled ? 1 : 0;
+    if (typeof payload.is_paused === 'boolean') payload.is_paused = payload.is_paused ? 1 : 0;
   }
 
   if (table === 'companies' && typeof payload.max_screens === 'string') {
@@ -39,6 +40,7 @@ function normalizeRow(table, row) {
   if (table === 'devices') {
     out.is_paired = !!out.is_paired;
     out.schedules_enabled = out.schedules_enabled !== 0 ? 1 : 0;
+    out.is_paused = out.is_paused !== 0 ? 1 : 0;
   }
   if (table === 'schedules') {
     out.is_active = !!out.is_active;
@@ -69,68 +71,93 @@ function crud(table, { tenantScoped = true, superAdminOnly = false } = {}) {
   };
 
   router.get('/', async (req, res) => {
-    if (!requireAllowed(req, res)) return;
-    const { clause, params } = scope(req, 'WHERE ');
-    const db = require('../lib/db');
-    const [rows] = await db.query(`SELECT * FROM \`${table}\`${clause} ORDER BY created_at DESC`, params);
-    res.json(rows.map((r) => normalizeRow(table, r)));
+    try {
+      if (!requireAllowed(req, res)) return;
+      const { clause, params } = scope(req, 'WHERE ');
+      const db = require('../lib/db');
+      const [rows] = await db.query(`SELECT * FROM \`${table}\`${clause} ORDER BY created_at DESC`, params);
+      res.json(rows.map((r) => normalizeRow(table, r)));
+    } catch (err) {
+      console.error(`CRUD_GET_${table.toUpperCase()}_ERROR:`, err);
+      res.status(500).json({ error: err.message || 'Failed to fetch items' });
+    }
   });
 
   router.get('/:id', async (req, res) => {
-    if (!requireAllowed(req, res)) return;
-    const db = require('../lib/db');
-    const scoped = scope(req, 'AND ');
-    const [rows] = await db.query(`SELECT * FROM \`${table}\` WHERE id = :id${scoped.clause} LIMIT 1`, { id: req.params.id, ...scoped.params });
-    if (!rows[0]) return res.status(404).json({ error: 'not found' });
-    res.json(normalizeRow(table, rows[0]));
+    try {
+      if (!requireAllowed(req, res)) return;
+      const db = require('../lib/db');
+      const scoped = scope(req, 'AND ');
+      const [rows] = await db.query(`SELECT * FROM \`${table}\` WHERE id = :id${scoped.clause} LIMIT 1`, { id: req.params.id, ...scoped.params });
+      if (!rows[0]) return res.status(404).json({ error: 'not found' });
+      res.json(normalizeRow(table, rows[0]));
+    } catch (err) {
+      console.error(`CRUD_GET_BY_ID_${table.toUpperCase()}_ERROR:`, err);
+      res.status(500).json({ error: err.message || 'Failed to fetch item' });
+    }
   });
 
   router.post('/', async (req, res) => {
-    if (!requireAllowed(req, res)) return;
-    const db = require('../lib/db');
-    const id = req.body.id || uuid();
-    const payload = normalizePayload(table, { ...req.body, id });
+    try {
+      if (!requireAllowed(req, res)) return;
+      const db = require('../lib/db');
+      const id = req.body.id || uuid();
+      const payload = normalizePayload(table, { ...req.body, id });
 
-    // Let MariaDB manage timestamp columns with DEFAULT / ON UPDATE.
-    // Browser ISO strings can break MariaDB DATETIME inserts/updates.
-    delete payload.created_at;
-    delete payload.updated_at;
+      // Let MariaDB manage timestamp columns with DEFAULT / ON UPDATE.
+      // Browser ISO strings can break MariaDB DATETIME inserts/updates.
+      delete payload.created_at;
+      delete payload.updated_at;
 
-    if (tenantScoped && req.user.role !== 'super_admin') payload.company_id = req.user.company_id;
-    const cols = Object.keys(payload);
-    const placeholders = cols.map((c) => `:${c}`).join(',');
-    await db.query(
-      `INSERT INTO \`${table}\` (${cols.map((c) => `\`${c}\``).join(',')}) VALUES (${placeholders})`,
-      payload
-    );
-    const [rows] = await db.query(`SELECT * FROM \`${table}\` WHERE id = :id LIMIT 1`, { id });
-    res.json(normalizeRow(table, rows[0] || { id }));
+      if (tenantScoped && req.user.role !== 'super_admin') payload.company_id = req.user.company_id;
+      const cols = Object.keys(payload);
+      const placeholders = cols.map((c) => `:${c}`).join(',');
+      await db.query(
+        `INSERT INTO \`${table}\` (${cols.map((c) => `\`${c}\``).join(',')}) VALUES (${placeholders})`,
+        payload
+      );
+      const [rows] = await db.query(`SELECT * FROM \`${table}\` WHERE id = :id LIMIT 1`, { id });
+      res.json(normalizeRow(table, rows[0] || { id }));
+    } catch (err) {
+      console.error(`CRUD_CREATE_${table.toUpperCase()}_ERROR:`, err);
+      res.status(500).json({ error: err.message || 'Failed to create item' });
+    }
   });
 
   router.patch('/:id', async (req, res) => {
-    if (!requireAllowed(req, res)) return;
-    const db = require('../lib/db');
-    const payload = normalizePayload(table, req.body);
+    try {
+      if (!requireAllowed(req, res)) return;
+      const db = require('../lib/db');
+      const payload = normalizePayload(table, req.body);
 
-    // Do not allow frontend payloads to overwrite DB-managed timestamps.
-    delete payload.created_at;
-    delete payload.updated_at;
+      // Do not allow frontend payloads to overwrite DB-managed timestamps.
+      delete payload.created_at;
+      delete payload.updated_at;
 
-    const cols = Object.keys(payload);
-    if (!cols.length) return res.json({ ok: true });
-    const sets = cols.map((c) => `\`${c}\` = :${c}`).join(',');
-    const scoped = scope(req, 'AND ');
-    const [result] = await db.query(`UPDATE \`${table}\` SET ${sets} WHERE id = :id${scoped.clause}`, { ...payload, id: req.params.id, ...scoped.params });
-    if (result.affectedRows === 0) return res.status(404).json({ error: 'not found or not allowed' });
-    res.json({ ok: true, affectedRows: result.affectedRows, changedRows: result.changedRows });
+      const cols = Object.keys(payload);
+      if (!cols.length) return res.json({ ok: true });
+      const sets = cols.map((c) => `\`${c}\` = :${c}`).join(',');
+      const scoped = scope(req, 'AND ');
+      const [result] = await db.query(`UPDATE \`${table}\` SET ${sets} WHERE id = :id${scoped.clause}`, { ...payload, id: req.params.id, ...scoped.params });
+      if (result.affectedRows === 0) return res.status(404).json({ error: 'not found or not allowed' });
+      res.json({ ok: true, affectedRows: result.affectedRows, changedRows: result.changedRows });
+    } catch (err) {
+      console.error(`CRUD_UPDATE_${table.toUpperCase()}_ERROR:`, err);
+      res.status(500).json({ error: err.message || 'Failed to update item' });
+    }
   });
 
   router.delete('/:id', async (req, res) => {
-    if (!requireAllowed(req, res)) return;
-    const db = require('../lib/db');
-    const scoped = scope(req, 'AND ');
-    await db.query(`DELETE FROM \`${table}\` WHERE id = :id${scoped.clause}`, { id: req.params.id, ...scoped.params });
-    res.json({ ok: true });
+    try {
+      if (!requireAllowed(req, res)) return;
+      const db = require('../lib/db');
+      const scoped = scope(req, 'AND ');
+      await db.query(`DELETE FROM \`${table}\` WHERE id = :id${scoped.clause}`, { id: req.params.id, ...scoped.params });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error(`CRUD_DELETE_${table.toUpperCase()}_ERROR:`, err);
+      res.status(500).json({ error: err.message || 'Failed to delete item' });
+    }
   });
 
   return router;

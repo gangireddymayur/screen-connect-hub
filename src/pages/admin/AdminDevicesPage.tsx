@@ -399,7 +399,7 @@ export default function AdminDevicesPage() {
                                       Schedules Disabled (Playing Fallback)
                                     </p>
                                   )}
-                                  {schedulesEnabled && needsLayout && (
+                                  {schedulesEnabled && needsLayout && !hasActiveSched && (
                                     <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight max-w-[10rem]">
                                       Assign a default layout, or create an active schedule for this device.
                                     </p>
