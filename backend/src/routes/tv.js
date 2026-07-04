@@ -181,4 +181,8 @@ router.post('/logout', async (req, res) => {
   }
 });
 
+router.get('/debug-version', (req, res) => {
+  res.json({ version: "v1.0.2-with-pause-fix-July-4", time: new Date().toISOString() });
+});
+
 module.exports = router;
