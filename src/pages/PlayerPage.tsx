@@ -6,6 +6,18 @@ import { ArrowLeft } from "lucide-react";
 
 const API = (import.meta as any).env?.VITE_API_URL || "/api";
 
+function getEmbedUrl(url: string | null): string {
+  if (!url) return "";
+  
+  // Match standard, mobile, shorts, and sharing YouTube URLs to extract the 11-char Video ID
+  const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=|shorts\/)|youtu\.be\/)([^"&?\/\s]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    return `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&rel=0`;
+  }
+  
+  return url;
+}
+
 interface PlayerLayout {
   id: string;
   name: string;
@@ -159,7 +171,7 @@ export default function PlayerPage() {
       {activeUrl && (
         <div className="fixed inset-0 z-[100] bg-black flex flex-col">
           <iframe
-            src={activeUrl}
+            src={getEmbedUrl(activeUrl)}
             className="flex-1 w-full h-full border-none"
             allow="autoplay; encrypted-media; fullscreen"
           />
