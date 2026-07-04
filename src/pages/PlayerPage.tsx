@@ -14,13 +14,37 @@ interface PlayerLayout {
   layout_data: ScreenZone | null;
 }
 
+interface PlayerCompany {
+  name: string;
+  logo_url: string | null;
+  show_brand_header: boolean;
+}
+
 export default function PlayerPage() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const [layout, setLayout] = useState<PlayerLayout | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [deviceName, setDeviceName] = useState("");
+  const [company, setCompany] = useState<PlayerCompany | null>(null);
+  const [timeString, setTimeString] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setTimeString(
+        now.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
+      );
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!deviceId) return;
@@ -34,6 +58,7 @@ export default function PlayerPage() {
         if (!cancelled) {
           setIsPaused(!!json?.device?.is_paused);
           setDeviceName(json?.device?.name || "");
+          setCompany(json?.company ?? null);
           setLayout(json.layout ?? null);
           setError(json.layout ? "" : (json?.device?.is_paused ? "" : "No layout assigned"));
           setLoading(false);
@@ -90,8 +115,24 @@ export default function PlayerPage() {
   const rootZone = layout.layout_data || createZone("root");
 
   return (
-    <div className="fixed inset-0 overflow-hidden" style={{ backgroundColor: layout.background_color || "#000000" }}>
-      <div className="absolute inset-0 overflow-hidden">
+    <div className="fixed inset-0 overflow-hidden flex flex-col" style={{ backgroundColor: layout.background_color || "#000000" }}>
+      {/* Brand Header */}
+      {company?.show_brand_header && (
+        <header className="h-16 bg-zinc-950/90 text-white flex items-center justify-between px-6 border-b border-zinc-800 shrink-0 z-50 select-none">
+          <div className="flex items-center gap-3">
+            {company.logo_url && (
+              <img
+                src={company.logo_url.startsWith("http") ? company.logo_url : company.logo_url}
+                alt="Logo"
+                className="h-8 w-8 object-contain rounded"
+              />
+            )}
+            <span className="font-semibold text-base tracking-wide">{company.name}</span>
+          </div>
+          <div className="text-base font-semibold font-mono tabular-nums opacity-90">{timeString}</div>
+        </header>
+      )}
+      <div className="relative flex-1 overflow-hidden">
         <ZoneRenderer
           zone={rootZone}
           onUpdate={() => {}}

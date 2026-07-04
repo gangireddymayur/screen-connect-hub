@@ -70,6 +70,12 @@ router.get('/:deviceId', async (req, res) => {
 
     const isPaused = !!device.is_paused;
 
+    const [companies] = await db.query(
+      'SELECT name, logo_url, show_brand_header FROM companies WHERE id = :id LIMIT 1',
+      { id: device.company_id }
+    );
+    const company = companies[0] || null;
+
     res.json({
       device: {
         id: device.id,
@@ -80,6 +86,11 @@ router.get('/:deviceId', async (req, res) => {
         company_id: device.company_id,
         is_paused: isPaused,
       },
+      company: company ? {
+        name: company.name,
+        logo_url: company.logo_url,
+        show_brand_header: !!company.show_brand_header,
+      } : null,
       source,
       layout: isPaused ? null : layout,
     });
