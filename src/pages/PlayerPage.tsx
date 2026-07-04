@@ -48,7 +48,13 @@ export default function PlayerPage() {
     const handleOpenUrl = (e: Event) => {
       const url = (e as CustomEvent).detail?.url;
       if (url) {
-        setActiveUrl(url);
+        const params = new URLSearchParams(window.location.search);
+        const isAndroidTv = params.get("platform") === "android-tv";
+        if (isAndroidTv) {
+          window.location.href = url;
+        } else {
+          setActiveUrl(url);
+        }
       }
     };
     window.addEventListener("open-player-url", handleOpenUrl);
