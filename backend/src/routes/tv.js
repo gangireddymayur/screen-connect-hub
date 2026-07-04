@@ -50,11 +50,9 @@ async function uniqueCode() {
 
 async function getActiveLayout(device) {
   const now = new Date();
-  const y = now.getFullYear();
-  const mo = String(now.getMonth() + 1).padStart(2, "0");
-  const da = String(now.getDate()).padStart(2, "0");
-  const today = `${y}-${mo}-${da}`;
-  const time = now.toTimeString().slice(0, 8);
+  // Force Indian Standard Time (IST) timezone
+  const today = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // "YYYY-MM-DD"
+  const time = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false }); // "HH:MM:SS"
 
   const schedulesEnabled = device.schedules_enabled ?? 1;
   let scheduledLayouts = [];
