@@ -18,7 +18,7 @@ async function download(req, res) {
     );
 
     const [content] = await db.query(
-      "SELECT id, name, url, type, size_bytes, duration_seconds FROM content WHERE company_id = ?",
+      "SELECT id, name, file_url AS url, type, file_size AS size_bytes, duration AS duration_seconds FROM content WHERE company_id = ?",
       [companyId]
     );
 
@@ -111,7 +111,7 @@ async function restore(req, res) {
     for (const c of content) {
       const newContentId = uuid();
       await conn.query(
-        "INSERT INTO content (id, name, url, type, size_bytes, duration_seconds, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO content (id, name, file_url, type, file_size, duration, company_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [newContentId, c.name, c.url, c.type, c.size_bytes || 0, c.duration_seconds || 10, companyId]
       );
       contentIdMap[c.id] = newContentId;
