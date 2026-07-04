@@ -98,8 +98,8 @@ export default function AdminDevicesPage() {
   };
 
   const fetchActiveSchedules = async (cId: string) => {
-    console.log("[fetchActiveSchedules] querying schedules for company:", cId);
-    const res = await supabase.from("schedules").select("device_id").eq("company_id", cId);
+    console.log("[fetchActiveSchedules] querying schedules...");
+    const res = await supabase.from("schedules").select("device_id");
     console.log("[fetchActiveSchedules] raw schedules payload received:", res);
     const list = res.data ?? [];
     const deviceIds = new Set(list.map((s: any) => s.device_id).filter(Boolean));

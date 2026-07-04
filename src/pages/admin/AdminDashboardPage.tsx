@@ -57,7 +57,7 @@ export default function AdminDashboardPage() {
         supabase.from("devices").select("id, name, location, is_paired, last_seen_at").eq("company_id", companyId),
         supabase.from("content").select("id, file_size").eq("company_id", companyId),
         supabase.from("layouts").select("id", { count: "exact", head: true }).eq("company_id", companyId),
-        supabase.from("schedules").select("id").eq("company_id", companyId),
+        supabase.from("schedules").select("id"),
       ]);
 
       setCompanyName(companyRes.data?.name ?? "");
