@@ -77,8 +77,10 @@ export default function AdminDevicesPage() {
 
   useEffect(() => {
     if (!user) return;
+    console.log("[useEffect] active user object:", user);
     supabase.from("profiles").select("company_id").eq("id", user.id).single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        console.log("[useEffect] profiles single response:", { data, error });
         if (data?.company_id) {
           setCompanyId(data.company_id);
           fetchDevices(data.company_id);
@@ -96,8 +98,13 @@ export default function AdminDevicesPage() {
   };
 
   const fetchActiveSchedules = async (cId: string) => {
-    const { data } = await supabase.from("schedules").select("device_id").eq("company_id", cId);
-    setActiveScheduleDeviceIds(new Set((data ?? []).map((s: any) => s.device_id).filter(Boolean)));
+    console.log("[fetchActiveSchedules] querying schedules for company:", cId);
+    const res = await supabase.from("schedules").select("device_id").eq("company_id", cId);
+    console.log("[fetchActiveSchedules] raw schedules payload received:", res);
+    const list = res.data ?? [];
+    const deviceIds = new Set(list.map((s: any) => s.device_id).filter(Boolean));
+    console.log("[fetchActiveSchedules] active schedule device ids Set:", Array.from(deviceIds));
+    setActiveScheduleDeviceIds(deviceIds);
   };
 
   const fetchDevices = async (cId: string) => {
