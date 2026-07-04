@@ -769,10 +769,10 @@ export default function AdminSchedulePage() {
                     <span
                       className={cn(
                         "size-1.5 rounded-full shrink-0 ml-1.5",
-                        d.status === "online"
-                          ? "bg-emerald-400 animate-pulse"
-                          : d.status === "paused"
-                            ? "bg-amber-400"
+                        !!d.is_paused
+                          ? "bg-amber-400"
+                          : d.status === "online"
+                            ? "bg-emerald-400 animate-pulse"
                             : "bg-muted-foreground/30"
                       )}
                     />
