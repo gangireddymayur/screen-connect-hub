@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ZoneRenderer } from "@/components/screen-editor/ZoneRenderer";
 import { createZone, type ScreenZone } from "@/lib/screen-editor-types";
+import { ArrowLeft } from "lucide-react";
 
 const API = (import.meta as any).env?.VITE_API_URL || "/api";
 
@@ -27,8 +28,20 @@ export default function PlayerPage() {
   const [deviceName, setDeviceName] = useState("");
   const [company, setCompany] = useState<PlayerCompany | null>(null);
   const [timeString, setTimeString] = useState("");
+  const [activeUrl, setActiveUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const handleOpenUrl = (e: Event) => {
+      const url = (e as CustomEvent).detail?.url;
+      if (url) {
+        setActiveUrl(url);
+      }
+    };
+    window.addEventListener("open-player-url", handleOpenUrl);
+    return () => window.removeEventListener("open-player-url", handleOpenUrl);
+  }, []);
 
   useEffect(() => {
     const updateTime = () => {
@@ -141,6 +154,26 @@ export default function PlayerPage() {
           previewMode
         />
       </div>
+
+      {/* Full Screen Web Link Overlay with Back Button */}
+      {activeUrl && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+          <iframe
+            src={activeUrl}
+            className="flex-1 w-full h-full border-none"
+            allow="autoplay; encrypted-media; fullscreen"
+          />
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[110] select-none">
+            <button
+              onClick={() => setActiveUrl(null)}
+              className="px-6 py-3 bg-zinc-950/95 hover:bg-zinc-900 text-white rounded-full border border-zinc-800 shadow-2xl flex items-center gap-2 text-sm font-semibold tracking-wide backdrop-blur transition-all active:scale-95 hover:scale-105"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Player</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

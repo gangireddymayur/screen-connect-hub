@@ -87,7 +87,8 @@ function LinksWidget({ widget, interactive }: { widget: ContentWidget; interacti
         const handleClick = (e: React.MouseEvent) => {
           if (!interactive || !link.url) return;
           e.stopPropagation();
-          window.open(link.url, '_blank', 'noopener,noreferrer');
+          const event = new CustomEvent("open-player-url", { detail: { url: link.url } });
+          window.dispatchEvent(event);
         };
         return (
           <button
