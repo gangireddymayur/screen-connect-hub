@@ -83,7 +83,7 @@ export default function PlayerPage() {
 
     const load = async () => {
       try {
-        const res = await fetch(`${API}/player/${deviceId}`, { cache: "no-store" });
+        const res = await fetch(`${API}/player/${deviceId}?t=${Date.now()}`, { cache: "no-store" });
         const json = await res.json().catch(() => null);
         if (!res.ok) throw new Error(json?.error || `${res.status} ${res.statusText}`);
         if (!cancelled) {
