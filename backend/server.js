@@ -42,6 +42,12 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toIS
       console.log("[db] Added show_brand_header column to companies table.");
     }
 
+    const [placementCols] = await db.query("SHOW COLUMNS FROM companies LIKE 'brand_header_placement'");
+    if (placementCols.length === 0) {
+      await db.query("ALTER TABLE companies ADD COLUMN brand_header_placement VARCHAR(10) DEFAULT 'top'");
+      console.log("[db] Added brand_header_placement column to companies table.");
+    }
+
     const [pausedCols] = await db.query("SHOW COLUMNS FROM devices LIKE 'is_paused'");
     if (pausedCols.length === 0) {
       await db.query("ALTER TABLE devices ADD COLUMN is_paused TINYINT(1) DEFAULT 0");

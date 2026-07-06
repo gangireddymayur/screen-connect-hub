@@ -8,7 +8,7 @@ async function download(req, res) {
 
   try {
     const [company] = await db.query(
-      "SELECT name, timezone, logo_url, show_brand_header FROM companies WHERE id = ? LIMIT 1",
+      "SELECT name, timezone, logo_url, show_brand_header, brand_header_placement FROM companies WHERE id = ? LIMIT 1",
       [companyId]
     );
 
@@ -84,8 +84,8 @@ async function restore(req, res) {
     // 1. Restore Company Settings
     if (company) {
       await conn.query(
-        `UPDATE companies SET name = ?, timezone = ?, logo_url = ?, show_brand_header = ? WHERE id = ?`,
-        [company.name, company.timezone || "UTC", company.logo_url, company.show_brand_header || 0, companyId]
+        `UPDATE companies SET name = ?, timezone = ?, logo_url = ?, show_brand_header = ?, brand_header_placement = ? WHERE id = ?`,
+        [company.name, company.timezone || "UTC", company.logo_url, company.show_brand_header || 0, company.brand_header_placement || "top", companyId]
       );
     }
 

@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Building2, Upload, X, LogOut, Edit2, Save, Loader2, RefreshCw } from "lucide-react";
+import { Building2, Upload, X, LogOut, Edit2, Save, Loader2, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +33,8 @@ export default function AdminSettingsPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [showBrandHeader, setShowBrandHeader] = useState(0);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [brandHeaderPlacement, setBrandHeaderPlacement] = useState<string>("top");
+  const [showPlacementSettings, setShowPlacementSettings] = useState(false);
 
   const [savingSettings, setSavingSettings] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -48,6 +50,7 @@ export default function AdminSettingsPage() {
     companyName: string;
     logoUrl: string | null;
     showBrandHeader: number;
+    brandHeaderPlacement: string;
   } | null>(null);
 
   useEffect(() => {
@@ -60,17 +63,19 @@ export default function AdminSettingsPage() {
           setEmail(profile.email ?? "");
           if (profile.company_id) {
             setCompanyId(profile.company_id);
-            const { data: company } = await supabase.from("companies").select("name, logo_url, show_brand_header").eq("id", profile.company_id).single();
+            const { data: company } = await supabase.from("companies").select("name, logo_url, show_brand_header, brand_header_placement").eq("id", profile.company_id).single();
             if (company) {
               setCompanyName(company.name ?? "");
               setLogoUrl((company as any).logo_url ?? null);
               setShowBrandHeader((company as any).show_brand_header ?? 0);
+              setBrandHeaderPlacement((company as any).brand_header_placement ?? "top");
 
               setOriginalData({
                 fullName: profile.full_name ?? "",
                 companyName: company.name ?? "",
                 logoUrl: (company as any).logo_url ?? null,
                 showBrandHeader: (company as any).show_brand_header ?? 0,
+                brandHeaderPlacement: (company as any).brand_header_placement ?? "top",
               });
             }
           }
@@ -90,9 +95,10 @@ export default function AdminSettingsPage() {
       fullName !== originalData.fullName ||
       companyName !== originalData.companyName ||
       logoUrl !== originalData.logoUrl ||
-      showBrandHeader !== originalData.showBrandHeader
+      showBrandHeader !== originalData.showBrandHeader ||
+      brandHeaderPlacement !== originalData.brandHeaderPlacement
     );
-  }, [fullName, companyName, logoUrl, showBrandHeader, originalData]);
+  }, [fullName, companyName, logoUrl, showBrandHeader, brandHeaderPlacement, originalData]);
 
   const handleSaveSettings = async () => {
     if (!user || !companyId) return;
@@ -109,13 +115,15 @@ export default function AdminSettingsPage() {
       if (
         companyName !== originalData?.companyName ||
         logoUrl !== originalData?.logoUrl ||
-        showBrandHeader !== originalData?.showBrandHeader
+        showBrandHeader !== originalData?.showBrandHeader ||
+        brandHeaderPlacement !== originalData?.brandHeaderPlacement
       ) {
         const { error: companyError } = await supabase.from("companies").update({
           name: companyName,
           timezone: "Asia/Kolkata",
           logo_url: logoUrl,
           show_brand_header: showBrandHeader,
+          brand_header_placement: brandHeaderPlacement,
         } as any).eq("id", companyId);
         if (companyError) throw companyError;
       }
@@ -127,6 +135,7 @@ export default function AdminSettingsPage() {
         companyName,
         logoUrl,
         showBrandHeader,
+        brandHeaderPlacement,
       });
     } catch (err: any) {
       toast.error(err.message || "Failed to save settings");
@@ -142,6 +151,8 @@ export default function AdminSettingsPage() {
       setCompanyName(originalData.companyName);
       setLogoUrl(originalData.logoUrl);
       setShowBrandHeader(originalData.showBrandHeader);
+      setBrandHeaderPlacement(originalData.brandHeaderPlacement);
+      setShowPlacementSettings(false);
     }
   };
 
@@ -386,16 +397,60 @@ export default function AdminSettingsPage() {
           </div>
 
           {/* Brand Header Toggle */}
-          <div className="flex items-center justify-between border-t border-white/5 pt-4">
-            <div>
-              <Label className="text-sm font-semibold text-foreground">Show Brand Header on Devices</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">Display logo, organization name, and local clock on signage screens.</p>
+          <div className="space-y-3 border-t border-white/5 pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm font-semibold text-foreground">Show Brand Header on Devices</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Display logo, organization name, and local clock on signage screens.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {showBrandHeader === 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={!isEditing}
+                    onClick={() => setShowPlacementSettings(!showPlacementSettings)}
+                    className={cn(
+                      "h-8 w-8 rounded-full border border-white/5 transition-colors",
+                      showPlacementSettings ? "bg-white/10 text-primary" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                  </Button>
+                )}
+                <Switch
+                  disabled={!isEditing}
+                  checked={showBrandHeader === 1}
+                  onCheckedChange={(checked) => {
+                    setShowBrandHeader(checked ? 1 : 0);
+                    if (!checked) setShowPlacementSettings(false);
+                  }}
+                />
+              </div>
             </div>
-            <Switch
-              disabled={!isEditing}
-              checked={showBrandHeader === 1}
-              onCheckedChange={(checked) => setShowBrandHeader(checked ? 1 : 0)}
-            />
+
+            {showBrandHeader === 1 && showPlacementSettings && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-foreground">Header Placement</Label>
+                  <select
+                    disabled={!isEditing}
+                    value={brandHeaderPlacement}
+                    onChange={(e) => setBrandHeaderPlacement(e.target.value)}
+                    className="w-full bg-background border border-white/10 rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                  >
+                    <option value="top">Top (Default)</option>
+                    <option value="bottom">Bottom</option>
+                    <option value="left">Left Sidebar</option>
+                    <option value="right">Right Sidebar</option>
+                  </select>
+                  <p className="text-[10px] text-muted-foreground leading-normal">
+                    Adjusts the position of the branding bar on all active playback displays.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </GlassCard>
 
