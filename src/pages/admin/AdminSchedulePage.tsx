@@ -316,6 +316,7 @@ export default function AdminSchedulePage() {
 
   // Set default selected device on load
   React.useEffect(() => {
+    console.log("AdminSchedulePage loaded");
     if (selectedDeviceId === null && devices.length > 0) {
       setSelectedDeviceId(devices[0].id);
     }
