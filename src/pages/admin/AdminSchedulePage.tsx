@@ -1379,6 +1379,14 @@ export default function AdminSchedulePage() {
                                 onMouseDown={(e) => handleBlockMouseDown(e, inst, "resize-bottom")}
                               />
                             )}
+
+                            {/* Drag handle center zone */}
+                            {!isPastDay && (
+                              <div
+                                className="absolute inset-x-2 inset-y-2 cursor-grab active:cursor-grabbing"
+                                onMouseDown={(e) => handleBlockMouseDown(e, inst, "move")}
+                              />
+                            )}
                           </div>
                         );
                       })}
