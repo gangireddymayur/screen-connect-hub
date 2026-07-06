@@ -745,4 +745,142 @@ router.post('/copy-day', async (req, res) => {
   }
 });
 
+// POST /api/schedules/copy-device
+router.post('/copy-device', async (req, res) => {
+  const { target_device_id, source_device_id, overwrite = false } = req.body || {};
+  if (!target_device_id || !source_device_id) {
+    return res.status(400).json({ error: "target_device_id and source_device_id required" });
+  }
+
+  try {
+    // 1. Scope / Security checks: Ensure both devices belong to the user's company
+    const [targetDevices] = await db.query(
+      'SELECT id, company_id FROM devices WHERE id = ? AND company_id = ? LIMIT 1',
+      [target_device_id, req.user.company_id]
+    );
+    const [sourceDevices] = await db.query(
+      'SELECT id, company_id FROM devices WHERE id = ? AND company_id = ? LIMIT 1',
+      [source_device_id, req.user.company_id]
+    );
+
+    if (targetDevices.length === 0 || sourceDevices.length === 0) {
+      return res.status(404).json({ error: "One or both devices not found or not allowed" });
+    }
+
+    // Force Indian timezone
+    const now = new Date();
+    const today = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // "YYYY-MM-DD"
+
+    // 2. Overwrite check: If overwrite is false, check if target has future instances
+    if (!overwrite) {
+      const [existing] = await db.query(
+        `SELECT id FROM schedule_instances 
+         WHERE device_id = ? AND date >= ? 
+         LIMIT 1`,
+        [target_device_id, today]
+      );
+      if (existing.length > 0) {
+        return res.json({ ok: false, has_existing: true });
+      }
+    }
+
+    // 3. Perform copy in a database transaction
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // Delete only future schedule instances of target device
+      await conn.query(
+        `DELETE FROM schedule_instances WHERE device_id = ? AND date >= ?`,
+        [target_device_id, today]
+      );
+
+      // Clean up target device parent schedules that no longer have any instances (completely in future)
+      await conn.query(
+        `DELETE FROM schedules 
+         WHERE device_id = ? 
+           AND id NOT IN (SELECT DISTINCT schedule_id FROM schedule_instances WHERE device_id = ?)`,
+        [target_device_id, target_device_id]
+      );
+
+      // Fetch all schedules and recurrences of source device
+      const [srcSchedules] = await conn.query(
+        `SELECT s.id, s.layout_id, s.start_time, s.end_time, DATE_FORMAT(s.start_date,'%Y-%m-%d') as start_date, 
+                r.repeat_mode, r.repeat_interval, r.days_count
+         FROM schedules s
+         LEFT JOIN schedule_recurrences r ON r.schedule_id = s.id
+         WHERE s.device_id = ? AND s.company_id = ?`,
+        [source_device_id, req.user.company_id]
+      );
+
+      let createdSchedules = 0;
+      for (const row of srcSchedules) {
+        // Generate instances for this source schedule
+        const allInstances = generateInstances(
+          row.id,
+          target_device_id,
+          row.layout_id,
+          row.start_time,
+          row.end_time,
+          row.start_date,
+          row.repeat_mode || 'none',
+          row.repeat_interval || 1,
+          row.days_count || 1
+        );
+
+        // Keep only future instances
+        const futureInstances = allInstances.filter(inst => inst.date >= today);
+
+        if (futureInstances.length > 0) {
+          // Create parent schedule for target
+          const [scheduleRes] = await conn.query(
+            `INSERT INTO schedules (device_id, layout_id, company_id, start_time, end_time, start_date)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [target_device_id, row.layout_id, req.user.company_id, row.start_time, row.end_time, row.start_date]
+          );
+          const newScheduleId = scheduleRes.insertId;
+
+          // Insert recurrence
+          await conn.query(
+            `INSERT INTO schedule_recurrences (schedule_id, repeat_mode, repeat_interval, days_count)
+             VALUES (?, ?, ?, ?)`,
+            [newScheduleId, row.repeat_mode || 'none', row.repeat_interval || 1, row.days_count || 1]
+          );
+
+          // Update instances with new schedule ID and convert to nested array for bulk insert
+          const instanceValues = futureInstances.map(inst => [
+            newScheduleId,
+            target_device_id,
+            inst.layout_id,
+            inst.date,
+            inst.start_time,
+            inst.end_time,
+            inst.start_datetime,
+            inst.end_datetime
+          ]);
+
+          await conn.query(
+            `INSERT INTO schedule_instances (schedule_id, device_id, layout_id, date, start_time, end_time, start_datetime, end_datetime)
+             VALUES ?`,
+            [instanceValues]
+          );
+
+          createdSchedules++;
+        }
+      }
+
+      await conn.commit();
+      res.json({ ok: true, created: createdSchedules });
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    console.error('COPY_DEVICE_SCHEDULES_ERROR:', err.stack || err);
+    res.status(500).json({ error: err.message || 'Copy schedules failed' });
+  }
+});
+
 module.exports = router;
