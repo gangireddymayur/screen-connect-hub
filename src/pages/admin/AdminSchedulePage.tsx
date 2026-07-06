@@ -322,6 +322,52 @@ export default function AdminSchedulePage() {
     }
   }, [devices, selectedDeviceId]);
 
+  // Load schedules and instances for the selected device
+  const schedulesQ = useQuery({
+    queryKey: ["schedules", selectedDeviceId],
+    queryFn: () => SchedulesApi.list(selectedDeviceId!),
+    enabled: selectedDeviceId !== null,
+  });
+
+  const schedules: ApiSchedule[] = schedulesQ.data?.schedules ?? [];
+  const instances: ApiScheduleInstance[] = schedulesQ.data?.instances ?? [];
+
+  // Track layout colors
+  const layoutColor = React.useMemo(() => {
+    const m = new Map<string, string>();
+    layouts.forEach((t, i) => m.set(t.id, PALETTE[i % PALETTE.length]));
+    return m;
+  }, [layouts]);
+
+  // Calculations for dates of the current week view
+  const weekDates = React.useMemo(() => {
+    const base = getMonday(parseISODate(currentWeekDate));
+    return Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date(base.getTime());
+      d.setDate(base.getDate() + i);
+      return d;
+    });
+  }, [currentWeekDate]);
+
+  // Live clock for time indicator
+  const [nowTime, setNowTime] = React.useState(new Date());
+  React.useEffect(() => {
+    const timer = setInterval(() => setNowTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Update column width on resize
+  React.useEffect(() => {
+    if (!weekGridRef.current) return;
+    const updateWidth = () => {
+      const colEl = weekGridRef.current?.querySelector(".day-column");
+      if (colEl) setColWidth(colEl.getBoundingClientRect().width);
+    };
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, [currentWeekDate, selectedDeviceId]);
+
   // Keyboard event listener for column selection (Shift + Arrows, Escape, Delete)
   React.useEffect(() => {
     if (selectedDates.length === 0 || !selectionAnchorDate) return;
@@ -381,52 +427,6 @@ export default function AdminSchedulePage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedDates, selectionAnchorDate, weekDates]);
-
-  // Load schedules and instances for the selected device
-  const schedulesQ = useQuery({
-    queryKey: ["schedules", selectedDeviceId],
-    queryFn: () => SchedulesApi.list(selectedDeviceId!),
-    enabled: selectedDeviceId !== null,
-  });
-
-  const schedules: ApiSchedule[] = schedulesQ.data?.schedules ?? [];
-  const instances: ApiScheduleInstance[] = schedulesQ.data?.instances ?? [];
-
-  // Track layout colors
-  const layoutColor = React.useMemo(() => {
-    const m = new Map<string, string>();
-    layouts.forEach((t, i) => m.set(t.id, PALETTE[i % PALETTE.length]));
-    return m;
-  }, [layouts]);
-
-  // Calculations for dates of the current week view
-  const weekDates = React.useMemo(() => {
-    const base = getMonday(parseISODate(currentWeekDate));
-    return Array.from({ length: 7 }).map((_, i) => {
-      const d = new Date(base.getTime());
-      d.setDate(base.getDate() + i);
-      return d;
-    });
-  }, [currentWeekDate]);
-
-  // Live clock for time indicator
-  const [nowTime, setNowTime] = React.useState(new Date());
-  React.useEffect(() => {
-    const timer = setInterval(() => setNowTime(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Update column width on resize
-  React.useEffect(() => {
-    if (!weekGridRef.current) return;
-    const updateWidth = () => {
-      const colEl = weekGridRef.current?.querySelector(".day-column");
-      if (colEl) setColWidth(colEl.getBoundingClientRect().width);
-    };
-    updateWidth();
-    window.addEventListener("resize", updateWidth);
-    return () => window.removeEventListener("resize", updateWidth);
-  }, [currentWeekDate, selectedDeviceId]);
 
   // Mutations
   const createMut = useMutation({
