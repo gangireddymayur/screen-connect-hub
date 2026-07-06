@@ -2,6 +2,11 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { v4: uuid } = require('uuid');
 const db = require('../lib/db');
+const path = require('path');
+const fs = require('fs');
+const archiver = require('archiver');
+const sqlite3 = require('sqlite3');
+const { SQLITE_SCHEMA } = require('../lib/sqlite-adapter');
 
 const requireSuperAdmin = (req, res) => {
   if (req.user?.role !== 'super_admin') {
@@ -211,6 +216,115 @@ async function logoutTvDevice(req, res) {
   res.json({ success: true, reset: true });
 }
 
+async function generateOfflinePackage(req, res) {
+  if (!requireSuperAdmin(req, res)) return;
+  const { company_name, email, password } = req.body || {};
+  if (!company_name || !email || !password) {
+    return res.status(400).json({ error: 'company_name, email, and password are required' });
+  }
+
+  const tempDbName = `db_temp_${uuid()}.sqlite3`;
+  const tempDbPath = path.join(__dirname, '../../', tempDbName);
+  const dbTemp = new sqlite3.Database(tempDbPath);
+
+  try {
+    await new Promise((resolve, reject) => {
+      dbTemp.serialize(async () => {
+        try {
+          for (const query of SQLITE_SCHEMA) {
+            await new Promise((resVal, rejVal) => dbTemp.run(query, (err) => err ? rejVal(err) : resVal()));
+          }
+          
+          const companyId = uuid();
+          const userId = uuid();
+          const passwordHash = await bcrypt.hash(password, 10);
+
+          await new Promise((resVal, rejVal) => dbTemp.run(
+            'INSERT INTO companies (id, name, contact_email, plan, max_screens, status) VALUES (?, ?, ?, ?, ?, ?)',
+            [companyId, company_name, email, 'pro', 25, 'active'],
+            (err) => err ? rejVal(err) : resVal()
+          ));
+
+          await new Promise((resVal, rejVal) => dbTemp.run(
+            'INSERT INTO users (id, email, password_hash, full_name, company_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
+            [userId, email, passwordHash, `${company_name} Admin`, companyId],
+            (err) => err ? rejVal(err) : resVal()
+          ));
+
+          await new Promise((resVal, rejVal) => dbTemp.run(
+            'INSERT INTO user_roles (id, user_id, role) VALUES (?, ?, ?)',
+            [uuid(), userId, 'admin'],
+            (err) => err ? rejVal(err) : resVal()
+          ));
+
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    await new Promise((resolve, reject) => {
+      dbTemp.close((err) => err ? reject(err) : resolve());
+    });
+
+    res.attachment('signage-hub-offline.zip');
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', (err) => {
+      console.error('ZIP Error:', err);
+    });
+
+    archive.pipe(res);
+
+    const batContent = `@echo off
+echo ============================================================
+echo           SignageHub Local Offline Web Server
+echo ============================================================
+echo.
+echo Installing local dependencies...
+call npm install --omit=dev
+echo.
+echo Starting backend server on port 8080...
+set IS_OFFLINE=true
+set PORT=8080
+call node server.js
+pause
+`;
+    archive.append(batContent, { name: 'run-server.bat' });
+    archive.file(tempDbPath, { name: 'db.sqlite3' });
+
+    const backendDir = path.join(__dirname, '../../');
+    archive.file(path.join(backendDir, 'server.js'), { name: 'server.js' });
+    archive.file(path.join(backendDir, 'package.json'), { name: 'package.json' });
+    archive.file(path.join(backendDir, 'schema.sql'), { name: 'schema.sql' });
+    archive.directory(path.join(backendDir, 'src'), 'src');
+
+    const frontendDistDir = path.join(__dirname, '../../../dist');
+    if (fs.existsSync(frontendDistDir)) {
+      archive.directory(frontendDistDir, 'public');
+    }
+
+    archive.finalize().then(() => {
+      setTimeout(() => {
+        fs.unlink(tempDbPath, (err) => {
+          if (err) console.error('Error deleting temp sqlite file:', err);
+        });
+      }, 5000);
+    });
+
+  } catch (err) {
+    console.error('GENERATE_OFFLINE_ERROR:', err);
+    try {
+      dbTemp.close();
+    } catch (_) {}
+    try {
+      fs.unlinkSync(tempDbPath);
+    } catch (_) {}
+    res.status(500).json({ error: err.message || 'Failed to generate offline package' });
+  }
+}
+
 const handlers = {
   'create-company-admin': createCompanyAdmin,
   'delete-company': deleteCompany,
@@ -221,6 +335,7 @@ const handlers = {
   'list-auth-users': listAuthUsers,
   'claim-tv-code': claimTvCode,
   'logout-tv-device': logoutTvDevice,
+  'generate-offline': generateOfflinePackage,
 };
 
 router.post('/:name', async (req, res) => {

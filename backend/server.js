@@ -155,7 +155,9 @@ try {
 
 // Serve frontend static files from root dist/
 // path is declared at top
-const distDir = path.join(__dirname, '../dist');
+const distDir = process.env.IS_OFFLINE === 'true'
+  ? path.join(__dirname, 'public')
+  : path.join(__dirname, '../dist');
 app.use(express.static(distDir, { maxAge: '1h', index: false }));
 app.get(/^(?!\/api|\/uploads).*/, (_req, res) => {
   res.sendFile(path.join(distDir, 'index.html'));
