@@ -883,4 +883,36 @@ router.post('/copy-device', async (req, res) => {
   }
 });
 
+// POST /api/schedules/clear-day
+router.post('/clear-day', async (req, res) => {
+  try {
+    const { device_id, date } = req.body || {};
+    if (!device_id || !date) {
+      return res.status(400).json({ error: "device_id and date required" });
+    }
+
+    const [dev] = await db.query("SELECT id FROM devices WHERE id = ? AND company_id = ? LIMIT 1", [device_id, req.user.company_id]);
+    if (dev.length === 0) return res.status(403).json({ error: "Access denied" });
+
+    // Find all schedule instances for this device on this date
+    const [instances] = await db.query(
+      `SELECT DISTINCT r.schedule_id 
+       FROM schedule_instances r
+       JOIN schedules s ON s.id = r.schedule_id
+       WHERE s.device_id = ? AND r.date = ?`,
+      [device_id, date]
+    );
+
+    for (const inst of instances) {
+      await db.query(
+        "DELETE FROM schedule_instances WHERE schedule_id = ? AND date = ?", 
+        [inst.schedule_id, date]
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
