@@ -4,7 +4,7 @@ const { v4: uuid } = require('uuid');
 const db = require('../lib/db');
 const path = require('path');
 const fs = require('fs');
-const archiver = require('archiver');
+
 
 const requireSuperAdmin = (req, res) => {
   if (req.user?.role !== 'super_admin') {
@@ -264,6 +264,8 @@ async function generateOfflinePackage(req, res) {
 
     res.attachment('signage-hub-local-setup.zip');
 
+    const archiverModule = await import('archiver');
+    const archiver = archiverModule.default || archiverModule;
     const archive = archiver('zip', { zlib: { level: 9 } });
     archive.on('error', (err) => {
       console.error('ZIP Error:', err);
