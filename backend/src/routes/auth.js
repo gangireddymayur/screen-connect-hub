@@ -84,7 +84,11 @@ router.post('/login', async (req, res) => {
     });
   } catch (err) {
     console.error('LOGIN_ERROR:', err.stack || err);
-    res.status(500).json({ error: 'Login failed. Check backend database connection and logs.' });
+    res.status(500).json({ 
+      error: 'Login failed. Check backend database connection and logs.',
+      details: err.message,
+      stack: err.stack
+    });
   }
 });
 
