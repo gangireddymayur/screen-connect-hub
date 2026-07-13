@@ -206,6 +206,40 @@ class SqlitePool {
       for (const statement of SQLITE_SCHEMA) {
         this.db.run(statement);
       }
+
+      // Seed default user and company if database is empty
+      const userCheck = this.db.prepare("SELECT id FROM users LIMIT 1");
+      let hasUsers = false;
+      if (userCheck.step()) {
+        hasUsers = true;
+      }
+      userCheck.free();
+
+      if (!hasUsers) {
+        console.log("[sqlite-init] Database is empty. Seeding default company and admin user...");
+        const companyId = "00000000-0000-0000-0000-000000000000";
+        const userId = "1";
+        
+        // Insert company
+        this.db.run(
+          "INSERT INTO companies (id, name, contact_email, plan, max_screens, status) VALUES (?, ?, ?, ?, ?, ?)",
+          [companyId, "SignageHub Local Company", "admin@signagehub.local", "pro", 20, "active"]
+        );
+        
+        // Insert user (admin@signagehub.local / admin123)
+        // bcrypt hash: $2b$10$alt8uoHymwrSMN4fPJFw0uUFGeKLIpAm9L3B8PCOn1Li8YXj2Dzeu
+        this.db.run(
+          "INSERT INTO users (id, email, password_hash, full_name, company_id, is_active) VALUES (?, ?, ?, ?, ?, 1)",
+          [userId, "admin@signagehub.local", "$2b$10$alt8uoHymwrSMN4fPJFw0uUFGeKLIpAm9L3B8PCOn1Li8YXj2Dzeu", "Local Admin", companyId]
+        );
+
+        // Insert role
+        this.db.run(
+          "INSERT INTO user_roles (id, user_id, role) VALUES (?, ?, ?)",
+          ["role-1", userId, "super_admin"]
+        );
+      }
+
       this.saveToDisk();
     } catch (e) {
       console.error("[sqlite-init] Schema seeding error:", e.message);
