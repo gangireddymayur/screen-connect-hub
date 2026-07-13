@@ -1,3 +1,4 @@
+// Trigger build - SQLite WASM and archiver dependencies integrated
 const path = require('path');
 const fs = require('fs');
 
