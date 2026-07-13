@@ -143,7 +143,8 @@ app.get('/api/debug-logs', (req, res) => {
       cwd: process.cwd(),
       rootFiles,
       iisnodeFiles,
-      logs
+      logs,
+      routeLoadError: global.routeLoadError || null
     });
   } catch (e) {
     res.status(500).json({ error: e.message, stack: e.stack });
@@ -179,6 +180,10 @@ try {
   app.use('/api/restore', authRequired, backupRoutes.restore);
 } catch (err) {
   console.error('ROUTE_LOAD_ERROR:', err.stack || err);
+  global.routeLoadError = {
+    message: err.message,
+    stack: err.stack ? err.stack.split('\n') : []
+  };
   app.use('/api', (_req, res) =>
     res.status(500).json({ error: 'Routes failed to load. Check logs/node.log.' })
   );
