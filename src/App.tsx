@@ -1,4 +1,4 @@
-// Force rebuild - dependencies update
+// Force rebuild - archiver dynamically imported in backend functions
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
