@@ -169,7 +169,102 @@ app.use((err, _req, res, _next) => {
 });
 
 const port = process.env.PORT || process.env.HTTP_PLATFORM_PORT || 8080;
-app.listen(port, () => console.log('RUNNING ON PORT:', port));
+app.listen(port, async () => {
+  console.log('RUNNING ON PORT:', port);
+
+  const isOffline = process.env.IS_OFFLINE === 'true';
+  if (isOffline) {
+    const fs = require('fs');
+    const path = require('path');
+    const backupCandidates = [
+      path.join(__dirname, 'backup.json'),
+      path.join(process.cwd(), 'backup.json')
+    ];
+    const backupPath = backupCandidates.find(f => fs.existsSync(f));
+    if (backupPath) {
+      console.log(`[backup] Found auto-restore file at: ${backupPath}. Restoring database...`);
+      try {
+        const fileContent = fs.readFileSync(backupPath, 'utf8').trim();
+        let payload;
+        
+        if (fileContent.startsWith('{') || fileContent.startsWith('[')) {
+          payload = JSON.parse(fileContent);
+        } else {
+          console.log('[backup] File is encrypted. Decrypting...');
+          const { decryptBackup } = require('./src/lib/backup-helper');
+          payload = decryptBackup(fileContent);
+        }
+        
+        const db = require('./src/lib/db');
+        const { restoreBackupPayload } = require('./src/lib/backup-helper');
+        await restoreBackupPayload(payload, db);
+        console.log('[backup] Database auto-restore completed successfully!');
+        
+        fs.unlink(backupPath, (e) => {
+          if (e) console.error('[backup] Error deleting backup.json:', e.message);
+          else console.log('[backup] Deleted backup.json after successful restore.');
+        });
+      } catch (err) {
+        console.error('[backup] Auto-restore database failed:', err.stack || err.message);
+      }
+    }
+
+    try {
+      const { exec } = require('child_process');
+      const url = `http://localhost:${port}`;
+      if (process.platform === 'win32') {
+        exec(`start ${url}`);
+      } else if (process.platform === 'darwin') {
+        exec(`open ${url}`);
+      } else {
+        exec(`xdg-open ${url}`);
+      }
+      console.log(`[local] Automatically opening default browser to ${url}`);
+    } catch (e) {
+      // ignore
+    }
+
+    try {
+      const dgram = require('dgram');
+      const os = require('os');
+      const udpServer = dgram.createSocket('udp4');
+      let discoveryLogged = false;
+      
+      udpServer.bind(() => {
+        udpServer.setBroadcast(true);
+        setInterval(() => {
+          try {
+            const interfaces = os.networkInterfaces();
+            const ips = [];
+            for (const name of Object.keys(interfaces)) {
+              for (const net of interfaces[name]) {
+                if (net.family === 'IPv4' && !net.internal) {
+                  ips.push(net.address);
+                }
+              }
+            }
+            if (!discoveryLogged && ips.length > 0) {
+              console.log(`[discovery] Broadcasting local server presence on: ${ips.map(ip => `http://${ip}:${port}`).join(', ')}`);
+              discoveryLogged = true;
+            }
+            for (const ip of ips) {
+              const payload = JSON.stringify({
+                server: `http://${ip}:${port}`,
+                type: 'signagehub-server'
+              });
+              const buffer = Buffer.from(payload, 'utf8');
+              udpServer.send(buffer, 0, buffer.length, 9999, '255.255.255.255');
+            }
+          } catch (e) {
+            // ignore
+          }
+        }, 4000);
+      });
+    } catch (err) {
+      console.error('[discovery] failed to init UDP broadcast:', err.message);
+    }
+  }
+});
 
 
 

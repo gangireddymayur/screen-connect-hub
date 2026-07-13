@@ -1,5 +1,3 @@
-const sqlite3 = require('sqlite3').verbose();
-
 const SQLITE_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS companies (
     id TEXT PRIMARY KEY,
@@ -117,9 +115,21 @@ const SQLITE_SCHEMA = [
   )`
 ];
 
-function translateQuery(sql) {
+function translateSqlQuery(sql) {
   let s = sql;
   
+  // Handle NOW() -> datetime('now', 'localtime')
+  s = s.replace(/NOW\(\)/g, "datetime('now', 'localtime')");
+
+  // Handle DATE_SUB(datetime('now', 'localtime'), INTERVAL X MINUTE) -> datetime('now', 'localtime', '-X minutes')
+  s = s.replace(/DATE_SUB\(\s*datetime\('now',\s*'localtime'\)\s*,\s*INTERVAL\s+(\d+)\s+MINUTE\)/gi, "datetime('now', 'localtime', '-$1 minutes')");
+  s = s.replace(/DATE_SUB\(\s*NOW\(\)\s*,\s*INTERVAL\s+(\d+)\s+MINUTE\)/gi, "datetime('now', 'localtime', '-$1 minutes')");
+  s = s.replace(/DATE_SUB\(\s*NOW\(\)\s*,\s*INTERVAL\s+(\d+)\s+DAY\)/gi, "datetime('now', 'localtime', '-$1 days')");
+
+  // Translate MySQL DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+  s = s.replace(/DATE_SUB\(\s*datetime\('now',\s*'localtime'\)\s*,\s*INTERVAL\s+15\s+MINUTE\)/gi, "datetime('now', 'localtime', '-15 minutes')");
+  s = s.replace(/DATE_SUB\(\s*NOW\(\)\s*,\s*INTERVAL\s+15\s+MINUTE\)/gi, "datetime('now', 'localtime', '-15 minutes')");
+
   // 1. TIME_FORMAT(col, '%H:%i') -> strftime('%H:%M', col)
   s = s.replace(/TIME_FORMAT\(([^,]+)\s*,\s*'%H:%i'\)/gi, "strftime('%H:%M', $1)");
   
@@ -148,119 +158,196 @@ function translateQuery(sql) {
   return s;
 }
 
-let sharedDb = null;
-function getSharedDb(dbPath) {
-  if (!sharedDb) {
-    sharedDb = new sqlite3.Database(dbPath);
-    sharedDb.serialize(() => {
-      sharedDb.run("PRAGMA journal_mode=WAL");
-      sharedDb.run("PRAGMA foreign_keys=ON");
-
-      // Auto-create missing schemas on load
-      for (const statement of SQLITE_SCHEMA) {
-        sharedDb.run(statement, (err) => {
-          if (err) {
-            console.error("[db] Error initializing SQLite table:", err);
-          }
-        });
-      }
-    });
-  }
-  return sharedDb;
-}
-
-class SqliteConnection {
-  constructor(db) {
-    this.db = db;
-  }
-
-  query(sql, params = []) {
-    return new Promise((resolve, reject) => {
-      let querySql = translateQuery(sql);
-      let queryParams = params;
-
-      // Handle MySQL SHOW COLUMNS FROM ... LIKE ...
-      const showColumnsMatch = querySql.match(/SHOW COLUMNS FROM (\w+) LIKE '(\w+)'/i);
-      if (showColumnsMatch) {
-        const table = showColumnsMatch[1];
-        const column = showColumnsMatch[2];
-        this.db.all(`PRAGMA table_info(${table})`, [], (err, infoRows) => {
-          if (err) return reject(err);
-          const colInfo = infoRows.filter(r => r.name === column).map(r => ({ Field: r.name, Type: r.type }));
-          resolve([colInfo, []]);
-        });
-        return;
-      }
-
-      // Handle MySQL-style bulk insert mapping: VALUES ?
-      if (querySql.trim().toUpperCase().includes('VALUES ?') || querySql.trim().toUpperCase().includes('VALUES(?)')) {
-        if (queryParams && queryParams.length === 1 && Array.isArray(queryParams[0])) {
-          const rows = queryParams[0];
-          if (rows.length > 0 && Array.isArray(rows[0])) {
-            const placeholders = rows.map(row => `(${row.map(() => '?').join(', ')})`).join(', ');
-            querySql = querySql.replace(/VALUES\s*\?\s*|VALUES\s*\(\s*\?\s*\)/i, `VALUES ${placeholders}`);
-            queryParams = rows.flat();
-          }
-        }
-      }
-
-      // Handle named parameters
-      if (queryParams && typeof queryParams === 'object' && !Array.isArray(queryParams)) {
-        const namedParams = {};
-        for (const [key, val] of Object.entries(queryParams)) {
-          namedParams[`:${key}`] = val;
-        }
-        queryParams = namedParams;
-      }
-
-      const isSelect = querySql.trim().toUpperCase().startsWith('SELECT') ||
-                       querySql.trim().toUpperCase().startsWith('PRAGMA') ||
-                       querySql.trim().toUpperCase().startsWith('SHOW');
-
-      if (isSelect) {
-        this.db.all(querySql, queryParams, (err, rows) => {
-          if (err) return reject(err);
-          resolve([rows, []]);
-        });
-      } else {
-        this.db.run(querySql, queryParams, function(err) {
-          if (err) return reject(err);
-          resolve([{ insertId: this.lastID, affectedRows: this.changes }, []]);
-        });
-      }
-    });
-  }
-
-  beginTransaction() {
-    return this.query('BEGIN TRANSACTION');
-  }
-
-  commit() {
-    return this.query('COMMIT');
-  }
-
-  rollback() {
-    return this.query('ROLLBACK');
-  }
-
-  release() {
-    // Shared connection is not closed on release
-  }
-}
-
 class SqlitePool {
   constructor(dbPath) {
     this.dbPath = dbPath;
+    this.SQL = null;
+    this.db = null;
+    this.isSqlite = true;
+    this.initPromise = this.init();
   }
 
-  async query(sql, params) {
-    const conn = await this.getConnection();
-    return await conn.query(sql, params);
+  async init() {
+    const initSqlJs = require("sql.js");
+    const fs = require("node:fs");
+    const path = require("node:path");
+    
+    // Load WebAssembly binary candidate paths
+    const wasmCandidates = [
+      path.join(__dirname, "node_modules", "sql.js", "dist", "sql-wasm.wasm"),
+      path.join(__dirname, "..", "node_modules", "sql.js", "dist", "sql-wasm.wasm"),
+      path.join(process.cwd(), "node_modules", "sql.js", "dist", "sql-wasm.wasm"),
+    ];
+    const wasmPath = wasmCandidates.find((candidate) => fs.existsSync(candidate));
+    if (!wasmPath) {
+      throw new Error(`sql.js WebAssembly asset was not found. Checked: ${wasmCandidates.join(", ")}`);
+    }
+    const wasmBinary = fs.readFileSync(wasmPath);
+
+    this.SQL = await initSqlJs({ wasmBinary: wasmBinary });
+    
+    if (fs.existsSync(this.dbPath)) {
+      const filebuffer = fs.readFileSync(this.dbPath);
+      this.db = new this.SQL.Database(filebuffer);
+    } else {
+      const dbDir = path.dirname(this.dbPath);
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+      }
+      this.db = new this.SQL.Database();
+      this.saveToDisk();
+    }
+    
+    // Enable PRAGMAs & Setup schema
+    try {
+      this.db.run("PRAGMA foreign_keys=ON;");
+      for (const statement of SQLITE_SCHEMA) {
+        this.db.run(statement);
+      }
+      this.saveToDisk();
+    } catch (e) {
+      console.error("[sqlite-init] Schema seeding error:", e.message);
+    }
+  }
+
+  saveToDisk() {
+    const fs = require("node:fs");
+    const data = this.db.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(this.dbPath, buffer);
+  }
+
+  async execute(sql, params = []) {
+    return this.query(sql, params);
+  }
+
+  async query(sql, params = []) {
+    await this.initPromise;
+    const originalSql = sql.trim();
+    
+    // Intercept "SHOW COLUMNS FROM <table> LIKE '<col>'"
+    const showColumnsMatch = originalSql.match(/SHOW COLUMNS FROM\s+(\w+)\s+LIKE\s+'(\w+)'/i);
+    if (showColumnsMatch) {
+      const table = showColumnsMatch[1];
+      const col = showColumnsMatch[2];
+      try {
+        const stmt = this.db.prepare(`PRAGMA table_info(${table})`);
+        const rows = [];
+        while (stmt.step()) {
+          const rowVal = stmt.get();
+          rows.push({ name: rowVal[1] });
+        }
+        stmt.free();
+        const found = rows.some(r => r.name.toLowerCase() === col.toLowerCase());
+        return [found ? [{ Field: col }] : [], null];
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    // Intercept "SHOW TABLES LIKE '<name>'"
+    const showTablesMatch = originalSql.match(/SHOW TABLES LIKE\s+'(\w+)'/i);
+    if (showTablesMatch) {
+      const table = showTablesMatch[1];
+      try {
+        const stmt = this.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`);
+        stmt.bind([table]);
+        const rows = [];
+        while (stmt.step()) {
+          const rowVal = stmt.get();
+          rows.push({ name: rowVal[0] });
+        }
+        stmt.free();
+        return [rows.length > 0 ? [{ [`Tables_in_${table}`]: table }] : [], null];
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    const translatedSql = translateSqlQuery(sql);
+
+    // Handle MySQL-style bulk INSERT: "INSERT INTO t (...) VALUES ?" with params=[[[row1],[row2],...]]
+    if (
+      Array.isArray(params) &&
+      params.length === 1 &&
+      Array.isArray(params[0]) &&
+      params[0].length > 0 &&
+      Array.isArray(params[0][0])
+    ) {
+      const rows = params[0];
+      const colCount = rows[0].length;
+      const placeholder = `(${Array(colCount).fill("?").join(",")})`;
+      const singleRowSql = translatedSql.replace(/VALUES\s+\?/i, `VALUES ${placeholder}`);
+      
+      let lastId = 0;
+      let changes = 0;
+      
+      for (const row of rows) {
+        try {
+          const stmt = this.db.prepare(singleRowSql);
+          stmt.run(row);
+          stmt.free();
+          
+          const res = this.db.exec("SELECT last_insert_rowid(), changes()");
+          if (res && res.length > 0) {
+            lastId = res[0].values[0][0];
+            changes += res[0].values[0][1];
+          }
+        } catch (err) {
+          throw err;
+        }
+      }
+      
+      this.saveToDisk();
+      return [{ insertId: lastId, affectedRows: changes }, null];
+    }
+
+    // Regular query
+    try {
+      let rows = [];
+      const stmt = this.db.prepare(translatedSql);
+      stmt.bind(params);
+      
+      const columns = stmt.getColumnNames();
+      while (stmt.step()) {
+        const rowVal = stmt.get();
+        const rowObj = {};
+        columns.forEach((col, idx) => {
+          rowObj[col] = rowVal[idx];
+        });
+        rows.push(rowObj);
+      }
+      stmt.free();
+      
+      const isWrite = /^\s*(insert|update|delete|create|drop|alter|replace)/i.test(translatedSql);
+      if (isWrite) {
+        let lastId = 0;
+        let changes = 0;
+        const res = this.db.exec("SELECT last_insert_rowid(), changes()");
+        if (res && res.length > 0) {
+          lastId = res[0].values[0][0];
+          changes = res[0].values[0][1];
+        }
+        this.saveToDisk();
+        return [{ insertId: lastId, affectedRows: changes }, null];
+      }
+      
+      return [rows, null];
+    } catch (err) {
+      throw err;
+    }
   }
 
   async getConnection() {
-    const db = getSharedDb(this.dbPath);
-    return new SqliteConnection(db);
+    return {
+      query: (sql, params) => this.query(sql, params),
+      execute: (sql, params) => this.execute(sql, params),
+      beginTransaction: async () => this.query("BEGIN TRANSACTION"),
+      commit: async () => this.query("COMMIT"),
+      rollback: async () => this.query("ROLLBACK"),
+      release: () => {},
+      isSqlite: true
+    };
   }
 }
 

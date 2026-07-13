@@ -15,7 +15,63 @@ router.post('/login', async (req, res) => {
       'WHERE u.email = :email AND u.is_active = 1 LIMIT 1',
       { email }
     );
-    const user = rows[0];
+    let user = rows[0];
+    const isOffline = process.env.IS_OFFLINE === 'true';
+
+    if (!user && isOffline) {
+      console.log(`[local-auth] User ${email} not found locally. Attempting cloud fallback authentication...`);
+      const cloudUrl = process.env.CLOUD_URL || 'https://agitated-satoshi.103-69-196-157.plesk.page';
+      try {
+        const loginRes = await fetch(`${cloudUrl}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        if (loginRes.ok) {
+          const loginData = await loginRes.json();
+          const cloudToken = loginData.token;
+          
+          console.log(`[local-auth] Cloud login successful. Fetching cloud database backup segment...`);
+          const backupRes = await fetch(`${cloudUrl}/api/backup`, {
+            headers: { 'Authorization': `Bearer ${cloudToken}` }
+          });
+          if (backupRes.ok) {
+            const backupPayload = await backupRes.json();
+            const { restoreBackupPayload } = require('../lib/backup-helper');
+            
+            // Add the authenticated cloud user detail to the payload so it is seeded locally
+            backupPayload.users = backupPayload.users || [];
+            if (!backupPayload.users.some(u => u.email === email)) {
+              const uId = loginData.user.id || require('uuid').v4();
+              backupPayload.users.push({
+                id: uId,
+                email: loginData.user.email,
+                full_name: loginData.user.full_name,
+                password_hash: await bcrypt.hash(password, 10),
+                company_id: loginData.user.company_id,
+                role: loginData.user.role,
+                is_active: 1
+              });
+            }
+
+            console.log(`[local-auth] Restoring backup payload to local database...`);
+            await restoreBackupPayload(backupPayload, db);
+            
+            // Re-query local database
+            const [retryRows] = await db.query(
+              'SELECT u.id, u.email, u.password_hash, u.full_name, u.company_id, r.role ' +
+              'FROM users u LEFT JOIN user_roles r ON r.user_id = u.id ' +
+              'WHERE u.email = :email AND u.is_active = 1 LIMIT 1',
+              { email }
+            );
+            user = retryRows[0];
+          }
+        }
+      } catch (e) {
+        console.error(`[local-auth] Cloud fallback auth error:`, e.message);
+      }
+    }
+
     if (!user) return res.status(401).json({ error: 'invalid credentials' });
 
     const ok = await bcrypt.compare(password, user.password_hash);

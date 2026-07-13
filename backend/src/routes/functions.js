@@ -5,8 +5,6 @@ const db = require('../lib/db');
 const path = require('path');
 const fs = require('fs');
 const archiver = require('archiver');
-const sqlite3 = require('sqlite3');
-const { SQLITE_SCHEMA } = require('../lib/sqlite-adapter');
 
 const requireSuperAdmin = (req, res) => {
   if (req.user?.role !== 'super_admin') {
@@ -223,52 +221,48 @@ async function generateOfflinePackage(req, res) {
     return res.status(400).json({ error: 'company_name, email, and password are required' });
   }
 
-  const tempDbName = `db_temp_${uuid()}.sqlite3`;
-  const tempDbPath = path.join(__dirname, '../../', tempDbName);
-  const dbTemp = new sqlite3.Database(tempDbPath);
-
   try {
-    await new Promise((resolve, reject) => {
-      dbTemp.serialize(async () => {
-        try {
-          for (const query of SQLITE_SCHEMA) {
-            await new Promise((resVal, rejVal) => dbTemp.run(query, (err) => err ? rejVal(err) : resVal()));
-          }
-          
-          const companyId = uuid();
-          const userId = uuid();
-          const passwordHash = await bcrypt.hash(password, 10);
+    const companyId = uuid();
+    const userId = uuid();
+    const passwordHash = await bcrypt.hash(password, 10);
 
-          await new Promise((resVal, rejVal) => dbTemp.run(
-            'INSERT INTO companies (id, name, contact_email, plan, max_screens, status) VALUES (?, ?, ?, ?, ?, ?)',
-            [companyId, company_name, email, 'pro', 25, 'active'],
-            (err) => err ? rejVal(err) : resVal()
-          ));
-
-          await new Promise((resVal, rejVal) => dbTemp.run(
-            'INSERT INTO users (id, email, password_hash, full_name, company_id, is_active) VALUES (?, ?, ?, ?, ?, 1)',
-            [userId, email, passwordHash, `${company_name} Admin`, companyId],
-            (err) => err ? rejVal(err) : resVal()
-          ));
-
-          await new Promise((resVal, rejVal) => dbTemp.run(
-            'INSERT INTO user_roles (id, user_id, role) VALUES (?, ?, ?)',
-            [uuid(), userId, 'admin'],
-            (err) => err ? rejVal(err) : resVal()
-          ));
-
-          resolve();
-        } catch (e) {
-          reject(e);
+    const payload = {
+      version: 1,
+      company: {
+        id: companyId,
+        name: company_name,
+        contact_email: email,
+        plan: 'pro',
+        max_screens: 25,
+        status: 'active',
+        timezone: 'UTC',
+        show_brand_header: 0,
+        brand_header_placement: 'top'
+      },
+      users: [
+        {
+          id: userId,
+          email: email,
+          password_hash: passwordHash,
+          full_name: `${company_name} Admin`,
+          company_id: companyId,
+          role: 'admin',
+          role_id: uuid(),
+          is_active: 1
         }
-      });
-    });
+      ],
+      layouts: [],
+      content: [],
+      devices: [],
+      schedules: [],
+      recurrences: [],
+      instances: []
+    };
 
-    await new Promise((resolve, reject) => {
-      dbTemp.close((err) => err ? reject(err) : resolve());
-    });
+    const { encryptBackup } = require('../lib/backup-helper');
+    const encryptedPayload = encryptBackup(payload);
 
-    res.attachment('signage-hub-offline.zip');
+    res.attachment('signage-hub-local-setup.zip');
 
     const archive = archiver('zip', { zlib: { level: 9 } });
     archive.on('error', (err) => {
@@ -277,50 +271,35 @@ async function generateOfflinePackage(req, res) {
 
     archive.pipe(res);
 
-    const batContent = `@echo off
-echo ============================================================
-echo           SignageHub Local Offline Web Server
-echo ============================================================
-echo.
-echo Installing local dependencies...
-call npm install --omit=dev
-echo.
-echo Starting backend server on port 8080...
-set IS_OFFLINE=true
-set PORT=8080
-call node server.js
-pause
+    const readmeContent = `============================================================
+              SignageHub Local Offline Server
+============================================================
+
+Instructions for setting up your local offline signage server:
+
+1. Extract all files from this ZIP package into a folder on your Windows computer.
+2. Double-click "local-server.exe" to start the server.
+3. The server will automatically detect "backup.json", install your configurations, and open the admin dashboard in your default browser.
+4. You can log in using your registered credentials:
+   - Email: ${email}
+   - Password: ${password} (as configured)
+
+Ensure that any TVs/Screens on the local network are connected to the same Wi-Fi router to pair and receive playlists.
 `;
-    archive.append(batContent, { name: 'run-server.bat' });
-    archive.file(tempDbPath, { name: 'db.sqlite3' });
+    archive.append(readmeContent, { name: 'README.txt' });
+    archive.append(Buffer.from(encryptedPayload, 'utf8'), { name: 'backup.json' });
 
-    const backendDir = path.join(__dirname, '../../');
-    archive.file(path.join(backendDir, 'server.js'), { name: 'server.js' });
-    archive.file(path.join(backendDir, 'package.json'), { name: 'package.json' });
-    archive.file(path.join(backendDir, 'schema.sql'), { name: 'schema.sql' });
-    archive.directory(path.join(backendDir, 'src'), 'src');
-
-    const frontendDistDir = path.join(__dirname, '../../../dist');
-    if (fs.existsSync(frontendDistDir)) {
-      archive.directory(frontendDistDir, 'public');
+    const exePath = path.join(__dirname, '../../../' + 'local-server.exe');
+    if (fs.existsSync(exePath)) {
+      archive.file(exePath, { name: 'local-server.exe' });
+    } else {
+      console.warn(`[local-download] local-server.exe not found at ${exePath}. Bundling placeholder.`);
+      archive.append(Buffer.from('Placeholder executable. Rebuild project to compile full executable.'), { name: 'local-server.exe' });
     }
 
-    archive.finalize().then(() => {
-      setTimeout(() => {
-        fs.unlink(tempDbPath, (err) => {
-          if (err) console.error('Error deleting temp sqlite file:', err);
-        });
-      }, 5000);
-    });
-
+    await archive.finalize();
   } catch (err) {
     console.error('GENERATE_OFFLINE_ERROR:', err);
-    try {
-      dbTemp.close();
-    } catch (_) {}
-    try {
-      fs.unlinkSync(tempDbPath);
-    } catch (_) {}
     res.status(500).json({ error: err.message || 'Failed to generate offline package' });
   }
 }

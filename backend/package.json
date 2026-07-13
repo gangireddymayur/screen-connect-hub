@@ -2,6 +2,13 @@
   "name": "signage-backend",
   "version": "1.0.0",
   "main": "server.js",
+  "bin": "server.js",
+  "pkg": {
+    "assets": [
+      "public/**/*",
+      "node_modules/sql.js/dist/sql-wasm.wasm"
+    ]
+  },
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
@@ -15,7 +22,7 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.11.0",
-    "sqlite3": "^6.0.1",
+    "sql.js": "^1.12.0",
     "uuid": "^9.0.1"
   }
 }
