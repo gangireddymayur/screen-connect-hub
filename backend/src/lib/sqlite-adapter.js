@@ -176,7 +176,9 @@ class SqlitePool {
     const wasmCandidates = [
       path.join(__dirname, "node_modules", "sql.js", "dist", "sql-wasm.wasm"),
       path.join(__dirname, "..", "node_modules", "sql.js", "dist", "sql-wasm.wasm"),
+      path.join(__dirname, "..", "..", "node_modules", "sql.js", "dist", "sql-wasm.wasm"),
       path.join(process.cwd(), "node_modules", "sql.js", "dist", "sql-wasm.wasm"),
+      path.join(process.cwd(), "backend", "node_modules", "sql.js", "dist", "sql-wasm.wasm"),
     ];
     const wasmPath = wasmCandidates.find((candidate) => fs.existsSync(candidate));
     if (!wasmPath) {
