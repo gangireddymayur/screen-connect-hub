@@ -120,6 +120,36 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toIS
   }
 })();
 
+app.get('/api/debug-logs', (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const logs = [];
+    const rootFiles = fs.readdirSync(process.cwd());
+    const iisnodePath = path.join(process.cwd(), 'iisnode');
+    let iisnodeFiles = [];
+    if (fs.existsSync(iisnodePath)) {
+      iisnodeFiles = fs.readdirSync(iisnodePath);
+      const logFiles = iisnodeFiles.filter(f => f.endsWith('.txt')).map(f => ({
+        name: f,
+        mtime: fs.statSync(path.join(iisnodePath, f)).mtime
+      })).sort((a, b) => b.mtime - a.mtime);
+      if (logFiles.length > 0) {
+        const content = fs.readFileSync(path.join(iisnodePath, logFiles[0].name), 'utf8');
+        logs.push({ file: logFiles[0].name, content: content.split('\n').slice(-100).join('\n') });
+      }
+    }
+    res.json({
+      cwd: process.cwd(),
+      rootFiles,
+      iisnodeFiles,
+      logs
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message, stack: e.stack });
+  }
+});
+
 try {
   const { authRequired } = require('./src/lib/auth');
   const authRoutes = require('./src/routes/auth');
