@@ -4,7 +4,7 @@ const isOffline = process.env.IS_OFFLINE === 'true';
 
 if (isOffline) {
   const { SqlitePool } = require('./sqlite-adapter');
-  const dbPath = process.env.SQLITE_DB_PATH || path.join(__dirname, '../../db.sqlite3');
+  const dbPath = process.env.SQLITE_DB_PATH || path.join(__dirname, '../../App_Data/db.sqlite3');
   console.log(`[db] Running in OFFLINE mode. Using SQLite database at: ${dbPath}`);
   module.exports = new SqlitePool(dbPath);
 } else {
