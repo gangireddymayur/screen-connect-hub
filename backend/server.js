@@ -28,9 +28,15 @@ app.use('/api', (req, res, next) => {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 // Run startup database migrations to ensure devices table column exists
+// SQLite: schema is fully managed by sqlite-adapter.js — skip MySQL-specific migrations
 (async () => {
   try {
     const db = require('./src/lib/db');
+    if (db.isSqlite) {
+      console.log('[db] SQLite mode detected — skipping MySQL-specific startup migrations.');
+      return;
+    }
+
     const [cols] = await db.query("SHOW COLUMNS FROM devices LIKE 'schedules_enabled'");
     if (cols.length === 0) {
       await db.query("ALTER TABLE devices ADD COLUMN schedules_enabled TINYINT(1) DEFAULT 1");
@@ -58,11 +64,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toIS
     const [tableExist] = await db.query("SHOW TABLES LIKE 'schedule_instances'");
     if (tableExist.length === 0) {
       console.log("[db] Initializing advanced schedules database tables...");
-      
-      // Drop legacy schedules table if it exists
       await db.query("DROP TABLE IF EXISTS schedules");
-      
-      // Create schedules parent table
       await db.query(`
         CREATE TABLE IF NOT EXISTS schedules (
           id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -78,8 +80,6 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toIS
           CONSTRAINT fk_schedules_layout FOREIGN KEY (layout_id) REFERENCES layouts(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
-
-      // Create schedule_recurrences table
       await db.query(`
         CREATE TABLE IF NOT EXISTS schedule_recurrences (
           id              INT AUTO_INCREMENT PRIMARY KEY,
@@ -90,8 +90,6 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toIS
           CONSTRAINT fk_recurrences_schedule FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
-
-      // Create schedule_instances table
       await db.query(`
         CREATE TABLE IF NOT EXISTS schedule_instances (
           id              INT AUTO_INCREMENT PRIMARY KEY,
@@ -108,11 +106,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toIS
           CONSTRAINT fk_instances_layout   FOREIGN KEY (layout_id)   REFERENCES layouts(id)   ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
-
-      // Create index for fast device query
-      await db.query(`
-        CREATE INDEX idx_instances_device_time ON schedule_instances (device_id, start_datetime, end_datetime);
-      `);
+      await db.query(`CREATE INDEX idx_instances_device_time ON schedule_instances (device_id, start_datetime, end_datetime);`);
       console.log("[db] Advanced schedules database tables initialized successfully.");
     }
   } catch (err) {
