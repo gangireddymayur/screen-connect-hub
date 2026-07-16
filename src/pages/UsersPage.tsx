@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, Shield, Building2, Mail, Calendar, Clock, UserCheck, UserX, X } from "lucide-react";
+import { Users, Shield, Building2, Mail, Calendar, Clock, UserCheck, UserX, X, Plus, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -11,6 +11,16 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface AuthUser {
   id: string;
@@ -40,6 +50,54 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [toggling, setToggling] = useState(false);
   const { user: currentUser } = useAuth();
+
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePassword, setInvitePassword] = useState("");
+  const [inviteCompanyId, setInviteCompanyId] = useState("");
+  const [inviteRole, setInviteRole] = useState("admin");
+  const [inviting, setInviting] = useState(false);
+
+  const handleInviteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteCompanyId) {
+      toast.error("Please select a company");
+      return;
+    }
+    if (invitePassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    setInviting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-user", {
+        body: {
+          email: inviteEmail,
+          password: invitePassword,
+          full_name: inviteName,
+          company_id: inviteCompanyId,
+          role: inviteRole,
+        },
+      });
+      if (error || data?.error) {
+        toast.error(data?.error || error?.message || "Failed to create user");
+      } else {
+        toast.success("User created successfully");
+        setInviteOpen(false);
+        setInviteEmail("");
+        setInvitePassword("");
+        setInviteName("");
+        setInviteCompanyId("");
+        fetchUsers();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create user");
+    } finally {
+      setInviting(false);
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -84,6 +142,7 @@ export default function UsersPage() {
     }).filter((u) => u.role !== "super_admin");
 
     setUsers(merged);
+    setCompanies(companiesRes.data ?? []);
     setLoading(false);
   };
 
@@ -152,9 +211,14 @@ export default function UsersPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Users</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage all users across the platform</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+            <p className="text-sm text-muted-foreground mt-1">Manage all users across the platform</p>
+          </div>
+          <Button onClick={() => setInviteOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Invite User
+          </Button>
         </div>
 
         {/* Stats */}
@@ -403,6 +467,95 @@ export default function UsersPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Invite User</DialogTitle>
+            <DialogDescription>
+              Create a new user account and assign it to a company.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleInviteSubmit} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="full_name">Full Name</Label>
+              <Input
+                id="full_name"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                placeholder="e.g. John Doe"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="name@company.com"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={invitePassword}
+                onChange={(e) => setInvitePassword(e.target.value)}
+                placeholder="Min 6 characters"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="company">Company</Label>
+              <select
+                id="company"
+                value={inviteCompanyId}
+                onChange={(e) => setInviteCompanyId(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-foreground"
+                required
+              >
+                <option value="">Select a company</option>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <select
+                id="role"
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-foreground"
+                required
+              >
+                <option value="admin">Company Admin</option>
+                <option value="sub_user">Sub User</option>
+              </select>
+            </div>
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setInviteOpen(false)}
+                disabled={inviting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={inviting}>
+                {inviting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create User
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

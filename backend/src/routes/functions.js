@@ -19,6 +19,44 @@ const first = async (sql, params) => {
   return rows[0] || null;
 };
 
+async function createUser(req, res) {
+  if (!requireSuperAdmin(req, res)) return;
+  const { email, password, full_name, company_id, role = 'admin' } = req.body || {};
+  if (!email || !password || !full_name || !company_id) {
+    return res.status(400).json({ error: 'email, password, full_name, and company_id are required' });
+  }
+
+  const existing = await first('SELECT id FROM users WHERE email = :email LIMIT 1', { email });
+  if (existing) return res.status(409).json({ error: 'A user with this email already exists' });
+
+  const userId = uuid();
+  const roleId = uuid();
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query(
+      'INSERT INTO users (id, email, password_hash, full_name, company_id, is_active) VALUES (:id, :email, :password_hash, :full_name, :company_id, 1)',
+      { id: userId, email, password_hash: passwordHash, full_name, company_id }
+    );
+    await conn.query(
+      'INSERT INTO user_roles (id, user_id, role) VALUES (:id, :user_id, :role)',
+      { id: roleId, user_id: userId, role }
+    );
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+
+  return res.json({
+    user: { id: userId, email, full_name, company_id, role },
+  });
+}
+
 async function createCompanyAdmin(req, res) {
   if (!requireSuperAdmin(req, res)) return;
   const { name, contact_email, password, max_screens, plan = 'starter' } = req.body || {};
@@ -308,6 +346,7 @@ Ensure that any TVs/Screens on the local network are connected to the same Wi-Fi
 
 const handlers = {
   'create-company-admin': createCompanyAdmin,
+  'create-user': createUser,
   'delete-company': deleteCompany,
   'reset-company-admin-password': resetCompanyAdminPassword,
   'bulk-company-action': bulkCompanyAction,
