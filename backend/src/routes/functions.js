@@ -21,7 +21,7 @@ const first = async (sql, params) => {
 
 async function createUser(req, res) {
   if (!requireSuperAdmin(req, res)) return;
-  const { email, password, full_name, company_id, role = 'admin' } = req.body || {};
+  const { email, password, full_name, company_id, role = 'admin', local_mode = 'none', max_devices = 5 } = req.body || {};
   if (!email || !password || !full_name || !company_id) {
     return res.status(400).json({ error: 'email, password, full_name, and company_id are required' });
   }
@@ -37,8 +37,8 @@ async function createUser(req, res) {
   try {
     await conn.beginTransaction();
     await conn.query(
-      'INSERT INTO users (id, email, password_hash, full_name, company_id, is_active) VALUES (:id, :email, :password_hash, :full_name, :company_id, 1)',
-      { id: userId, email, password_hash: passwordHash, full_name, company_id }
+      'INSERT INTO users (id, email, password_hash, full_name, company_id, is_active, local_mode, max_devices) VALUES (:id, :email, :password_hash, :full_name, :company_id, 1, :local_mode, :max_devices)',
+      { id: userId, email, password_hash: passwordHash, full_name, company_id, local_mode, max_devices: Number(max_devices) }
     );
     await conn.query(
       'INSERT INTO user_roles (id, user_id, role) VALUES (:id, :user_id, :role)',
@@ -59,7 +59,7 @@ async function createUser(req, res) {
 
 async function createCompanyAdmin(req, res) {
   if (!requireSuperAdmin(req, res)) return;
-  const { name, contact_email, password, max_screens, plan = 'starter' } = req.body || {};
+  const { name, contact_email, password, max_screens, plan = 'starter', local_mode = 'none', max_devices = 5 } = req.body || {};
   if (!name || !contact_email || !password) {
     return res.status(400).json({ error: 'name, contact_email, and password are required' });
   }
@@ -80,8 +80,8 @@ async function createCompanyAdmin(req, res) {
       { id: companyId, name, contact_email, plan, max_screens: Number(max_screens || 10), status: 'active', created_by: req.user.id }
     );
     await conn.query(
-      'INSERT INTO users (id, email, password_hash, full_name, company_id, is_active) VALUES (:id, :email, :password_hash, :full_name, :company_id, 1)',
-      { id: userId, email: contact_email, password_hash: passwordHash, full_name: `${name} Admin`, company_id: companyId }
+      'INSERT INTO users (id, email, password_hash, full_name, company_id, is_active, local_mode, max_devices) VALUES (:id, :email, :password_hash, :full_name, :company_id, 1, :local_mode, :max_devices)',
+      { id: userId, email: contact_email, password_hash: passwordHash, full_name: `${name} Admin`, company_id: companyId, local_mode, max_devices: Number(max_devices) }
     );
     await conn.query(
       'INSERT INTO user_roles (id, user_id, role) VALUES (:id, :user_id, :role)',

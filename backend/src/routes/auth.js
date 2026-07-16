@@ -10,7 +10,7 @@ router.post('/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'email & password required' });
 
     const [rows] = await db.query(
-      'SELECT u.id, u.email, u.password_hash, u.full_name, u.company_id, r.role ' +
+      'SELECT u.id, u.email, u.password_hash, u.full_name, u.company_id, u.local_mode, u.max_devices, r.role ' +
       'FROM users u LEFT JOIN user_roles r ON r.user_id = u.id ' +
       'WHERE u.email = :email AND u.is_active = 1 LIMIT 1',
       { email }
@@ -50,6 +50,8 @@ router.post('/login', async (req, res) => {
                 password_hash: await bcrypt.hash(password, 10),
                 company_id: loginData.user.company_id,
                 role: loginData.user.role,
+                local_mode: loginData.user.local_mode || 'none',
+                max_devices: loginData.user.max_devices || 5,
                 is_active: 1
               });
             }
@@ -59,7 +61,7 @@ router.post('/login', async (req, res) => {
             
             // Re-query local database
             const [retryRows] = await db.query(
-              'SELECT u.id, u.email, u.password_hash, u.full_name, u.company_id, r.role ' +
+              'SELECT u.id, u.email, u.password_hash, u.full_name, u.company_id, u.local_mode, u.max_devices, r.role ' +
               'FROM users u LEFT JOIN user_roles r ON r.user_id = u.id ' +
               'WHERE u.email = :email AND u.is_active = 1 LIMIT 1',
               { email }
@@ -80,7 +82,7 @@ router.post('/login', async (req, res) => {
     const token = sign({ id: user.id, email: user.email, role: user.role, company_id: user.company_id });
     res.json({
       token,
-      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role, company_id: user.company_id },
+      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role, company_id: user.company_id, local_mode: user.local_mode, max_devices: user.max_devices },
     });
   } catch (err) {
     console.error('LOGIN_ERROR:', err.stack || err);

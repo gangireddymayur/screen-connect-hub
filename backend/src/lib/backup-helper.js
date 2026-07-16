@@ -69,9 +69,9 @@ async function restoreBackupPayload(payload, dbPool) {
     if (payload.users && Array.isArray(payload.users)) {
       for (const u of payload.users) {
         const insertUserSql = isSqlite
-          ? `INSERT OR REPLACE INTO users (id, email, password_hash, full_name, company_id, is_active) VALUES (?, ?, ?, ?, ?, ?)`
-          : `INSERT INTO users (id, email, password_hash, full_name, company_id, is_active) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash)`;
-        await conn.query(insertUserSql, [u.id, u.email, u.password_hash, u.full_name, u.company_id, u.is_active ?? 1]);
+          ? `INSERT OR REPLACE INTO users (id, email, password_hash, full_name, company_id, is_active, local_mode, max_devices) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          : `INSERT INTO users (id, email, password_hash, full_name, company_id, is_active, local_mode, max_devices) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), local_mode=VALUES(local_mode), max_devices=VALUES(max_devices)`;
+        await conn.query(insertUserSql, [u.id, u.email, u.password_hash, u.full_name, u.company_id, u.is_active ?? 1, u.local_mode || 'none', u.max_devices || 5]);
 
         if (u.role) {
           const insertRoleSql = isSqlite

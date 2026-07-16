@@ -61,6 +61,18 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toIS
       console.log("[db] Added is_paused column to devices table.");
     }
 
+    const [localModeCols] = await db.query("SHOW COLUMNS FROM users LIKE 'local_mode'");
+    if (localModeCols.length === 0) {
+      await db.query("ALTER TABLE users ADD COLUMN local_mode VARCHAR(32) DEFAULT 'none'");
+      console.log("[db] Added local_mode column to users table.");
+    }
+
+    const [maxDevicesCols] = await db.query("SHOW COLUMNS FROM users LIKE 'max_devices'");
+    if (maxDevicesCols.length === 0) {
+      await db.query("ALTER TABLE users ADD COLUMN max_devices INT DEFAULT 5");
+      console.log("[db] Added max_devices column to users table.");
+    }
+
     const [tableExist] = await db.query("SHOW TABLES LIKE 'schedule_instances'");
     if (tableExist.length === 0) {
       console.log("[db] Initializing advanced schedules database tables...");

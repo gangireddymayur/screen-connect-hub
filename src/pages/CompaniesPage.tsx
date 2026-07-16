@@ -87,6 +87,8 @@ export default function CompaniesPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [maxScreens, setMaxScreens] = useState("10");
   const [addPlan, setAddPlan] = useState("starter");
+  const [localMode, setLocalMode] = useState("none");
+  const [maxDevices, setMaxDevices] = useState("5");
   const [submitting, setSubmitting] = useState(false);
 
   // Edit dialog
@@ -195,7 +197,14 @@ export default function CompaniesPage() {
     e.preventDefault();
     setSubmitting(true);
     const { data, error } = await supabase.functions.invoke("create-company-admin", {
-      body: { name, contact_email: contactEmail, password, max_screens: parseInt(maxScreens) },
+      body: {
+        name,
+        contact_email: contactEmail,
+        password,
+        max_screens: parseInt(maxScreens),
+        local_mode: localMode,
+        max_devices: localMode === "multi" ? parseInt(maxDevices) : 1
+      },
     });
     if (error || data?.error) {
       setSubmitting(false);
@@ -210,6 +219,7 @@ export default function CompaniesPage() {
     toast.success("Company and admin account created!");
     setAddOpen(false);
     setName(""); setContactEmail(""); setPassword(""); setMaxScreens("10"); setAddPlan("starter");
+    setLocalMode("none"); setMaxDevices("5");
     fetchCompanies();
   };
 
@@ -397,6 +407,25 @@ export default function CompaniesPage() {
                       <Label>Max Screens</Label>
                       <Input type="number" value={maxScreens} onChange={(e) => setMaxScreens(e.target.value)} min="1" required />
                     </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Deployment Mode</Label>
+                      <Select value={localMode} onValueChange={setLocalMode}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Cloud Mode (Standard)</SelectItem>
+                          <SelectItem value="single">Local Single-Device (Solo)</SelectItem>
+                          <SelectItem value="multi">Local Multi-Tablet (Cluster)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {localMode === "multi" && (
+                      <div className="space-y-2">
+                        <Label>Max Local Tablets</Label>
+                        <Input type="number" value={maxDevices} onChange={(e) => setMaxDevices(e.target.value)} min="1" required />
+                      </div>
+                    )}
                   </div>
                   <Button type="submit" className="w-full" disabled={submitting}>
                     {submitting ? "Creating..." : "Create Company & Admin"}

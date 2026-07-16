@@ -58,6 +58,8 @@ export default function UsersPage() {
   const [invitePassword, setInvitePassword] = useState("");
   const [inviteCompanyId, setInviteCompanyId] = useState("");
   const [inviteRole, setInviteRole] = useState("admin");
+  const [inviteLocalMode, setInviteLocalMode] = useState("none");
+  const [inviteMaxDevices, setInviteMaxDevices] = useState(5);
   const [inviting, setInviting] = useState(false);
 
   const handleInviteSubmit = async (e: React.FormEvent) => {
@@ -79,6 +81,8 @@ export default function UsersPage() {
           full_name: inviteName,
           company_id: inviteCompanyId,
           role: inviteRole,
+          local_mode: inviteLocalMode,
+          max_devices: inviteLocalMode === "multi" ? inviteMaxDevices : 1,
         },
       });
       if (error || data?.error) {
@@ -90,6 +94,8 @@ export default function UsersPage() {
         setInvitePassword("");
         setInviteName("");
         setInviteCompanyId("");
+        setInviteLocalMode("none");
+        setInviteMaxDevices(5);
         fetchUsers();
       }
     } catch (err: any) {
@@ -539,6 +545,33 @@ export default function UsersPage() {
                 <option value="sub_user">Sub User</option>
               </select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="local_mode">Deployment Mode</Label>
+              <select
+                id="local_mode"
+                value={inviteLocalMode}
+                onChange={(e) => setInviteLocalMode(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-foreground"
+                required
+              >
+                <option value="none">Cloud Mode (Standard)</option>
+                <option value="single">Local Single-Device (Solo)</option>
+                <option value="multi">Local Multi-Tablet (Network Cluster)</option>
+              </select>
+            </div>
+            {inviteLocalMode === "multi" && (
+              <div className="space-y-2">
+                <Label htmlFor="max_devices">Max Allowed Tablets/Screens</Label>
+                <Input
+                  id="max_devices"
+                  type="number"
+                  min={1}
+                  value={inviteMaxDevices}
+                  onChange={(e) => setInviteMaxDevices(Number(e.target.value))}
+                  required
+                />
+              </div>
+            )}
             <DialogFooter className="pt-2">
               <Button
                 type="button"

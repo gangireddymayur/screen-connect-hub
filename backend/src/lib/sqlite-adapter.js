@@ -22,6 +22,8 @@ const SQLITE_SCHEMA = [
     full_name TEXT,
     company_id TEXT,
     is_active INTEGER NOT NULL DEFAULT 1,
+    local_mode TEXT NOT NULL DEFAULT 'none',
+    max_devices INTEGER NOT NULL DEFAULT 5,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(company_id) REFERENCES companies(id) ON DELETE SET NULL
@@ -89,7 +91,8 @@ const SQLITE_SCHEMA = [
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE,
-    FOREIGN KEY(layout_id) REFERENCES layouts(id) ON DELETE CASCADE
+    FOREIGN KEY(layout_id) REFERENCES layouts(id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id) REFERENCES companies(id) ON DELETE CASCADE
   )`,
   `CREATE TABLE IF NOT EXISTS schedule_recurrences (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -206,6 +209,15 @@ class SqlitePool {
       for (const statement of SQLITE_SCHEMA) {
         this.db.run(statement);
       }
+
+      // Check/alter local_mode and max_devices columns in SQLite if they don't exist
+      try {
+        this.db.run("ALTER TABLE users ADD COLUMN local_mode TEXT NOT NULL DEFAULT 'none';");
+      } catch (e) {}
+
+      try {
+        this.db.run("ALTER TABLE users ADD COLUMN max_devices INTEGER NOT NULL DEFAULT 5;");
+      } catch (e) {}
 
       // Seed default user and company if database is empty
       const userCheck = this.db.prepare("SELECT id FROM users LIMIT 1");
