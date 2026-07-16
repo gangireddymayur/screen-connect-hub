@@ -93,6 +93,15 @@ export function AdminSidebar() {
             <p className="text-[10px] text-sidebar-foreground/50 truncate">{user?.email}</p>
           </div>
         )}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={() => signOut()}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          {!collapsed && <span>Logout</span>}
+        </Button>
       </SidebarFooter>
     </Sidebar>
   );
