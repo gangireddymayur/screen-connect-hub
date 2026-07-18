@@ -140,6 +140,27 @@ function crud(table, { tenantScoped = true, superAdminOnly = false } = {}) {
       const scoped = scope(req, 'AND ');
       const [result] = await db.query(`UPDATE \`${table}\` SET ${sets} WHERE id = :id${scoped.clause}`, { ...payload, id: req.params.id, ...scoped.params });
       if (result.affectedRows === 0) return res.status(404).json({ error: 'not found or not allowed' });
+      
+      // Auto-propagate local_mode and max_devices from company to users
+      if (table === 'companies' && (payload.local_mode !== undefined || payload.max_devices !== undefined)) {
+        const updateFields = [];
+        const updateParams = { cid: req.params.id };
+        if (payload.local_mode !== undefined) {
+          updateFields.push('`local_mode` = :local_mode');
+          updateParams.local_mode = payload.local_mode;
+        }
+        if (payload.max_devices !== undefined) {
+          updateFields.push('`max_devices` = :max_devices');
+          updateParams.max_devices = payload.max_devices;
+        }
+        if (updateFields.length > 0) {
+          await db.query(
+            `UPDATE \`users\` SET ${updateFields.join(', ')} WHERE \`company_id\` = :cid`,
+            updateParams
+          );
+        }
+      }
+      
       res.json({ ok: true, affectedRows: result.affectedRows, changedRows: result.changedRows });
     } catch (err) {
       console.error(`CRUD_UPDATE_${table.toUpperCase()}_ERROR:`, err);
