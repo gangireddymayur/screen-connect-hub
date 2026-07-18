@@ -227,6 +227,17 @@ async function claimTvCode(req, res) {
   if (!device) return res.status(404).json({ error: 'Code not found or expired. Refresh the TV app to generate a new code.' });
   if (device.is_paired) return res.status(409).json({ error: 'This code has already been used' });
 
+  // Check max_devices limit
+  const userObj = await first('SELECT local_mode, max_devices FROM users WHERE id = :id LIMIT 1', { id: req.user.id });
+  if (userObj) {
+    const activeDevices = await first('SELECT COUNT(*) as count FROM devices WHERE company_id = :company_id AND is_paired = 1', { company_id: req.user.company_id });
+    const currentCount = activeDevices?.count || 0;
+    const maxDevices = userObj.max_devices || 5;
+    if (currentCount >= maxDevices) {
+      return res.status(403).json({ error: `Device limit reached. Your maximum allowed screens is ${maxDevices}.` });
+    }
+  }
+
   await db.query(
     'UPDATE devices SET company_id = :company_id, name = :name, location = :location, orientation = :orientation, is_paired = 1, pairing_code = NULL, status = :status, last_seen_at = NOW() WHERE id = :id',
     { company_id: req.user.company_id, name, location: location || null, orientation, status: 'online', id: device.id }
@@ -344,6 +355,29 @@ Ensure that any TVs/Screens on the local network are connected to the same Wi-Fi
   }
 }
 
+async function downloadTvApk(req, res) {
+  const fs = require('fs');
+  const path = require('path');
+  const releasePath = '/Users/mayur/AndroidStudioProjects/TV/app/build/outputs/apk/release/app-release.apk';
+  const unsignedPath = '/Users/mayur/AndroidStudioProjects/TV/app/build/outputs/apk/release/app-release-unsigned.apk';
+  const debugPath = '/Users/mayur/AndroidStudioProjects/TV/app/build/outputs/apk/debug/app-debug.apk';
+  
+  let targetPath = null;
+  if (fs.existsSync(releasePath)) {
+    targetPath = releasePath;
+  } else if (fs.existsSync(unsignedPath)) {
+    targetPath = unsignedPath;
+  } else if (fs.existsSync(debugPath)) {
+    targetPath = debugPath;
+  }
+  
+  if (!targetPath) {
+    return res.status(404).json({ error: 'Android TV App APK has not been built yet. Please build it in Android Studio or compile it using Gradle.' });
+  }
+  
+  res.download(targetPath, 'SignageHub-TV.apk');
+}
+
 const handlers = {
   'create-company-admin': createCompanyAdmin,
   'create-user': createUser,
@@ -356,6 +390,7 @@ const handlers = {
   'claim-tv-code': claimTvCode,
   'logout-tv-device': logoutTvDevice,
   'generate-offline': generateOfflinePackage,
+  'download-tv-apk': downloadTvApk,
 };
 
 router.post('/:name', async (req, res) => {

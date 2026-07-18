@@ -556,12 +556,12 @@ export default function UsersPage() {
               >
                 <option value="none">Cloud Mode (Standard)</option>
                 <option value="single">Local Single-Device (Solo)</option>
-                <option value="multi">Local Multi-Tablet (Network Cluster)</option>
+                <option value="multi">Local Multi-Screen (Network Cluster)</option>
               </select>
             </div>
             {inviteLocalMode === "multi" && (
               <div className="space-y-2">
-                <Label htmlFor="max_devices">Max Allowed Tablets/Screens</Label>
+                <Label htmlFor="max_devices">Max Allowed Screens</Label>
                 <Input
                   id="max_devices"
                   type="number"

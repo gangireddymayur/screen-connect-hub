@@ -416,13 +416,13 @@ export default function CompaniesPage() {
                         <SelectContent>
                           <SelectItem value="none">Cloud Mode (Standard)</SelectItem>
                           <SelectItem value="single">Local Single-Device (Solo)</SelectItem>
-                          <SelectItem value="multi">Local Multi-Tablet (Cluster)</SelectItem>
+                          <SelectItem value="multi">Local Multi-Screen (Cluster)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     {localMode === "multi" && (
                       <div className="space-y-2">
-                        <Label>Max Local Tablets</Label>
+                        <Label>Max Local Screens</Label>
                         <Input type="number" value={maxDevices} onChange={(e) => setMaxDevices(e.target.value)} min="1" required />
                       </div>
                     )}

@@ -79,6 +79,13 @@ router.post('/login', async (req, res) => {
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: 'invalid credentials' });
 
+    // Local server login restrictions: Only local network admins (role === 'admin', local_mode === 'multi') are permitted to log in.
+    if (isOffline) {
+      if (user.role !== 'admin' || user.local_mode !== 'multi') {
+        return res.status(403).json({ error: 'Only local network admins are permitted to log in on this local server.' });
+      }
+    }
+
     const token = sign({ id: user.id, email: user.email, role: user.role, company_id: user.company_id });
     res.json({
       token,

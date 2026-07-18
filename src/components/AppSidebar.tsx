@@ -89,6 +89,47 @@ export function AppSidebar() {
             <p className="text-[10px] text-sidebar-foreground/50 truncate">{user?.email}</p>
           </div>
         )}
+        {!collapsed && (
+          <Button
+            variant="default"
+            size="sm"
+            className="w-full justify-start gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+            onClick={async () => {
+              try {
+                const token = localStorage.getItem("auth_token");
+                const headers = {};
+                if (token) headers["Authorization"] = `Bearer ${token}`;
+                
+                const apiRoot = (import.meta as any).env?.VITE_API_URL || "";
+                const response = await fetch(`${apiRoot}/api/functions/download-tv-apk`, {
+                  method: "POST",
+                  headers
+                });
+                
+                if (!response.ok) {
+                  const errorJson = await response.json().catch(() => ({}));
+                  throw new Error(errorJson.error || "Failed to download TV APK file");
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "SignageHub-TV.apk";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+              } catch (err: any) {
+                console.error("TV APK download error:", err);
+                alert(err.message || "Failed to download Android TV App APK. Please make sure the app is built.");
+              }
+            }}
+          >
+            <Tv className="h-4 w-4 shrink-0" />
+            <span>Download TV App APK</span>
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
