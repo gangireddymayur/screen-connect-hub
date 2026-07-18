@@ -232,7 +232,7 @@ async function claimTvCode(req, res) {
   if (userObj) {
     const activeDevices = await first('SELECT COUNT(*) as count FROM devices WHERE company_id = :company_id AND is_paired = 1', { company_id: req.user.company_id });
     const currentCount = activeDevices?.count || 0;
-    const maxDevices = userObj.max_devices || 5;
+    const maxDevices = userObj.local_mode === 'single' ? 1 : (userObj.max_devices || 5);
     if (currentCount >= maxDevices) {
       return res.status(403).json({ error: `Device limit reached. Your maximum allowed screens is ${maxDevices}.` });
     }

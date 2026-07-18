@@ -301,6 +301,7 @@ export default function UsersPage() {
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Mode</TableHead>
                     <TableHead>Company</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Last Sign In</TableHead>
@@ -329,6 +330,11 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm capitalize">{getRoleLabel(u.role)}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm font-medium capitalize">
+                          {u.local_mode === "single" ? "Solo" : u.local_mode === "multi" ? "Multi" : "Cloud"}
+                        </span>
                       </TableCell>
                       <TableCell>
                         {u.company_name ? (

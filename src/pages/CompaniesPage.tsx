@@ -513,6 +513,7 @@ export default function CompaniesPage() {
                       </button>
                     </TableHead>
                     <TableHead>Plan</TableHead>
+                    <TableHead>Mode</TableHead>
                     <TableHead>
                       <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("max_screens")}>
                         Max Screens <ArrowUpDown className="h-3 w-3" />
@@ -549,6 +550,11 @@ export default function CompaniesPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={`capitalize ${PLAN_COLORS[company.plan] || ""}`}>{company.plan}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm font-medium capitalize">
+                          {company.local_mode === "single" ? "Solo" : company.local_mode === "multi" ? "Multi" : "Cloud"}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
