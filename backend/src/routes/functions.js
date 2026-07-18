@@ -64,6 +64,10 @@ async function createCompanyAdmin(req, res) {
     return res.status(400).json({ error: 'name, contact_email, and password are required' });
   }
 
+  const dbLocalMode = local_mode || 'none';
+  const dbMaxScreens = dbLocalMode === 'single' ? 1 : Number(max_screens || 10);
+  const dbMaxDevices = dbLocalMode === 'single' ? 1 : Number(max_devices || 5);
+
   const existing = await first('SELECT id FROM users WHERE email = :email LIMIT 1', { email: contact_email });
   if (existing) return res.status(409).json({ error: 'A user with this email already exists' });
 
@@ -77,11 +81,11 @@ async function createCompanyAdmin(req, res) {
     await conn.beginTransaction();
     await conn.query(
       'INSERT INTO companies (id, name, contact_email, plan, max_screens, status, created_by, local_mode, max_devices) VALUES (:id, :name, :contact_email, :plan, :max_screens, :status, :created_by, :local_mode, :max_devices)',
-      { id: companyId, name, contact_email, plan, max_screens: Number(max_screens || 10), status: 'active', created_by: req.user.id, local_mode, max_devices: Number(max_devices) }
+      { id: companyId, name, contact_email, plan, max_screens: dbMaxScreens, status: 'active', created_by: req.user.id, local_mode: dbLocalMode, max_devices: dbMaxDevices }
     );
     await conn.query(
       'INSERT INTO users (id, email, password_hash, full_name, company_id, is_active, local_mode, max_devices) VALUES (:id, :email, :password_hash, :full_name, :company_id, 1, :local_mode, :max_devices)',
-      { id: userId, email: contact_email, password_hash: passwordHash, full_name: `${name} Admin`, company_id: companyId, local_mode, max_devices: Number(max_devices) }
+      { id: userId, email: contact_email, password_hash: passwordHash, full_name: `${name} Admin`, company_id: companyId, local_mode: dbLocalMode, max_devices: dbMaxDevices }
     );
     await conn.query(
       'INSERT INTO user_roles (id, user_id, role) VALUES (:id, :user_id, :role)',

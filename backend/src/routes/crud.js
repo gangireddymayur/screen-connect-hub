@@ -134,6 +134,13 @@ function crud(table, { tenantScoped = true, superAdminOnly = false } = {}) {
       delete payload.created_at;
       delete payload.updated_at;
 
+      if (table === 'companies') {
+        if (payload.local_mode === 'single') {
+          payload.max_screens = 1;
+          payload.max_devices = 1;
+        }
+      }
+
       const cols = Object.keys(payload);
       if (!cols.length) return res.json({ ok: true });
       const sets = cols.map((c) => `\`${c}\` = :${c}`).join(',');
