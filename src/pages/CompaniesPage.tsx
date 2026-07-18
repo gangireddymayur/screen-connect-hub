@@ -100,6 +100,8 @@ export default function CompaniesPage() {
   const [editStatus, setEditStatus] = useState("");
   const [editPlan, setEditPlan] = useState("starter");
   const [editNotes, setEditNotes] = useState("");
+  const [editLocalMode, setEditLocalMode] = useState("none");
+  const [editMaxDevices, setEditMaxDevices] = useState("5");
 
   // Detail sheet
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -232,6 +234,8 @@ export default function CompaniesPage() {
     setEditStatus(company.status);
     setEditPlan(company.plan || "starter");
     setEditNotes(company.notes ?? "");
+    setEditLocalMode(company.local_mode || "none");
+    setEditMaxDevices(String(company.max_devices || 5));
     setEditOpen(true);
   };
 
@@ -242,10 +246,12 @@ export default function CompaniesPage() {
     const { error } = await supabase.from("companies").update({
       name: editName,
       contact_email: editEmail,
-      max_screens: parseInt(editMaxScreens),
+      max_screens: editLocalMode === "single" ? 1 : parseInt(editMaxScreens),
       status: editStatus,
       plan: editPlan,
       notes: editNotes.trim() || null,
+      local_mode: editLocalMode,
+      max_devices: editLocalMode === "single" ? 1 : (editLocalMode === "multi" ? parseInt(editMaxDevices) : 1)
     }).eq("id", editCompany.id);
     setSubmitting(false);
     if (error) toast.error(error.message);
@@ -405,7 +411,14 @@ export default function CompaniesPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Max Screens</Label>
-                      <Input type="number" value={maxScreens} onChange={(e) => setMaxScreens(e.target.value)} min="1" required />
+                      <Input 
+                        type="number" 
+                        value={localMode === "single" ? "1" : maxScreens} 
+                        onChange={(e) => setMaxScreens(e.target.value)} 
+                        min="1" 
+                        disabled={localMode === "single"} 
+                        required 
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -651,8 +664,34 @@ export default function CompaniesPage() {
               </div>
               <div className="space-y-2">
                 <Label>Max Screens</Label>
-                <Input type="number" value={editMaxScreens} onChange={(e) => setEditMaxScreens(e.target.value)} min="1" required />
+                <Input 
+                  type="number" 
+                  value={editLocalMode === "single" ? "1" : editMaxScreens} 
+                  onChange={(e) => setEditMaxScreens(e.target.value)} 
+                  min="1" 
+                  disabled={editLocalMode === "single"} 
+                  required 
+                />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Deployment Mode</Label>
+                <Select value={editLocalMode} onValueChange={setEditLocalMode}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Cloud Mode (Standard)</SelectItem>
+                    <SelectItem value="single">Local Single-Device (Solo)</SelectItem>
+                    <SelectItem value="multi">Local Multi-Screen (Cluster)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {editLocalMode === "multi" && (
+                <div className="space-y-2">
+                  <Label>Max Local Screens</Label>
+                  <Input type="number" value={editMaxDevices} onChange={(e) => setEditMaxDevices(e.target.value)} min="1" required />
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
