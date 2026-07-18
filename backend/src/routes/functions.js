@@ -76,8 +76,8 @@ async function createCompanyAdmin(req, res) {
   try {
     await conn.beginTransaction();
     await conn.query(
-      'INSERT INTO companies (id, name, contact_email, plan, max_screens, status, created_by) VALUES (:id, :name, :contact_email, :plan, :max_screens, :status, :created_by)',
-      { id: companyId, name, contact_email, plan, max_screens: Number(max_screens || 10), status: 'active', created_by: req.user.id }
+      'INSERT INTO companies (id, name, contact_email, plan, max_screens, status, created_by, local_mode, max_devices) VALUES (:id, :name, :contact_email, :plan, :max_screens, :status, :created_by, :local_mode, :max_devices)',
+      { id: companyId, name, contact_email, plan, max_screens: Number(max_screens || 10), status: 'active', created_by: req.user.id, local_mode, max_devices: Number(max_devices) }
     );
     await conn.query(
       'INSERT INTO users (id, email, password_hash, full_name, company_id, is_active, local_mode, max_devices) VALUES (:id, :email, :password_hash, :full_name, :company_id, 1, :local_mode, :max_devices)',

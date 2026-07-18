@@ -219,6 +219,14 @@ class SqlitePool {
         this.db.run("ALTER TABLE users ADD COLUMN max_devices INTEGER NOT NULL DEFAULT 5;");
       } catch (e) {}
 
+      try {
+        this.db.run("ALTER TABLE companies ADD COLUMN local_mode TEXT NOT NULL DEFAULT 'none';");
+      } catch (e) {}
+
+      try {
+        this.db.run("ALTER TABLE companies ADD COLUMN max_devices INTEGER NOT NULL DEFAULT 5;");
+      } catch (e) {}
+
       // Seed default company if database is empty
       const compCheck = this.db.prepare("SELECT id FROM companies LIMIT 1");
       let hasCompany = false;

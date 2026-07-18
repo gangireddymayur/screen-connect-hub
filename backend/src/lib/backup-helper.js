@@ -48,8 +48,8 @@ async function restoreBackupPayload(payload, dbPool) {
     if (company) {
       // In SQLite, we do INSERT OR REPLACE to keep it simple and clean
       const insertCompanySql = isSqlite
-        ? `INSERT OR REPLACE INTO companies (id, name, contact_email, plan, max_screens, status, timezone, logo_url, show_brand_header, brand_header_placement) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        : `INSERT INTO companies (id, name, contact_email, plan, max_screens, status, timezone, logo_url, show_brand_header, brand_header_placement) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), max_screens=VALUES(max_screens)`;
+        ? `INSERT OR REPLACE INTO companies (id, name, contact_email, plan, max_screens, status, timezone, logo_url, show_brand_header, brand_header_placement, local_mode, max_devices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        : `INSERT INTO companies (id, name, contact_email, plan, max_screens, status, timezone, logo_url, show_brand_header, brand_header_placement, local_mode, max_devices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), max_screens=VALUES(max_screens), local_mode=VALUES(local_mode), max_devices=VALUES(max_devices)`;
       
       await conn.query(insertCompanySql, [
         company.id || payload.company_id,
@@ -61,7 +61,9 @@ async function restoreBackupPayload(payload, dbPool) {
         company.timezone || 'UTC',
         company.logo_url || null,
         company.show_brand_header || 0,
-        company.brand_header_placement || 'top'
+        company.brand_header_placement || 'top',
+        company.local_mode || 'none',
+        company.max_devices || 5
       ]);
     }
 
