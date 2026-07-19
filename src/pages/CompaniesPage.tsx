@@ -196,7 +196,7 @@ export default function CompaniesPage() {
         password,
         max_screens: localMode === "single" ? 1 : parseInt(maxScreens),
         local_mode: localMode,
-        max_devices: localMode === "multi" ? parseInt(maxDevices) : 1
+        max_devices: localMode === "single" ? 1 : parseInt(maxScreens)
       },
     });
     if (error || data?.error) {
@@ -236,7 +236,7 @@ export default function CompaniesPage() {
       status: editStatus,
       notes: editNotes.trim() || null,
       local_mode: editLocalMode,
-      max_devices: editLocalMode === "single" ? 1 : (editLocalMode === "multi" ? parseInt(editMaxDevices) : 1)
+      max_devices: editLocalMode === "single" ? 1 : parseInt(editMaxScreens)
     }).eq("id", editCompany.id);
     setSubmitting(false);
     if (error) toast.error(error.message);
@@ -395,24 +395,16 @@ export default function CompaniesPage() {
                       required 
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Deployment Mode</Label>
-                      <Select value={localMode} onValueChange={setLocalMode}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Cloud Mode (Standard)</SelectItem>
-                          <SelectItem value="single">Local Single-Device (Solo)</SelectItem>
-                          <SelectItem value="multi">Local Multi-Screen (Cluster)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {localMode === "multi" && (
-                      <div className="space-y-2">
-                        <Label>Max Local Screens</Label>
-                        <Input type="number" value={maxDevices} onChange={(e) => setMaxDevices(e.target.value)} min="1" required />
-                      </div>
-                    )}
+                  <div className="space-y-2">
+                    <Label>Deployment Mode</Label>
+                    <Select value={localMode} onValueChange={setLocalMode}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Cloud Mode (Standard)</SelectItem>
+                        <SelectItem value="single">Local Single-Device (Solo)</SelectItem>
+                        <SelectItem value="multi">Local Multi-Screen (Cluster)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <Button type="submit" className="w-full" disabled={submitting}>
                     {submitting ? "Creating..." : "Create Company & Admin"}
@@ -627,24 +619,16 @@ export default function CompaniesPage() {
                 required 
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Deployment Mode</Label>
-                <Select value={editLocalMode} onValueChange={setEditLocalMode}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Cloud Mode (Standard)</SelectItem>
-                    <SelectItem value="single">Local Single-Device (Solo)</SelectItem>
-                    <SelectItem value="multi">Local Multi-Screen (Cluster)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {editLocalMode === "multi" && (
-                <div className="space-y-2">
-                  <Label>Max Local Screens</Label>
-                  <Input type="number" value={editMaxDevices} onChange={(e) => setEditMaxDevices(e.target.value)} min="1" required />
-                </div>
-              )}
+            <div className="space-y-2">
+              <Label>Deployment Mode</Label>
+              <Select value={editLocalMode} onValueChange={setEditLocalMode}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Cloud Mode (Standard)</SelectItem>
+                  <SelectItem value="single">Local Single-Device (Solo)</SelectItem>
+                  <SelectItem value="multi">Local Multi-Screen (Cluster)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
