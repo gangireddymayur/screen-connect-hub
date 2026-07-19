@@ -65,7 +65,7 @@ async function createCompanyAdmin(req, res) {
   }
 
   const dbLocalMode = local_mode || 'none';
-  const dbMaxScreens = Number(max_screens || 10);
+  const dbMaxScreens = dbLocalMode === 'single' ? 1 : Number(max_screens || 10);
   const dbMaxDevices = dbLocalMode === 'single' ? 1 : Number(max_devices || 5);
 
   const existing = await first('SELECT id FROM users WHERE email = :email LIMIT 1', { email: contact_email });

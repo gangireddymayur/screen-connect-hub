@@ -194,7 +194,7 @@ export default function CompaniesPage() {
         name,
         contact_email: contactEmail,
         password,
-        max_screens: parseInt(maxScreens),
+        max_screens: localMode === "single" ? 1 : parseInt(maxScreens),
         local_mode: localMode,
         max_devices: localMode === "multi" ? parseInt(maxDevices) : 1
       },
@@ -232,7 +232,7 @@ export default function CompaniesPage() {
     const { error } = await supabase.from("companies").update({
       name: editName,
       contact_email: editEmail,
-      max_screens: parseInt(editMaxScreens),
+      max_screens: editLocalMode === "single" ? 1 : parseInt(editMaxScreens),
       status: editStatus,
       notes: editNotes.trim() || null,
       local_mode: editLocalMode,
@@ -388,9 +388,10 @@ export default function CompaniesPage() {
                     <Label>Max Screens</Label>
                     <Input 
                       type="number" 
-                      value={maxScreens} 
+                      value={localMode === "single" ? "1" : maxScreens} 
                       onChange={(e) => setMaxScreens(e.target.value)} 
                       min="1" 
+                      disabled={localMode === "single"} 
                       required 
                     />
                   </div>
@@ -619,9 +620,10 @@ export default function CompaniesPage() {
               <Label>Max Screens</Label>
               <Input 
                 type="number" 
-                value={editMaxScreens} 
+                value={editLocalMode === "single" ? "1" : editMaxScreens} 
                 onChange={(e) => setEditMaxScreens(e.target.value)} 
                 min="1" 
+                disabled={editLocalMode === "single"} 
                 required 
               />
             </div>
