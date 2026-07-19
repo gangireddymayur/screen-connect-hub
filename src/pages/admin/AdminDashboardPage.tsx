@@ -29,7 +29,6 @@ const isOnline = (lastSeen: string | null) => {
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const [companyName, setCompanyName] = useState("");
-  const [plan, setPlan] = useState<string>("starter");
   const [maxScreens, setMaxScreens] = useState(0);
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [contentCount, setContentCount] = useState(0);
@@ -53,7 +52,7 @@ export default function AdminDashboardPage() {
       const companyId = profile.company_id;
 
       const [companyRes, devicesRes, contentRes, layoutsRes, schedulesRes] = await Promise.all([
-        supabase.from("companies").select("name, max_screens, plan").eq("id", companyId).single(),
+        supabase.from("companies").select("name, max_screens").eq("id", companyId).single(),
         supabase.from("devices").select("id, name, location, is_paired, last_seen_at").eq("company_id", companyId),
         supabase.from("content").select("id, file_size").eq("company_id", companyId),
         supabase.from("layouts").select("id", { count: "exact", head: true }).eq("company_id", companyId),
@@ -61,7 +60,6 @@ export default function AdminDashboardPage() {
       ]);
 
       setCompanyName(companyRes.data?.name ?? "");
-      setPlan(companyRes.data?.plan ?? "starter");
       setMaxScreens(companyRes.data?.max_screens ?? 0);
       setDevices(devicesRes.data ?? []);
       setContentCount(contentRes.data?.length ?? 0);
@@ -77,14 +75,12 @@ export default function AdminDashboardPage() {
 
   const onlineDevices = devices.filter((d) => d.is_paired && isOnline(d.last_seen_at)).length;
   const totalDevices = devices.length;
-  const storageQuota = getStorageQuota(plan);
-  const storagePct = Math.min(100, (storageBytes / storageQuota) * 100);
   const screenPct = maxScreens > 0 ? Math.min(100, (totalDevices / maxScreens) * 100) : 0;
 
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -92,13 +88,11 @@ export default function AdminDashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
-            <Sparkles className="h-4 w-4 text-primary" />
+            <Monitor className="h-4 w-4 text-primary" />
             <div className="text-xs">
-              <span className="text-muted-foreground">Current plan</span>
+              <span className="text-muted-foreground">Screens Capacity</span>
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm">{PLAN_LABELS[plan] ?? plan}</span>
-                <span className="text-muted-foreground">·</span>
-                <span className="text-muted-foreground">{formatBytes(storageQuota)} · {maxScreens} screens</span>
+                <span className="font-semibold text-sm">{maxScreens} screens max</span>
               </div>
             </div>
           </div>
@@ -137,9 +131,8 @@ export default function AdminDashboardPage() {
               </div>
               <p className="text-3xl font-bold">{loading ? "—" : contentCount}</p>
               <div className="mt-3">
-                <Progress value={storagePct} className="h-1.5" />
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <HardDrive className="h-3 w-3" /> {formatBytes(storageBytes)} of {formatBytes(storageQuota)}
+                  <HardDrive className="h-3 w-3" /> {formatBytes(storageBytes)} storage used
                 </p>
               </div>
             </CardContent>

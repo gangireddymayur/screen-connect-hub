@@ -7,11 +7,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { getStorageQuota, formatBytes, PLAN_LABELS } from "@/lib/plan-quotas";
+import { formatBytes } from "@/lib/plan-quotas";
 
 interface ContentItem {
   id: string;
@@ -42,7 +40,6 @@ export default function AdminContentPage() {
   const [content, setContent] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
-  const [plan, setPlan] = useState<string>("starter");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -70,8 +67,6 @@ export default function AdminContentPage() {
       .then(async ({ data }) => {
         if (data?.company_id) {
           setCompanyId(data.company_id);
-          const { data: company } = await supabase.from("companies").select("plan").eq("id", data.company_id).single();
-          if (company) setPlan(company.plan ?? "starter");
           fetchContent(data.company_id);
         } else setLoading(false);
       });
@@ -86,9 +81,6 @@ export default function AdminContentPage() {
   };
 
   const totalStorage = useMemo(() => content.reduce((s, c) => s + (c.file_size || 0), 0), [content]);
-  const storageQuota = getStorageQuota(plan);
-  const storagePct = Math.min(100, (totalStorage / storageQuota) * 100);
-  const isOverQuota = totalStorage >= storageQuota;
 
   const filtered = useMemo(() => content.filter((c) => {
     const matchesSearch = !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -111,12 +103,6 @@ export default function AdminContentPage() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !companyId) return;
-    const incomingSize = Array.from(files).reduce((s, f) => s + f.size, 0);
-    if (totalStorage + incomingSize > storageQuota) {
-      toast.error(`Upload would exceed your ${PLAN_LABELS[plan] ?? plan} plan quota of ${formatBytes(storageQuota)}. Upgrade or free up space.`);
-      if (fileRef.current) fileRef.current.value = "";
-      return;
-    }
     let successCount = 0;
     setUploading(true);
     for (const file of Array.from(files)) {
@@ -128,73 +114,78 @@ export default function AdminContentPage() {
         toast.error(`Failed to upload ${file.name}: ${uploadError.message}`);
         continue;
       }
-      const { data: urlData } = supabase.storage.from("content").getPublicUrl(path);
-      const { error: insertError } = await supabase.from("content").insert({
-        company_id: companyId, name: file.name, type,
-        file_url: urlData.publicUrl, file_size: file.size,
-        duration: type === "image" ? 10 : 30,
+      const { data: publicUrlData } = supabase.storage.from("content").getPublicUrl(path);
+      const { error: dbError } = await supabase.from("content").insert({
+        name: file.name,
+        type,
+        file_url: publicUrlData.publicUrl,
+        file_size: file.size,
+        duration: type === "video" ? 15 : 10,
+        company_id: companyId,
       });
-      if (insertError) {
-        toast.error(`Failed to save ${file.name}: ${insertError.message}`);
-      } else {
-        successCount++;
-      }
-    }
-    if (successCount > 0) {
-      toast.success(`${successCount} file(s) uploaded successfully!`);
-      setUploadOpen(false);
+      if (dbError) toast.error(`Failed to save ${file.name} to database: ${dbError.message}`);
+      else successCount++;
     }
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
-    fetchContent(companyId);
+    if (successCount > 0) {
+      toast.success(`Successfully uploaded ${successCount} file(s)`);
+      fetchContent(companyId);
+      setUploadOpen(false);
+    }
   };
 
-  const handleDelete = async () => {
-    if (!deleteItem || !companyId) return;
+  const handleDeleteClick = (item: ContentItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteItem(item);
+    setDeleteOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteItem) return;
     setDeleting(true);
-    if (deleteItem.file_url) {
-      const path = deleteItem.file_url.split("/content/")[1];
-      if (path) await supabase.storage.from("content").remove([path]);
-    }
+    const path = deleteItem.file_url?.split("/").slice(-2).join("/");
+    if (path) await supabase.storage.from("content").remove([path]);
     const { error } = await supabase.from("content").delete().eq("id", deleteItem.id);
     setDeleting(false);
-    if (error) toast.error(error.message);
+    if (error) toast.error("Failed to delete content");
     else {
-      toast.success("Content deleted!");
+      toast.success("Content deleted");
+      fetchContent(deleteItem.company_id);
       setDeleteOpen(false);
       setDeleteItem(null);
-      fetchContent(companyId);
     }
   };
 
   const handleBulkDelete = async () => {
     if (selected.size === 0 || !companyId) return;
     setDeleting(true);
-    const items = content.filter((c) => selected.has(c.id));
-    const paths = items.map((i) => i.file_url?.split("/content/")[1]).filter(Boolean) as string[];
+    const itemsToDelete = content.filter(item => selected.has(item.id));
+    const paths = itemsToDelete
+      .map(item => item.file_url?.split("/").slice(-2).join("/"))
+      .filter((path): path is string => !!path);
     if (paths.length > 0) await supabase.storage.from("content").remove(paths);
     const { error } = await supabase.from("content").delete().in("id", Array.from(selected));
     setDeleting(false);
-    if (error) toast.error(error.message);
+    if (error) toast.error("Failed to delete selected content");
     else {
-      toast.success(`Deleted ${selected.size} items`);
-      setBulkDeleteOpen(false);
+      toast.success("Selected content deleted");
       fetchContent(companyId);
+      setBulkDeleteOpen(false);
     }
   };
 
-  const toggleSelect = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+  const toggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newSelected = new Set(selected);
+    if (newSelected.has(id)) newSelected.delete(id);
+    else newSelected.add(id);
+    setSelected(newSelected);
   };
 
-  const allSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
   const toggleSelectAll = () => {
-    if (allSelected) setSelected(new Set());
-    else setSelected(new Set(filtered.map((c) => c.id)));
+    if (selected.size === paginatedContent.length) setSelected(new Set());
+    else setSelected(new Set(paginatedContent.map(item => item.id)));
   };
 
   return (
@@ -210,23 +201,16 @@ export default function AdminContentPage() {
           </Button>
         </div>
 
-        <Card className={isOverQuota ? "border-destructive/50" : ""}>
+        <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm">
                 <HardDrive className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">{formatSize(totalStorage)}</span>
-                <span className="text-muted-foreground">of {formatBytes(storageQuota)} used</span>
-                <Badge variant="secondary" className="ml-1 text-xs">{PLAN_LABELS[plan] ?? plan} plan</Badge>
+                <span className="text-muted-foreground">storage used</span>
               </div>
               <span className="text-xs text-muted-foreground">{content.length} files</span>
             </div>
-            <Progress value={storagePct} className="h-2" />
-            {isOverQuota && (
-              <p className="text-xs text-destructive mt-2">
-                Storage quota reached. Delete files or upgrade your plan to upload more.
-              </p>
-            )}
           </CardContent>
         </Card>
 

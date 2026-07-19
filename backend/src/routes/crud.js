@@ -136,7 +136,6 @@ function crud(table, { tenantScoped = true, superAdminOnly = false } = {}) {
 
       if (table === 'companies') {
         if (payload.local_mode === 'single') {
-          payload.max_screens = 1;
           payload.max_devices = 1;
         }
       }

@@ -52,13 +52,6 @@ interface CompanyStats {
   admin_id: string | null;
 }
 
-const PLANS = ["starter", "pro", "enterprise"];
-const PLAN_COLORS: Record<string, string> = {
-  starter: "bg-muted text-muted-foreground",
-  pro: "bg-primary/10 text-primary",
-  enterprise: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-};
-
 type SortKey = "name" | "created_at" | "max_screens";
 type SortDir = "asc" | "desc";
 
@@ -71,7 +64,7 @@ export default function CompaniesPage() {
   // Search & filters
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [planFilter, setPlanFilter] = useState<string>("all");
+
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
@@ -86,7 +79,7 @@ export default function CompaniesPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [maxScreens, setMaxScreens] = useState("10");
-  const [addPlan, setAddPlan] = useState("starter");
+
   const [localMode, setLocalMode] = useState("none");
   const [maxDevices, setMaxDevices] = useState("5");
   const [submitting, setSubmitting] = useState(false);
@@ -98,7 +91,7 @@ export default function CompaniesPage() {
   const [editEmail, setEditEmail] = useState("");
   const [editMaxScreens, setEditMaxScreens] = useState("");
   const [editStatus, setEditStatus] = useState("");
-  const [editPlan, setEditPlan] = useState("starter");
+
   const [editNotes, setEditNotes] = useState("");
   const [editLocalMode, setEditLocalMode] = useState("none");
   const [editMaxDevices, setEditMaxDevices] = useState("5");
@@ -153,7 +146,6 @@ export default function CompaniesPage() {
       list = list.filter((c) => c.name.toLowerCase().includes(q) || c.contact_email.toLowerCase().includes(q));
     }
     if (statusFilter !== "all") list = list.filter((c) => c.status === statusFilter);
-    if (planFilter !== "all") list = list.filter((c) => c.plan === planFilter);
     list = [...list].sort((a, b) => {
       let av: any = a[sortKey]; let bv: any = b[sortKey];
       if (sortKey === "created_at") { av = new Date(av).getTime(); bv = new Date(bv).getTime(); }
@@ -163,10 +155,9 @@ export default function CompaniesPage() {
       return 0;
     });
     return list;
-  }, [companies, search, statusFilter, planFilter, sortKey, sortDir]);
+  }, [companies, search, statusFilter, sortKey, sortDir]);
 
-  // Reset page when filters change
-  useEffect(() => { setPage(1); setSelected(new Set()); }, [search, statusFilter, planFilter]);
+  useEffect(() => { setPage(1); setSelected(new Set()); }, [search, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -213,14 +204,10 @@ export default function CompaniesPage() {
       toast.error(data?.error || error?.message || "Failed to create company");
       return;
     }
-    // Apply plan if not starter
-    if (addPlan !== "starter" && data?.company?.id) {
-      await supabase.from("companies").update({ plan: addPlan }).eq("id", data.company.id);
-    }
     setSubmitting(false);
     toast.success("Company and admin account created!");
     setAddOpen(false);
-    setName(""); setContactEmail(""); setPassword(""); setMaxScreens("10"); setAddPlan("starter");
+    setName(""); setContactEmail(""); setPassword(""); setMaxScreens("10");
     setLocalMode("none"); setMaxDevices("5");
     fetchCompanies();
   };
@@ -232,7 +219,6 @@ export default function CompaniesPage() {
     setEditEmail(company.contact_email);
     setEditMaxScreens(String(company.max_screens));
     setEditStatus(company.status);
-    setEditPlan(company.plan || "starter");
     setEditNotes(company.notes ?? "");
     setEditLocalMode(company.local_mode || "none");
     setEditMaxDevices(String(company.max_devices || 5));
@@ -246,9 +232,8 @@ export default function CompaniesPage() {
     const { error } = await supabase.from("companies").update({
       name: editName,
       contact_email: editEmail,
-      max_screens: editLocalMode === "single" ? 1 : parseInt(editMaxScreens),
+      max_screens: parseInt(editMaxScreens),
       status: editStatus,
-      plan: editPlan,
       notes: editNotes.trim() || null,
       local_mode: editLocalMode,
       max_devices: editLocalMode === "single" ? 1 : (editLocalMode === "multi" ? parseInt(editMaxDevices) : 1)
@@ -333,11 +318,11 @@ export default function CompaniesPage() {
   const exportCSV = () => {
     const rows = filtered;
     if (rows.length === 0) { toast.error("Nothing to export"); return; }
-    const header = ["Name", "Email", "Plan", "Status", "Max Screens", "Notes", "Created"];
+    const header = ["Name", "Email", "Status", "Max Screens", "Notes", "Created"];
     const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const csv = [
       header.join(","),
-      ...rows.map((c) => [c.name, c.contact_email, c.plan, c.status, c.max_screens, c.notes ?? "", c.created_at].map(escape).join(",")),
+      ...rows.map((c) => [c.name, c.contact_email, c.status, c.max_screens, c.notes ?? "", c.created_at].map(escape).join(",")),
     ].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -399,27 +384,15 @@ export default function CompaniesPage() {
                       </Button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Plan</Label>
-                      <Select value={addPlan} onValueChange={setAddPlan}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {PLANS.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Max Screens</Label>
-                      <Input 
-                        type="number" 
-                        value={localMode === "single" ? "1" : maxScreens} 
-                        onChange={(e) => setMaxScreens(e.target.value)} 
-                        min="1" 
-                        disabled={localMode === "single"} 
-                        required 
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label>Max Screens</Label>
+                    <Input 
+                      type="number" 
+                      value={maxScreens} 
+                      onChange={(e) => setMaxScreens(e.target.value)} 
+                      min="1" 
+                      required 
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
@@ -471,13 +444,7 @@ export default function CompaniesPage() {
               <SelectItem value="suspended">Suspended</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={planFilter} onValueChange={setPlanFilter}>
-            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Plan" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All plans</SelectItem>
-              {PLANS.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}
-            </SelectContent>
-          </Select>
+
         </div>
 
         {/* Bulk actions bar */}
@@ -525,7 +492,6 @@ export default function CompaniesPage() {
                         Company <ArrowUpDown className="h-3 w-3" />
                       </button>
                     </TableHead>
-                    <TableHead>Plan</TableHead>
                     <TableHead>Mode</TableHead>
                     <TableHead>
                       <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("max_screens")}>
@@ -560,9 +526,6 @@ export default function CompaniesPage() {
                             <p className="text-xs text-muted-foreground">{company.contact_email}</p>
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`capitalize ${PLAN_COLORS[company.plan] || ""}`}>{company.plan}</Badge>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm font-medium capitalize">
@@ -652,27 +615,15 @@ export default function CompaniesPage() {
               <Label>Contact Email</Label>
               <Input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} required />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Plan</Label>
-                <Select value={editPlan} onValueChange={setEditPlan}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PLANS.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Max Screens</Label>
-                <Input 
-                  type="number" 
-                  value={editLocalMode === "single" ? "1" : editMaxScreens} 
-                  onChange={(e) => setEditMaxScreens(e.target.value)} 
-                  min="1" 
-                  disabled={editLocalMode === "single"} 
-                  required 
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Max Screens</Label>
+              <Input 
+                type="number" 
+                value={editMaxScreens} 
+                onChange={(e) => setEditMaxScreens(e.target.value)} 
+                min="1" 
+                required 
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -787,7 +738,6 @@ export default function CompaniesPage() {
                   <h3 className="font-semibold text-lg">{selectedCompany.name}</h3>
                   <div className="flex items-center gap-2 mt-1">
                     <StatusBadge status={selectedCompany.status as any} />
-                    <Badge variant="outline" className={`capitalize ${PLAN_COLORS[selectedCompany.plan] || ""}`}>{selectedCompany.plan}</Badge>
                   </div>
                 </div>
               </div>
