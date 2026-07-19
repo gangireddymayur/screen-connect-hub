@@ -315,6 +315,39 @@ app.listen(port, async () => {
               });
               const buffer = Buffer.from(payload, 'utf8');
               udpServer.send(buffer, 0, buffer.length, 9999, '255.255.255.255');
+
+              // Many routers and Android devices discard the all-subnets
+              // broadcast above. Also send to the interface's directed
+              // broadcast address (for example 192.168.0.255).
+              for (const name of Object.keys(interfaces)) {
+                for (const net of interfaces[name]) {
+                  if (
+                    net.family !== 'IPv4' ||
+                    net.internal ||
+                    net.address !== ip ||
+                    !net.netmask
+                  ) continue;
+                  const address = ip.split('.').map(Number);
+                  const mask = net.netmask.split('.').map(Number);
+                  const broadcast = address
+                    .map((part, index) => (part & mask[index]) | (~mask[index] & 255))
+                    .join('.');
+                  udpServer.send(buffer, 0, buffer.length, 9999, broadcast);
+
+                  // Some Android builds filter broadcast packets even while
+                  // the app is visible. On a normal /24 LAN, send the same
+                  // small discovery packet directly to each host as fallback.
+                  if (net.netmask === '255.255.255.0') {
+                    const subnet = address.slice(0, 3).join('.');
+                    for (let host = 1; host <= 254; host += 1) {
+                      const target = `${subnet}.${host}`;
+                      if (target !== ip) {
+                        udpServer.send(buffer, 0, buffer.length, 9999, target);
+                      }
+                    }
+                  }
+                }
+              }
             }
           } catch (e) {
             // ignore
@@ -326,8 +359,4 @@ app.listen(port, async () => {
     }
   }
 });
-
-
-
-
 

@@ -2,7 +2,9 @@ const fs = require('fs/promises');
 const path = require('path');
 const router = require('express').Router();
 
-const uploadRoot = path.resolve(__dirname, '../../uploads');
+const uploadRoot = process.pkg
+  ? path.join(path.dirname(process.execPath), 'uploads')
+  : path.resolve(__dirname, '../../uploads');
 
 const safePath = (value) => {
   const cleaned = String(value || '')
@@ -43,4 +45,83 @@ router.post('/remove', async (req, res) => {
   res.json({ success: true });
 });
 
-module.exports = { router, uploadRoot };
+async function fetchAndCacheCloudUpload(requestedPath, cloudUrl) {
+  const rel = safePath(requestedPath);
+  const full = path.join(uploadRoot, rel);
+  if (!full.startsWith(uploadRoot)) throw new Error('Invalid upload path');
+
+  const sourceUrl = `${String(cloudUrl).replace(/\/+$/, '')}/uploads/${rel
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/')}`;
+  const response = await fetch(sourceUrl);
+  if (!response.ok) {
+    const error = new Error(`Cloud upload returned ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  await fs.mkdir(path.dirname(full), { recursive: true });
+  await fs.writeFile(full, buffer);
+  return {
+    buffer,
+    contentType: response.headers.get('content-type') || 'application/octet-stream',
+    relativePath: rel,
+  };
+}
+
+async function syncCloudUploads(payload, cloudUrl) {
+  // Collect every upload reference in the one-time backup, including URLs
+  // nested inside layout_data widgets. No cloud fetches happen after this
+  // bootstrap function finishes.
+  const urls = [];
+  const collectUploadUrls = (value) => {
+    if (typeof value === 'string') {
+      if (value.includes('/uploads/')) urls.push(value);
+      if ((value.startsWith('{') || value.startsWith('[')) && value.includes('/uploads/')) {
+        try { collectUploadUrls(JSON.parse(value)); } catch { }
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(collectUploadUrls);
+      return;
+    }
+    if (value && typeof value === 'object') {
+      Object.values(value).forEach(collectUploadUrls);
+    }
+  };
+  collectUploadUrls(payload);
+
+  const paths = [...new Set(urls.map((value) => {
+    try {
+      const parsed = new URL(String(value), cloudUrl);
+      const marker = '/uploads/';
+      const index = parsed.pathname.indexOf(marker);
+      return index >= 0 ? decodeURIComponent(parsed.pathname.slice(index + marker.length)) : null;
+    } catch {
+      return null;
+    }
+  }).filter(Boolean))];
+
+  let synced = 0;
+  for (const rel of paths) {
+    try {
+      await fetchAndCacheCloudUpload(rel, cloudUrl);
+      synced += 1;
+    } catch (error) {
+      console.warn(`[cloud-assets] Could not cache ${rel}: ${error.message}`);
+    }
+  }
+  console.log(`[cloud-assets] Cached ${synced}/${paths.length} cloud uploads locally.`);
+  return { synced, total: paths.length };
+}
+
+module.exports = {
+  router,
+  uploadRoot,
+  safePath,
+  fetchAndCacheCloudUpload,
+  syncCloudUploads,
+};

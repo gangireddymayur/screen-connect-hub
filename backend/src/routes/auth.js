@@ -27,8 +27,11 @@ router.post('/login', async (req, res) => {
       }
     }
 
-    if ((!user || !passwordMatches) && isOffline) {
-      console.log(`[local-auth] User missing locally or password mismatch for ${normalizedEmail}. Attempting cloud authentication...`);
+    // Plesk is used only to bootstrap an account that has never been saved
+    // locally. Once a local user exists, all authentication remains local;
+    // even a wrong password must never trigger another cloud request.
+    if (!user && isOffline) {
+      console.log(`[local-auth] User ${normalizedEmail} has not been bootstrapped. Attempting one-time cloud authentication...`);
       const cloudUrl = process.env.CLOUD_URL || 'https://agitated-satoshi.103-69-196-157.plesk.page';
       try {
         const loginRes = await fetch(`${cloudUrl}/api/auth/login`, {
@@ -85,6 +88,8 @@ router.post('/login', async (req, res) => {
 
             console.log(`[local-auth] Restoring backup payload to local database...`);
             await restoreBackupPayload(backupPayload, db);
+            const { syncCloudUploads } = require('./storage');
+            await syncCloudUploads(backupPayload, cloudUrl);
           } else {
             console.warn(`[local-auth] Cloud backup download failed with status ${backupRes.status}; saving login identity only.`);
           }
