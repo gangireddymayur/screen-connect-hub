@@ -8,7 +8,8 @@ const useSqlite = process.env.USE_SQLITE === 'true' ||
 
 if (useSqlite) {
   const { SqlitePool } = require('./sqlite-adapter');
-  const dbPath = process.env.SQLITE_DB_PATH || path.join(__dirname, '../../App_Data/db.sqlite3');
+  const writableBaseDir = process.pkg ? path.dirname(process.execPath) : path.join(__dirname, '../..');
+  const dbPath = process.env.SQLITE_DB_PATH || path.join(writableBaseDir, 'App_Data', 'db.sqlite3');
   console.log(`[db] Running with SQLite database at: ${dbPath}`);
   module.exports = new SqlitePool(dbPath);
 } else {

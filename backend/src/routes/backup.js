@@ -8,7 +8,7 @@ async function download(req, res) {
 
   try {
     const [company] = await db.query(
-      "SELECT name, timezone, logo_url, show_brand_header, brand_header_placement, local_mode, max_devices FROM companies WHERE id = ? LIMIT 1",
+      "SELECT id, name, contact_email, plan, max_screens, status, timezone, logo_url, show_brand_header, brand_header_placement, local_mode, max_devices FROM companies WHERE id = ? LIMIT 1",
       [companyId]
     );
 
@@ -52,6 +52,7 @@ async function download(req, res) {
 
     res.json({
       version: 1,
+      company_id: companyId,
       company: company[0] || null,
       layouts,
       content,

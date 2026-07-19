@@ -121,17 +121,17 @@ const SQLITE_SCHEMA = [
 function translateSqlQuery(sql) {
   let s = sql;
   
-  // Handle NOW() -> datetime('now', 'localtime')
-  s = s.replace(/NOW\(\)/g, "datetime('now', 'localtime')");
+  // SQLite CURRENT_TIMESTAMP is UTC, matching MySQL's server-side timestamp
+  // storage. Keep NOW() in UTC as well so freshly-created pairing codes are
+  // not mistaken for expired records on machines in non-UTC timezones.
+  s = s.replace(/NOW\(\)/g, "datetime('now')");
 
-  // Handle DATE_SUB(datetime('now', 'localtime'), INTERVAL X MINUTE) -> datetime('now', 'localtime', '-X minutes')
-  s = s.replace(/DATE_SUB\(\s*datetime\('now',\s*'localtime'\)\s*,\s*INTERVAL\s+(\d+)\s+MINUTE\)/gi, "datetime('now', 'localtime', '-$1 minutes')");
-  s = s.replace(/DATE_SUB\(\s*NOW\(\)\s*,\s*INTERVAL\s+(\d+)\s+MINUTE\)/gi, "datetime('now', 'localtime', '-$1 minutes')");
-  s = s.replace(/DATE_SUB\(\s*NOW\(\)\s*,\s*INTERVAL\s+(\d+)\s+DAY\)/gi, "datetime('now', 'localtime', '-$1 days')");
+  // Handle DATE_SUB(datetime('now'), INTERVAL X ...)
+  s = s.replace(/DATE_SUB\(\s*datetime\('now'\)\s*,\s*INTERVAL\s+(\d+)\s+MINUTE\)/gi, "datetime('now', '-$1 minutes')");
+  s = s.replace(/DATE_SUB\(\s*datetime\('now'\)\s*,\s*INTERVAL\s+(\d+)\s+DAY\)/gi, "datetime('now', '-$1 days')");
 
   // Translate MySQL DATE_SUB(NOW(), INTERVAL 15 MINUTE)
-  s = s.replace(/DATE_SUB\(\s*datetime\('now',\s*'localtime'\)\s*,\s*INTERVAL\s+15\s+MINUTE\)/gi, "datetime('now', 'localtime', '-15 minutes')");
-  s = s.replace(/DATE_SUB\(\s*NOW\(\)\s*,\s*INTERVAL\s+15\s+MINUTE\)/gi, "datetime('now', 'localtime', '-15 minutes')");
+  s = s.replace(/DATE_SUB\(\s*datetime\('now'\)\s*,\s*INTERVAL\s+15\s+MINUTE\)/gi, "datetime('now', '-15 minutes')");
 
   // 1. TIME_FORMAT(col, '%H:%i') -> strftime('%H:%M', col)
   s = s.replace(/TIME_FORMAT\(([^,]+)\s*,\s*'%H:%i'\)/gi, "strftime('%H:%M', $1)");
@@ -166,6 +166,7 @@ class SqlitePool {
     this.dbPath = dbPath;
     this.SQL = null;
     this.db = null;
+    this.inTransaction = false;
     this.isSqlite = true;
     this.initPromise = this.init();
   }
@@ -200,7 +201,7 @@ class SqlitePool {
         fs.mkdirSync(dbDir, { recursive: true });
       }
       this.db = new this.SQL.Database();
-      this.saveToDisk();
+      if (!this.inTransaction) this.saveToDisk();
     }
     
     // Enable PRAGMAs & Setup schema
@@ -348,7 +349,16 @@ class SqlitePool {
     try {
       let rows = [];
       const stmt = this.db.prepare(translatedSql);
-      stmt.bind(params);
+      // mysql2 accepts { email: value } for a :email placeholder, whereas
+      // sql.js requires the punctuation to be part of the object key.
+      let sqliteParams = params;
+      if (params && !Array.isArray(params) && typeof params === "object") {
+        sqliteParams = {};
+        for (const [key, value] of Object.entries(params)) {
+          sqliteParams[/^[:@$]/.test(key) ? key : `:${key}`] = value;
+        }
+      }
+      stmt.bind(sqliteParams);
       
       const columns = stmt.getColumnNames();
       while (stmt.step()) {
@@ -370,7 +380,7 @@ class SqlitePool {
           lastId = res[0].values[0][0];
           changes = res[0].values[0][1];
         }
-        this.saveToDisk();
+        if (!this.inTransaction) this.saveToDisk();
         return [{ insertId: lastId, affectedRows: changes }, null];
       }
       
@@ -384,9 +394,22 @@ class SqlitePool {
     return {
       query: (sql, params) => this.query(sql, params),
       execute: (sql, params) => this.execute(sql, params),
-      beginTransaction: async () => this.query("BEGIN TRANSACTION"),
-      commit: async () => this.query("COMMIT"),
-      rollback: async () => this.query("ROLLBACK"),
+      beginTransaction: async () => {
+        await this.initPromise;
+        this.db.run("BEGIN TRANSACTION");
+        this.inTransaction = true;
+      },
+      commit: async () => {
+        if (!this.inTransaction) return;
+        this.db.run("COMMIT");
+        this.inTransaction = false;
+        this.saveToDisk();
+      },
+      rollback: async () => {
+        if (!this.inTransaction) return;
+        this.db.run("ROLLBACK");
+        this.inTransaction = false;
+      },
       release: () => {},
       isSqlite: true
     };

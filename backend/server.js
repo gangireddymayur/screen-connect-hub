@@ -2,6 +2,13 @@
 const path = require('path');
 const fs = require('fs');
 
+if (process.pkg) {
+  // A packaged build is always the local Windows server. Set this before any
+  // database or route module is loaded.
+  process.env.IS_OFFLINE = 'true';
+  require('./src/lib/windows-installer').installIfNeeded();
+}
+
 if (fs.existsSync(path.resolve(process.cwd(), '.env'))) {
   require('dotenv').config();
 } else if (fs.existsSync(path.resolve(__dirname, '../.env'))) {
@@ -209,9 +216,7 @@ try {
 
 // Serve frontend static files from root dist/
 // path is declared at top
-const distDir = process.env.IS_OFFLINE === 'true'
-  ? path.join(__dirname, 'public')
-  : path.join(__dirname, '../dist');
+const distDir = path.join(__dirname, '../dist');
 app.use(express.static(distDir, { maxAge: '1h', index: false }));
 app.get(/^(?!\/api|\/uploads).*/, (_req, res) => {
   res.sendFile(path.join(distDir, 'index.html'));
@@ -266,14 +271,16 @@ app.listen(port, async () => {
     try {
       const { exec } = require('child_process');
       const url = `http://localhost:${port}`;
-      if (process.platform === 'win32') {
-        exec(`start ${url}`);
-      } else if (process.platform === 'darwin') {
-        exec(`open ${url}`);
-      } else {
-        exec(`xdg-open ${url}`);
+      if (process.env.OPEN_BROWSER !== 'false') {
+        if (process.platform === 'win32') {
+          exec(`start ${url}`);
+        } else if (process.platform === 'darwin') {
+          exec(`open ${url}`);
+        } else {
+          exec(`xdg-open ${url}`);
+        }
+        console.log(`[local] Automatically opening default browser to ${url}`);
       }
-      console.log(`[local] Automatically opening default browser to ${url}`);
     } catch (e) {
       // ignore
     }
@@ -319,8 +326,6 @@ app.listen(port, async () => {
     }
   }
 });
-
-
 
 
 
