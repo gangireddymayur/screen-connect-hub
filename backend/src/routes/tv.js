@@ -54,8 +54,7 @@ async function getActiveLayout(device) {
   const today = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // "YYYY-MM-DD"
   const time = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false }); // "HH:MM:SS"
 
-  const schedulesEnabled = device.schedules_enabled ?? 1;
-  let scheduledLayouts = [];
+  const schedulesEnabled = device.schedules_enabled !== 0;
 
   if (schedulesEnabled) {
     const [rows] = await db.query(
@@ -69,9 +68,9 @@ async function getActiveLayout(device) {
        LIMIT 1`,
       { device_id: device.id, date: today, time }
     );
-    scheduledLayouts = rows;
+    if (rows[0]) return normalizeLayout(rows[0]);
+    return null;
   }
-  if (scheduledLayouts[0]) return normalizeLayout(scheduledLayouts[0]);
 
   if (!device.layout_id) return null;
   const [layouts] = await db.query(

@@ -38,8 +38,9 @@ router.get('/:deviceId', async (req, res) => {
     const today = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // "YYYY-MM-DD"
     const time = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false }); // "HH:MM:SS"
 
-    const schedulesEnabled = device.schedules_enabled ?? 1;
-    let scheduledLayouts = [];
+    const schedulesEnabled = device.schedules_enabled !== 0;
+    let layout = null;
+    let source = 'schedule';
 
     if (schedulesEnabled) {
       const [rows] = await db.query(
@@ -53,13 +54,8 @@ router.get('/:deviceId', async (req, res) => {
          LIMIT 1`,
         { device_id: device.id, date: today, time }
       );
-      scheduledLayouts = rows;
-    }
-
-    let layout = normalizeLayout(scheduledLayouts[0]);
-    let source = 'schedule';
-
-    if (!layout && device.layout_id) {
+      layout = normalizeLayout(rows[0]);
+    } else if (device.layout_id) {
       const [layouts] = await db.query(
         'SELECT * FROM layouts WHERE id = :id AND company_id = :company_id LIMIT 1',
         { id: device.layout_id, company_id: device.company_id }
