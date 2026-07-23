@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { v4: uuid } = require('uuid');
 const db = require('../lib/db');
+const { getIndiaDateTime } = require('../lib/india-time');
 
 const UNPAIRED_COMPANY_ID = '00000000-0000-0000-0000-000000000000';
 const PAIRING_EXPIRES_MINUTES = 15;
@@ -49,10 +50,7 @@ async function uniqueCode() {
 }
 
 async function getActiveLayout(device) {
-  const now = new Date();
-  // Force Indian Standard Time (IST) timezone
-  const today = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // "YYYY-MM-DD"
-  const time = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false }); // "HH:MM:SS"
+  const { date: today, time } = getIndiaDateTime();
 
   const schedulesEnabled = device.schedules_enabled !== 0;
 

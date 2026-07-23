@@ -778,6 +778,11 @@ export default function AdminSchedulePage() {
   const handleGridDrop = (e: React.DragEvent, dateStr: string) => {
     e.preventDefault();
 
+    if (!schedulesEnabled) {
+      toast.error("Scheduling is disabled for this device. Turn on Enable Scheduling first.");
+      return;
+    }
+
     const todayStr = toISO(new Date());
     if (dateStr < todayStr) {
       toast.error("You cannot schedule on past dates");
@@ -990,10 +995,16 @@ export default function AdminSchedulePage() {
               
               <div className="flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-xs font-medium text-foreground">Disable Schedule</span>
-                  <span className="text-[10px] text-muted-foreground">Use default layout 24/7</span>
+                  <span className="text-xs font-medium text-foreground">Enable Scheduling</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {schedulesEnabled ? "Play layouts from the weekly timeline" : "Off — using the default layout 24/7"}
+                  </span>
                 </div>
                 <button
+                  type="button"
+                  role="switch"
+                  aria-checked={schedulesEnabled}
+                  aria-label="Enable Scheduling"
                   onClick={() => {
                     const nextVal = selectedDevice.schedules_enabled === 0;
                     updateDeviceSchedulesMode.mutate(nextVal);
@@ -1001,13 +1012,13 @@ export default function AdminSchedulePage() {
                   disabled={updateDeviceSchedulesMode.isPending}
                   className={cn(
                     "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-primary/40 focus:ring-offset-1 focus:ring-offset-background",
-                    selectedDevice.schedules_enabled === 0 ? "bg-amber-600/70 border-amber-500/50" : "bg-muted border-border/40"
+                    schedulesEnabled ? "bg-primary border-primary/60" : "bg-muted border-border/40"
                   )}
                 >
                   <span
                     className={cn(
                       "pointer-events-none inline-block size-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
-                      selectedDevice.schedules_enabled === 0 ? "translate-x-4" : "translate-x-0"
+                      schedulesEnabled ? "translate-x-4" : "translate-x-0"
                     )}
                   />
                 </button>

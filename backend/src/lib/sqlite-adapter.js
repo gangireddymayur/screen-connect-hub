@@ -341,7 +341,10 @@ class SqlitePool {
         }
       }
       
-      this.saveToDisk();
+      // A bulk insert may run inside a schedule transaction. Exporting the
+      // sql.js database before COMMIT can block the request and persist an
+      // incomplete state. commit() performs the single durable save.
+      if (!this.inTransaction) this.saveToDisk();
       return [{ insertId: lastId, affectedRows: changes }, null];
     }
 

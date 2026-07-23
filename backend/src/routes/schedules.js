@@ -1,8 +1,8 @@
 const router = require('express').Router();
 const db = require('../lib/db');
+const { getIndiaDateTime } = require('../lib/india-time');
 
-const todayInIndia = () =>
-  new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+const todayInIndia = () => getIndiaDateTime().date;
 
 // Helper to generate instances for a schedule
 function generateInstances(scheduleId, deviceId, layoutId, startTime, endTime, startDate, repeatMode, repeatInterval = 1, daysCount = 1) {

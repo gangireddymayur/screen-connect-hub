@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const db = require('../lib/db');
+const { getIndiaDateTime } = require('../lib/india-time');
 
 const parseJson = (value, fallback = null) => {
   if (!value) return fallback;
@@ -33,10 +34,7 @@ router.get('/:deviceId', async (req, res) => {
       { status: 'online', id: device.id }
     );
 
-    // Force Indian Standard Time (IST) timezone
-    const now = new Date();
-    const today = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // "YYYY-MM-DD"
-    const time = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false }); // "HH:MM:SS"
+    const { date: today, time } = getIndiaDateTime();
 
     const schedulesEnabled = device.schedules_enabled !== 0;
     let layout = null;
