@@ -2,6 +2,7 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const db = require('../lib/db');
 const { sign, authRequired } = require('../lib/auth');
+const { rememberLocalLoginPassword } = require('../lib/cloud-session-cache');
 
 // POST /api/auth/login  { email, password }
 router.post('/login', async (req, res) => {
@@ -168,6 +169,10 @@ router.post('/login', async (req, res) => {
       if (user.role !== 'admin' || user.local_mode !== 'multi') {
         return res.status(403).json({ error: 'Only local network admins are permitted to log in on this local server.' });
       }
+      // Keep the current sign-in password in process memory only so the
+      // authenticated admin can explicitly refresh cloud entitlements without
+      // being prompted a second time. It is never written to disk.
+      rememberLocalLoginPassword(user.id, password);
     }
 
     const token = sign({ id: user.id, email: user.email, role: user.role, company_id: user.company_id });

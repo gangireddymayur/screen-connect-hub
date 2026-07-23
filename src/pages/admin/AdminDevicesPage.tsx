@@ -66,8 +66,6 @@ export default function AdminDevicesPage() {
   const [layouts, setLayouts] = useState<Layout[]>([]);
   const [activeScheduleDeviceIds, setActiveScheduleDeviceIds] = useState<Set<string>>(new Set());
   const [isLocalServer, setIsLocalServer] = useState(false);
-  const [syncOpen, setSyncOpen] = useState(false);
-  const [cloudPassword, setCloudPassword] = useState("");
   const [syncing, setSyncing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -260,28 +258,23 @@ export default function AdminDevicesPage() {
     }
   };
 
-  const handleCloudSync = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!companyId || !cloudPassword) return;
+  const handleCloudSync = async () => {
+    if (!companyId) return;
     setSyncing(true);
-    const { data, error } = await supabase.functions.invoke("sync-cloud-to-local", {
-      body: { password: cloudPassword },
-    });
+    const { data, error } = await supabase.functions.invoke("sync-cloud-to-local");
     setSyncing(false);
     if (error || data?.error) {
       toast.error(data?.error || error?.message || "Cloud sync failed");
       return;
     }
 
-    setCloudPassword("");
-    setSyncOpen(false);
     await Promise.all([
       fetchDevices(companyId),
       fetchLayouts(companyId),
       fetchActiveSchedules(companyId),
     ]);
     toast.success("Local Windows data updated from cloud", {
-      description: `Screen allowance: ${data.max_devices}. Synced ${data.counts?.layouts || 0} layouts, ${data.counts?.schedules || 0} schedules, and ${data.assets?.synced || 0} files.`,
+      description: `Screen allowance updated to ${data.max_devices}. Local layouts, devices, schedules, and files were left unchanged.`,
     });
   };
 
@@ -297,37 +290,10 @@ export default function AdminDevicesPage() {
           </div>
           <div className="flex items-center gap-2">
             {isLocalServer && (
-              <Dialog open={syncOpen} onOpenChange={(open) => {
-                setSyncOpen(open);
-                if (!open) setCloudPassword("");
-              }}>
-                <DialogTrigger asChild>
-                  <Button size="sm" variant="outline">
-                    <RefreshCw className="h-4 w-4 mr-2" /> Sync from Cloud
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader><DialogTitle>Sync Windows Server from Cloud</DialogTitle></DialogHeader>
-                  <form onSubmit={handleCloudSync} className="space-y-4">
-                    <p className="text-xs text-muted-foreground leading-normal">
-                      Pull the latest screen limit, devices, layouts, schedules, and files. Your local screens keep working if the cloud is unavailable.
-                    </p>
-                    <div className="space-y-2">
-                      <Label>Current Cloud Password</Label>
-                      <Input
-                        type="password"
-                        value={cloudPassword}
-                        onChange={(e) => setCloudPassword(e.target.value)}
-                        autoComplete="current-password"
-                        required
-                      />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={syncing || !cloudPassword}>
-                      {syncing ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Syncing...</> : "Pull Latest Changes"}
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
+              <Button size="sm" variant="outline" onClick={handleCloudSync} disabled={syncing}>
+                <RefreshCw className={cn("h-4 w-4 mr-2", syncing && "animate-spin")} />
+                {syncing ? "Syncing..." : "Sync from Cloud"}
+              </Button>
             )}
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
