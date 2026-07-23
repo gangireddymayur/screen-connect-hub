@@ -267,6 +267,116 @@ async function logoutTvDevice(req, res) {
   res.json({ success: true, reset: true });
 }
 
+async function syncCloudToLocal(req, res) {
+  if (process.env.IS_OFFLINE !== 'true') {
+    return res.status(404).json({ error: 'Cloud sync is available only in the Windows local server.' });
+  }
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Only the local company admin can sync from cloud.' });
+  }
+
+  const password = String(req.body?.password || '');
+  if (!password) return res.status(400).json({ error: 'Your current cloud password is required.' });
+
+  const localUser = await first(
+    'SELECT id, email, company_id, local_mode FROM users WHERE id = :id LIMIT 1',
+    { id: req.user.id }
+  );
+  if (!localUser || localUser.local_mode !== 'multi') {
+    return res.status(403).json({ error: 'Cloud sync is available only for a local multi-screen account.' });
+  }
+
+  const cloudUrl = String(
+    process.env.CLOUD_URL || 'https://agitated-satoshi.103-69-196-157.plesk.page'
+  ).replace(/\/+$/, '');
+
+  let loginRes;
+  try {
+    loginRes = await fetch(`${cloudUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: localUser.email, password })
+    });
+  } catch (error) {
+    return res.status(503).json({
+      error: 'Cloud is unreachable. Local screens will keep working; try the sync again when internet is available.'
+    });
+  }
+  if (!loginRes.ok) {
+    return res.status(loginRes.status === 401 ? 401 : 502).json({
+      error: loginRes.status === 401 ? 'Cloud password is incorrect.' : `Cloud login failed (${loginRes.status}).`
+    });
+  }
+
+  const loginData = await loginRes.json();
+  const cloudToken = loginData.token;
+  if (!cloudToken) return res.status(502).json({ error: 'Cloud login did not return an access token.' });
+
+  let backupRes;
+  try {
+    backupRes = await fetch(`${cloudUrl}/api/backup`, {
+      headers: { Authorization: `Bearer ${cloudToken}` }
+    });
+  } catch (error) {
+    return res.status(503).json({ error: 'Cloud backup could not be reached. No local data was changed.' });
+  }
+  if (!backupRes.ok) {
+    return res.status(502).json({ error: `Cloud backup download failed (${backupRes.status}). No local data was changed.` });
+  }
+
+  const payload = await backupRes.json();
+  const remoteUser = loginData.user || {};
+  // The cloud Companies page exposes this entitlement as "Max Screens".
+  // In the Windows app that same value is the TV/device pairing allowance.
+  const cloudScreenLimit = Number(
+    payload.company?.max_screens || remoteUser.max_devices || payload.company?.max_devices || 5
+  );
+  const company = {
+    ...(payload.company || {}),
+    id: localUser.company_id,
+    local_mode: remoteUser.local_mode || payload.company?.local_mode || localUser.local_mode,
+    max_screens: cloudScreenLimit,
+    max_devices: cloudScreenLimit
+  };
+  if (company.local_mode === 'single') {
+    company.max_devices = 1;
+    company.max_screens = 1;
+  }
+
+  payload.company_id = localUser.company_id;
+  payload.company = company;
+  // Never import a cloud password hash during a configuration sync. The local
+  // password remains usable offline and is refreshed only by login fallback.
+  payload.users = [];
+
+  const { restoreBackupPayload } = require('../lib/backup-helper');
+  const { syncCloudUploads } = require('./storage');
+  await restoreBackupPayload(payload, db);
+  const assets = await syncCloudUploads(payload, cloudUrl);
+  await db.query(
+    'UPDATE users SET local_mode = :local_mode, max_devices = :max_devices WHERE company_id = :company_id',
+    {
+      local_mode: company.local_mode,
+      max_devices: company.max_devices,
+      company_id: localUser.company_id
+    }
+  );
+
+  res.json({
+    success: true,
+    local_mode: company.local_mode,
+    max_devices: Number(company.max_devices || 5),
+    max_screens: Number(company.max_screens || company.max_devices || 5),
+    counts: {
+      devices: Array.isArray(payload.devices) ? payload.devices.length : 0,
+      layouts: Array.isArray(payload.layouts) ? payload.layouts.length : 0,
+      content: Array.isArray(payload.content) ? payload.content.length : 0,
+      schedules: Array.isArray(payload.schedules) ? payload.schedules.length : 0
+    },
+    assets
+  });
+}
+
 async function generateOfflinePackage(req, res) {
   if (!requireSuperAdmin(req, res)) return;
   const { company_name, email, password } = req.body || {};
@@ -393,6 +503,7 @@ const handlers = {
   'list-auth-users': listAuthUsers,
   'claim-tv-code': claimTvCode,
   'logout-tv-device': logoutTvDevice,
+  'sync-cloud-to-local': syncCloudToLocal,
   'generate-offline': generateOfflinePackage,
   'download-tv-apk': downloadTvApk,
 };
@@ -409,4 +520,3 @@ router.post('/:name', async (req, res) => {
 });
 
 module.exports = router;
-

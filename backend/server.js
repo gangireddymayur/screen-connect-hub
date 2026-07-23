@@ -34,6 +34,10 @@ app.use('/api', (req, res, next) => {
 });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+app.get('/api/local-status', (_req, res) => res.json({
+  isLocalServer: process.env.IS_OFFLINE === 'true',
+  manualCloudSync: process.env.IS_OFFLINE === 'true'
+}));
 // Run startup database migrations to ensure devices table column exists
 // SQLite: schema is fully managed by sqlite-adapter.js — skip MySQL-specific migrations
 (async () => {
@@ -359,4 +363,3 @@ app.listen(port, async () => {
     }
   }
 });
-

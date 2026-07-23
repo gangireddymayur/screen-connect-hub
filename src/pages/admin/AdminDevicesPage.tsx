@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Monitor, MapPin, Search, LogOut, Trash2, Settings, Play, Pause, Calendar } from "lucide-react";
+import { Plus, Monitor, MapPin, Search, LogOut, Trash2, Settings, Play, Pause, Calendar, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -18,7 +18,17 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
-const isOnline = (lastSeen: string | null) => !!lastSeen && Date.now() - new Date(lastSeen).getTime() < ONLINE_THRESHOLD_MS;
+const parseServerDate = (value: string) => {
+  // MySQL/SQLite return UTC timestamps without a timezone suffix. Browsers
+  // otherwise interpret "YYYY-MM-DD HH:mm:ss" as local time, which makes a
+  // fresh heartbeat look 5:30 hours old in India.
+  const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value)
+    ? value
+    : `${value.replace(" ", "T")}Z`;
+  return new Date(normalized);
+};
+const isOnline = (lastSeen: string | null) =>
+  !!lastSeen && Date.now() - parseServerDate(lastSeen).getTime() < ONLINE_THRESHOLD_MS;
 
 type DeviceStatus = "unpaired" | "paused" | "waiting_layout" | "online" | "offline";
 const getDeviceStatus = (d: { is_paired: boolean; layout_id: string | null; last_seen_at: string | null; is_paused: number | boolean }, hasActiveSchedule: boolean): DeviceStatus => {
@@ -55,6 +65,10 @@ export default function AdminDevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [layouts, setLayouts] = useState<Layout[]>([]);
   const [activeScheduleDeviceIds, setActiveScheduleDeviceIds] = useState<Set<string>>(new Set());
+  const [isLocalServer, setIsLocalServer] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [cloudPassword, setCloudPassword] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "online" | "offline" | "unpaired">("all");
@@ -66,6 +80,13 @@ export default function AdminDevicesPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter]);
+
+  useEffect(() => {
+    fetch("/api/local-status", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((status) => setIsLocalServer(status?.isLocalServer === true))
+      .catch(() => setIsLocalServer(false));
+  }, []);
 
   // Pair dialog
   const [addOpen, setAddOpen] = useState(false);
@@ -239,6 +260,31 @@ export default function AdminDevicesPage() {
     }
   };
 
+  const handleCloudSync = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!companyId || !cloudPassword) return;
+    setSyncing(true);
+    const { data, error } = await supabase.functions.invoke("sync-cloud-to-local", {
+      body: { password: cloudPassword },
+    });
+    setSyncing(false);
+    if (error || data?.error) {
+      toast.error(data?.error || error?.message || "Cloud sync failed");
+      return;
+    }
+
+    setCloudPassword("");
+    setSyncOpen(false);
+    await Promise.all([
+      fetchDevices(companyId),
+      fetchLayouts(companyId),
+      fetchActiveSchedules(companyId),
+    ]);
+    toast.success("Local Windows data updated from cloud", {
+      description: `Screen allowance: ${data.max_devices}. Synced ${data.counts?.layouts || 0} layouts, ${data.counts?.schedules || 0} schedules, and ${data.assets?.synced || 0} files.`,
+    });
+  };
+
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   return (
@@ -249,31 +295,66 @@ export default function AdminDevicesPage() {
             <h1 className="text-2xl font-bold tracking-tight">Devices</h1>
             <p className="text-sm text-muted-foreground mt-1">Pair, configure, and monitor your Android TV screens.</p>
           </div>
-          <Dialog open={addOpen} onOpenChange={setAddOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-2" /> Pair Device</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Pair Android TV Device</DialogTitle></DialogHeader>
-              <form onSubmit={handleAdd} className="space-y-4">
-                <p className="text-xs text-muted-foreground leading-normal">
-                  Open the SignageHub app on your Android TV and enter the 6-character code displayed on the screen.
-                </p>
-                <div className="space-y-2"><Label>Pairing Code</Label><Input value={pairCode} onChange={(e) => setPairCode(e.target.value)} placeholder="ABC123" required /></div>
-                <div className="space-y-2"><Label>Device Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Reception Screen" required /></div>
-                <div className="space-y-2"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Office Lobby" /></div>
-                <div className="space-y-2">
-                  <Label>Orientation</Label>
-                  <div className="flex gap-2">
-                    {["landscape", "portrait"].map((o) => (
-                      <Button key={o} type="button" variant={orientation === o ? "default" : "outline"} size="sm" onClick={() => setOrientation(o)} className="capitalize flex-1">{o}</Button>
-                    ))}
+          <div className="flex items-center gap-2">
+            {isLocalServer && (
+              <Dialog open={syncOpen} onOpenChange={(open) => {
+                setSyncOpen(open);
+                if (!open) setCloudPassword("");
+              }}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <RefreshCw className="h-4 w-4 mr-2" /> Sync from Cloud
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Sync Windows Server from Cloud</DialogTitle></DialogHeader>
+                  <form onSubmit={handleCloudSync} className="space-y-4">
+                    <p className="text-xs text-muted-foreground leading-normal">
+                      Pull the latest screen limit, devices, layouts, schedules, and files. Your local screens keep working if the cloud is unavailable.
+                    </p>
+                    <div className="space-y-2">
+                      <Label>Current Cloud Password</Label>
+                      <Input
+                        type="password"
+                        value={cloudPassword}
+                        onChange={(e) => setCloudPassword(e.target.value)}
+                        autoComplete="current-password"
+                        required
+                      />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={syncing || !cloudPassword}>
+                      {syncing ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Syncing...</> : "Pull Latest Changes"}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm"><Plus className="h-4 w-4 mr-2" /> Pair Device</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Pair Android TV Device</DialogTitle></DialogHeader>
+                <form onSubmit={handleAdd} className="space-y-4">
+                  <p className="text-xs text-muted-foreground leading-normal">
+                    Open the SignageHub app on your Android TV and enter the 6-character code displayed on the screen.
+                  </p>
+                  <div className="space-y-2"><Label>Pairing Code</Label><Input value={pairCode} onChange={(e) => setPairCode(e.target.value)} placeholder="ABC123" required /></div>
+                  <div className="space-y-2"><Label>Device Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Reception Screen" required /></div>
+                  <div className="space-y-2"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Office Lobby" /></div>
+                  <div className="space-y-2">
+                    <Label>Orientation</Label>
+                    <div className="flex gap-2">
+                      {["landscape", "portrait"].map((o) => (
+                        <Button key={o} type="button" variant={orientation === o ? "default" : "outline"} size="sm" onClick={() => setOrientation(o)} className="capitalize flex-1">{o}</Button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <Button type="submit" className="w-full" disabled={submitting}>{submitting ? "Pairing..." : "Pair TV Screen"}</Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <Button type="submit" className="w-full" disabled={submitting}>{submitting ? "Pairing..." : "Pair TV Screen"}</Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <Card>
@@ -378,7 +459,7 @@ export default function AdminDevicesPage() {
                                   </Badge>
                                   {d.last_seen_at && (
                                     <span className="text-[9px] text-muted-foreground">
-                                      Seen {formatDistanceToNow(new Date(d.last_seen_at))} ago
+                                      Seen {formatDistanceToNow(parseServerDate(d.last_seen_at))} ago
                                     </span>
                                   )}
                                 </div>
@@ -388,7 +469,7 @@ export default function AdminDevicesPage() {
                                   <Badge variant="destructive" className="w-fit">Offline</Badge>
                                   {d.last_seen_at && (
                                     <span className="text-[9px] text-muted-foreground">
-                                      Seen {formatDistanceToNow(new Date(d.last_seen_at))} ago
+                                      Seen {formatDistanceToNow(parseServerDate(d.last_seen_at))} ago
                                     </span>
                                   )}
                                 </div>

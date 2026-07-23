@@ -92,6 +92,8 @@ export default function AdminContentPage() {
   const paginatedContent = useMemo(() => {
     return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filtered, currentPage, itemsPerPage]);
+  const allSelected = paginatedContent.length > 0 &&
+    paginatedContent.every((item) => selected.has(item.id));
 
   useEffect(() => {
     const nextTotalPages = Math.ceil(filtered.length / itemsPerPage);
@@ -365,7 +367,7 @@ export default function AdminContentPage() {
           <p className="text-sm text-muted-foreground">Are you sure you want to delete <strong>{deleteItem?.name}</strong>?</p>
           <div className="flex gap-3 justify-end mt-4">
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>{deleting ? "Deleting..." : "Delete"}</Button>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={deleting}>{deleting ? "Deleting..." : "Delete"}</Button>
           </div>
         </DialogContent>
       </Dialog>

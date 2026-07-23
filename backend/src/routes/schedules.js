@@ -1,6 +1,9 @@
 const router = require('express').Router();
 const db = require('../lib/db');
 
+const todayInIndia = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
 // Helper to generate instances for a schedule
 function generateInstances(scheduleId, deviceId, layoutId, startTime, endTime, startDate, repeatMode, repeatInterval = 1, daysCount = 1) {
   const instances = [];
@@ -171,7 +174,7 @@ router.post('/', async (req, res) => {
   const formattedStartTime = start_time.length === 5 ? `${start_time}:00` : start_time;
   const formattedEndTime = end_time.length === 5 ? `${end_time}:00` : end_time;
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayInIndia();
   if (start_date < todayStr) {
     return res.status(400).json({ error: "You cannot schedule on past dates" });
   }
@@ -300,7 +303,7 @@ router.put('/:id', async (req, res) => {
       dateStrInput = String(sd || "").slice(0, 10);
     }
 
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = todayInIndia();
     if (dateStrInput < todayStr) {
       await conn.rollback();
       return res.status(400).json({ error: "You cannot schedule on past dates" });
@@ -560,7 +563,7 @@ router.post('/repeat', async (req, res) => {
       dateStrInput = String(sd || "").slice(0, 10);
     }
 
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = todayInIndia();
     if (dateStrInput < todayStr) {
       await conn.rollback();
       return res.status(400).json({ error: "You cannot schedule on past dates" });
