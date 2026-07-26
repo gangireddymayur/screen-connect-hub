@@ -37,6 +37,10 @@ interface Company {
   status: string;
   notes: string | null;
   created_at: string;
+  subscription_status?: string;
+  trial_ends_at?: string | null;
+  local_mode?: string;
+  max_devices?: number;
 }
 
 interface CompanyStats {
@@ -56,6 +60,21 @@ type SortKey = "name" | "created_at" | "max_screens";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 10;
+
+export const getTrialInfo = (company: Company) => {
+  if (company.subscription_status === "active") return { isExpired: false, text: "Active", variant: "default" };
+  if (company.subscription_status === "expired") return { isExpired: true, text: "Trial Expired", variant: "destructive" };
+  
+  if (!company.trial_ends_at) return { isExpired: false, text: "Trial (7d left)", variant: "warning" };
+  const diff = new Date(company.trial_ends_at).getTime() - new Date().getTime();
+  const days = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  const isExpired = diff <= 0;
+  return {
+    isExpired,
+    text: isExpired ? "Trial Expired" : `Trial (${days}d left)`,
+    variant: isExpired ? "destructive" : "warning"
+  };
+};
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -95,6 +114,8 @@ export default function CompaniesPage() {
   const [editNotes, setEditNotes] = useState("");
   const [editLocalMode, setEditLocalMode] = useState("none");
   const [editMaxDevices, setEditMaxDevices] = useState("5");
+  const [editSubscriptionStatus, setEditSubscriptionStatus] = useState("trial");
+  const [editTrialEndsAt, setEditTrialEndsAt] = useState<string | null>(null);
 
   // Detail sheet
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -222,6 +243,8 @@ export default function CompaniesPage() {
     setEditNotes(company.notes ?? "");
     setEditLocalMode(company.local_mode || "none");
     setEditMaxDevices(String(company.max_devices || 5));
+    setEditSubscriptionStatus(company.subscription_status || "trial");
+    setEditTrialEndsAt(company.trial_ends_at || null);
     setEditOpen(true);
   };
 
@@ -236,7 +259,9 @@ export default function CompaniesPage() {
       status: editStatus,
       notes: editNotes.trim() || null,
       local_mode: editLocalMode,
-      max_devices: editLocalMode === "single" ? 1 : parseInt(editMaxScreens)
+      max_devices: editLocalMode === "single" ? 1 : parseInt(editMaxScreens),
+      subscription_status: editSubscriptionStatus,
+      trial_ends_at: editTrialEndsAt ? new Date(editTrialEndsAt).toISOString() : null
     }).eq("id", editCompany.id);
     setSubmitting(false);
     if (error) toast.error(error.message);
@@ -531,7 +556,14 @@ export default function CompaniesPage() {
                           <span className="text-sm">{company.max_screens}</span>
                         </div>
                       </TableCell>
-                      <TableCell><StatusBadge status={company.status as any} /></TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1 items-start">
+                          <StatusBadge status={company.status as any} />
+                          <Badge variant={getTrialInfo(company).variant as any} className="text-[10px] py-0 px-1.5 w-fit">
+                            {getTrialInfo(company).text}
+                          </Badge>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{formatDate(company.created_at)}</TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
@@ -641,6 +673,40 @@ export default function CompaniesPage() {
               </div>
             </div>
             <div className="space-y-2">
+              <Label>Subscription Status</Label>
+              <Select value={editSubscriptionStatus} onValueChange={setEditSubscriptionStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="trial">Free Trial</SelectItem>
+                  <SelectItem value="active">Active (Paid)</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editSubscriptionStatus === "trial" && (
+              <div className="space-y-2">
+                <Label>Trial Expiry Date</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    type="datetime-local" 
+                    value={editTrialEndsAt ? editTrialEndsAt.slice(0, 16) : ""} 
+                    onChange={(e) => setEditTrialEndsAt(e.target.value)} 
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      const future = new Date();
+                      future.setDate(future.getDate() + 7);
+                      setEditTrialEndsAt(future.toISOString());
+                    }}
+                  >
+                    Reset Trial (7 Days)
+                  </Button>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
               <Label>Internal Notes <span className="text-xs text-muted-foreground">(super admin only)</span></Label>
               <Textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="VIP client, billing issue, contract renewal date..." rows={3} maxLength={1000} />
             </div>
@@ -743,6 +809,24 @@ export default function CompaniesPage() {
                   <div>
                     <p className="text-xs text-muted-foreground">Created</p>
                     <p className="text-sm font-medium">{formatDate(selectedCompany.created_at)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Subscription Plan / Trial</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-sm font-medium capitalize">{selectedCompany.plan} Plan</span>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <Badge variant={getTrialInfo(selectedCompany).variant as any} className="text-[11px] py-0 font-medium">
+                        {getTrialInfo(selectedCompany).text}
+                      </Badge>
+                    </div>
+                    {selectedCompany.subscription_status === "trial" && selectedCompany.trial_ends_at && (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Expires: {new Date(selectedCompany.trial_ends_at).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

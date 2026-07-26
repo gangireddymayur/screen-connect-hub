@@ -79,8 +79,10 @@ async function createCompanyAdmin(req, res) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    await conn.query(
-      'INSERT INTO companies (id, name, contact_email, plan, max_screens, status, created_by, local_mode, max_devices) VALUES (:id, :name, :contact_email, :plan, :max_screens, :status, :created_by, :local_mode, :max_devices)',
+    const insertCompanySql = db.isSqlite
+      ? 'INSERT INTO companies (id, name, contact_email, plan, max_screens, status, created_by, local_mode, max_devices, subscription_status, trial_ends_at) VALUES (:id, :name, :contact_email, :plan, :max_screens, :status, :created_by, :local_mode, :max_devices, \'trial\', datetime(\'now\', \'+7 days\'))'
+      : 'INSERT INTO companies (id, name, contact_email, plan, max_screens, status, created_by, local_mode, max_devices, subscription_status, trial_ends_at) VALUES (:id, :name, :contact_email, :plan, :max_screens, :status, :created_by, :local_mode, :max_devices, \'trial\', DATE_ADD(NOW(), INTERVAL 7 DAY))';
+    await conn.query(insertCompanySql,
       { id: companyId, name, contact_email, plan, max_screens: dbMaxScreens, status: 'active', created_by: req.user.id, local_mode: dbLocalMode, max_devices: dbMaxDevices }
     );
     await conn.query(

@@ -6,6 +6,8 @@ const SQLITE_SCHEMA = [
     plan TEXT NOT NULL DEFAULT 'starter',
     max_screens INTEGER NOT NULL DEFAULT 10,
     status TEXT NOT NULL DEFAULT 'active',
+    subscription_status TEXT NOT NULL DEFAULT 'trial',
+    trial_ends_at TEXT,
     timezone TEXT NOT NULL DEFAULT 'UTC',
     logo_url TEXT,
     notes TEXT,
@@ -228,6 +230,14 @@ class SqlitePool {
         this.db.run("ALTER TABLE companies ADD COLUMN max_devices INTEGER NOT NULL DEFAULT 5;");
       } catch (e) {}
 
+      try {
+        this.db.run("ALTER TABLE companies ADD COLUMN subscription_status TEXT NOT NULL DEFAULT 'trial';");
+      } catch (e) {}
+
+      try {
+        this.db.run("ALTER TABLE companies ADD COLUMN trial_ends_at TEXT;");
+      } catch (e) {}
+
       // Seed default company if database is empty
       const compCheck = this.db.prepare("SELECT id FROM companies LIMIT 1");
       let hasCompany = false;
@@ -242,8 +252,8 @@ class SqlitePool {
         
         // Insert company
         this.db.run(
-          "INSERT INTO companies (id, name, contact_email, plan, max_screens, status) VALUES (?, ?, ?, ?, ?, ?)",
-          [companyId, "SignageHub Local Company", "admin@signagehub.local", "pro", 20, "active"]
+          "INSERT INTO companies (id, name, contact_email, plan, max_screens, status, subscription_status, trial_ends_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          [companyId, "SignageHub Local Company", "admin@signagehub.local", "pro", 20, "active", "trial", new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()]
         );
       }
 

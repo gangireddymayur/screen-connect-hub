@@ -96,6 +96,18 @@ app.get('/api/local-status', (_req, res) => res.json({
       console.log("[db] Added max_devices column to companies table.");
     }
 
+    const [compSubCols] = await db.query("SHOW COLUMNS FROM companies LIKE 'subscription_status'");
+    if (compSubCols.length === 0) {
+      await db.query("ALTER TABLE companies ADD COLUMN subscription_status VARCHAR(32) DEFAULT 'trial'");
+      console.log("[db] Added subscription_status column to companies table.");
+    }
+
+    const [compTrialCols] = await db.query("SHOW COLUMNS FROM companies LIKE 'trial_ends_at'");
+    if (compTrialCols.length === 0) {
+      await db.query("ALTER TABLE companies ADD COLUMN trial_ends_at DATETIME NULL");
+      console.log("[db] Added trial_ends_at column to companies table.");
+    }
+
     const [tableExist] = await db.query("SHOW TABLES LIKE 'schedule_instances'");
     if (tableExist.length === 0) {
       console.log("[db] Initializing advanced schedules database tables...");

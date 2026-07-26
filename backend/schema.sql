@@ -41,6 +41,8 @@ CREATE TABLE `companies` (
   `plan` ENUM('starter','pro','enterprise') NOT NULL DEFAULT 'starter',
   `max_screens` INT NOT NULL DEFAULT 10,
   `status` ENUM('active','suspended','archived') NOT NULL DEFAULT 'active',
+  `subscription_status` VARCHAR(32) NOT NULL DEFAULT 'trial',
+  `trial_ends_at` DATETIME DEFAULT NULL,
   `timezone` VARCHAR(64) NOT NULL DEFAULT 'UTC',
   `logo_url` TEXT DEFAULT NULL,
   `notes` TEXT DEFAULT NULL,
@@ -126,8 +128,8 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- Password hash is bcrypt of "ChangeMe123!" — change it after first login.
 -- ============================================================
 
-INSERT INTO `companies` (`id`, `name`, `contact_email`, `plan`, `max_screens`, `status`) VALUES
-('11111111-1111-1111-1111-111111111111', 'Acme Corp', 'admin@acme.com', 'pro', 25, 'active');
+INSERT INTO `companies` (`id`, `name`, `contact_email`, `plan`, `max_screens`, `status`, `subscription_status`, `trial_ends_at`) VALUES
+('11111111-1111-1111-1111-111111111111', 'Acme Corp', 'admin@acme.com', 'pro', 25, 'active', 'active', NULL);
 
 INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `company_id`) VALUES
 ('00000000-0000-0000-0000-000000000001', 'super@demo.com',  '$2b$10$E5l5Z8Ck0kQyqQyHwUkj1u3aPq3v8VYxFvN8rB7Wnv2yQF5q2eXKa', 'Super Admin', NULL),

@@ -111,6 +111,40 @@ router.post('/generate-code', async (req, res) => {
   }
 });
 
+function computeTrialInfo(company) {
+  if (!company) return { isExpired: false, status: "active", daysLeft: 999, trialEndsAt: null };
+  if (company.subscription_status === "active") {
+    return { isExpired: false, status: "active", daysLeft: 999, trialEndsAt: null };
+  }
+  if (!company.trial_ends_at) {
+    const created = company.created_at ? new Date(company.created_at) : new Date();
+    const fallbackEnds = new Date(created.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const isExpired = now > fallbackEnds;
+    const diffMs = fallbackEnds.getTime() - now.getTime();
+    const daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    return {
+      isExpired,
+      status: isExpired ? "expired" : "trial",
+      daysLeft,
+      trialEndsAt: fallbackEnds.toISOString()
+    };
+  }
+
+  const now = new Date();
+  const trialEnds = new Date(company.trial_ends_at);
+  const diffMs = trialEnds.getTime() - now.getTime();
+  const isExpired = now > trialEnds || company.subscription_status === "expired";
+  const daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+
+  return {
+    isExpired,
+    status: isExpired ? "expired" : "trial",
+    daysLeft,
+    trialEndsAt: trialEnds.toISOString(),
+  };
+}
+
 router.post('/poll-status', async (req, res) => {
   try {
     const { device_id } = req.body || {};
@@ -118,7 +152,13 @@ router.post('/poll-status', async (req, res) => {
 
     await cleanupExpiredPendingDevices();
 
-    const [rows] = await db.query('SELECT * FROM devices WHERE id = :id LIMIT 1', { id: device_id });
+    const [rows] = await db.query(
+      'SELECT d.*, c.status AS company_status, c.subscription_status, c.trial_ends_at, c.created_at AS company_created_at ' +
+      'FROM devices d ' +
+      'LEFT JOIN companies c ON c.id = d.company_id ' +
+      'WHERE d.id = :id LIMIT 1',
+      { id: device_id }
+    );
     const device = rows[0];
     if (!device) return res.status(404).json({ error: 'Device not found or pairing expired', reset: true });
 
@@ -135,6 +175,50 @@ router.post('/poll-status', async (req, res) => {
           status: 'pending',
         },
         layout: null,
+      });
+    }
+
+    // 1. Account suspension check
+    if (device.company_status === 'suspended') {
+      return res.json({
+        device: {
+          id: device.id,
+          is_paired: true,
+          name: device.name,
+          layout_id: null,
+          orientation: device.orientation,
+          resolution: device.resolution,
+          is_paused: !!device.is_paused,
+          status: 'suspended',
+        },
+        layout: null,
+        suspended: true,
+        message: 'This account has been suspended. Please contact support to resolve billing issues.'
+      });
+    }
+
+    // 2. Trial mode expiration check
+    const trialInfo = computeTrialInfo({
+      subscription_status: device.subscription_status,
+      trial_ends_at: device.trial_ends_at,
+      created_at: device.company_created_at
+    });
+
+    if (trialInfo.isExpired) {
+      return res.json({
+        device: {
+          id: device.id,
+          is_paired: true,
+          name: device.name,
+          layout_id: null,
+          orientation: device.orientation,
+          resolution: device.resolution,
+          is_paused: !!device.is_paused,
+          status: 'expired',
+        },
+        layout: null,
+        trial_expired: true,
+        message: 'Your 7-day free trial period has ended. Contact your administrator to grant full access for this device.'
       });
     }
 
