@@ -193,7 +193,7 @@ app.get('/api/debug-logs', (req, res) => {
 });
 
 try {
-  const { authRequired } = require('./src/lib/auth');
+  const { authRequired, requireTrialNotExpired } = require('./src/lib/auth');
   const authRoutes = require('./src/routes/auth');
   const crud = require('./src/routes/crud');
   const functionRoutes = require('./src/routes/functions');
@@ -205,20 +205,20 @@ try {
   app.use('/api/player', playerRoutes);
   app.use('/api/tv', tvRoutes);
   app.use('/api/auth', authRoutes);
-  app.use('/api/functions', authRequired, functionRoutes);
-  app.use('/api/storage', authRequired, storageRoutes.router);
-  app.use('/api/companies',  authRequired, crud('companies'));
-  app.use('/api/users',      authRequired, crud('users',      { tenantScoped: false, superAdminOnly: true }));
-  app.use('/api/profiles',   authRequired, crud('users')); // alias; admins see users in their own company
-  app.use('/api/user_roles', authRequired, crud('user_roles', { tenantScoped: false }));
-  app.use('/api/devices',    authRequired, crud('devices'));
-  app.use('/api/layouts',    authRequired, crud('layouts'));
-  app.use('/api/content',    authRequired, crud('content'));
-  app.use('/api/schedules',  authRequired, require('./src/routes/schedules'));
+  app.use('/api/functions', authRequired, requireTrialNotExpired, functionRoutes);
+  app.use('/api/storage', authRequired, requireTrialNotExpired, storageRoutes.router);
+  app.use('/api/companies',  authRequired, requireTrialNotExpired, crud('companies'));
+  app.use('/api/users',      authRequired, requireTrialNotExpired, crud('users',      { tenantScoped: false, superAdminOnly: true }));
+  app.use('/api/profiles',   authRequired, requireTrialNotExpired, crud('users')); // alias; admins see users in their own company
+  app.use('/api/user_roles', authRequired, requireTrialNotExpired, crud('user_roles', { tenantScoped: false }));
+  app.use('/api/devices',    authRequired, requireTrialNotExpired, crud('devices'));
+  app.use('/api/layouts',    authRequired, requireTrialNotExpired, crud('layouts'));
+  app.use('/api/content',    authRequired, requireTrialNotExpired, crud('content'));
+  app.use('/api/schedules',  authRequired, requireTrialNotExpired, require('./src/routes/schedules'));
   
   const backupRoutes = require('./src/routes/backup');
   app.use('/api/backup', authRequired, backupRoutes.download);
-  app.use('/api/restore', authRequired, backupRoutes.restore);
+  app.use('/api/restore', authRequired, requireTrialNotExpired, backupRoutes.restore);
 } catch (err) {
   console.error('ROUTE_LOAD_ERROR:', err.stack || err);
   global.routeLoadError = {
