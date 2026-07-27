@@ -109,6 +109,13 @@ function crud(table, { tenantScoped = true, superAdminOnly = false } = {}) {
       delete payload.created_at;
       delete payload.updated_at;
 
+      if (table === 'companies') {
+        if (!payload.subscription_status) payload.subscription_status = 'trial';
+        if (!payload.trial_ends_at && payload.subscription_status === 'trial') {
+          payload.trial_ends_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+        }
+      }
+
       if (tenantScoped && req.user.role !== 'super_admin') payload.company_id = req.user.company_id;
       const cols = Object.keys(payload);
       const placeholders = cols.map((c) => `:${c}`).join(',');

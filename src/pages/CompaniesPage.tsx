@@ -65,10 +65,20 @@ export const getTrialInfo = (company: Company) => {
   if (company.subscription_status === "active") return { isExpired: false, text: "Active", variant: "default" };
   if (company.subscription_status === "expired") return { isExpired: true, text: "Trial Expired", variant: "destructive" };
   
-  if (!company.trial_ends_at) return { isExpired: false, text: "Trial (7d left)", variant: "warning" };
-  const diff = new Date(company.trial_ends_at).getTime() - new Date().getTime();
+  const trialEnd = company.trial_ends_at
+    ? new Date(company.trial_ends_at)
+    : company.created_at
+      ? new Date(new Date(company.created_at).getTime() + 7 * 24 * 60 * 60 * 1000)
+      : null;
+
+  if (!trialEnd || isNaN(trialEnd.getTime())) {
+    return { isExpired: false, text: "Trial (7d left)", variant: "warning" };
+  }
+
+  const diff = trialEnd.getTime() - new Date().getTime();
   const days = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   const isExpired = diff <= 0;
+
   return {
     isExpired,
     text: isExpired ? "Trial Expired" : `Trial (${days}d left)`,
@@ -822,9 +832,9 @@ export default function CompaniesPage() {
                         {getTrialInfo(selectedCompany).text}
                       </Badge>
                     </div>
-                    {selectedCompany.subscription_status === "trial" && selectedCompany.trial_ends_at && (
+                    {(selectedCompany.subscription_status === "trial" || !selectedCompany.subscription_status) && (
                       <p className="text-[11px] text-muted-foreground mt-1">
-                        Expires: {new Date(selectedCompany.trial_ends_at).toLocaleString()}
+                        Expires: {new Date(selectedCompany.trial_ends_at || (selectedCompany.created_at ? new Date(selectedCompany.created_at).getTime() + 7 * 24 * 60 * 60 * 1000 : Date.now() + 7 * 24 * 60 * 60 * 1000)).toLocaleString()}
                       </p>
                     )}
                   </div>
