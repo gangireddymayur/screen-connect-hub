@@ -39,7 +39,7 @@ export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, role, isTrialExpired, signOut } = useAuth();
 
   const isActive = (path: string) =>
     path === "/admin" ? location.pathname === "/admin" : location.pathname.startsWith(path);
@@ -71,16 +71,41 @@ export function AdminSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {adminNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} end={item.url === "/admin"}>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {adminNav.map((item) => {
+                const isLocked = isTrialExpired && role !== "super_admin" && item.url !== "/admin/settings";
+
+                if (isLocked) {
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <div
+                        className="flex items-center justify-between rounded-md p-2 text-sm text-muted-foreground/40 cursor-not-allowed select-none opacity-50 w-full"
+                        title="Trial Expired — Contact Administrator to Unlock"
+                      >
+                        <div className="flex items-center gap-2">
+                          <item.icon className="h-4 w-4 opacity-40" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </div>
+                        {!collapsed && (
+                          <span className="text-[9px] bg-destructive/20 text-destructive font-bold px-1.5 py-0.5 rounded">
+                            Locked
+                          </span>
+                        )}
+                      </div>
+                    </SidebarMenuItem>
+                  );
+                }
+
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                      <NavLink to={item.url} end={item.url === "/admin"}>
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

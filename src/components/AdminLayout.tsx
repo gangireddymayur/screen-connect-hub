@@ -1,13 +1,25 @@
-import { forwardRef } from "react";
+import { forwardRef, useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/AdminSidebar";
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, AlertTriangle, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/hooks/useAuth";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export const AdminLayout = forwardRef<HTMLDivElement, { children: React.ReactNode }>(
   ({ children }, ref) => {
+    const { role, isTrialExpired } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+      if (isTrialExpired && role !== "super_admin" && location.pathname !== "/admin/settings") {
+        navigate("/admin/settings", { replace: true });
+      }
+    }, [isTrialExpired, role, location.pathname, navigate]);
+
     return (
       <SidebarProvider>
         <div ref={ref} className="min-h-screen flex w-full">
@@ -36,6 +48,27 @@ export const AdminLayout = forwardRef<HTMLDivElement, { children: React.ReactNod
               </div>
             </header>
             <main className="flex-1 p-6 overflow-auto">
+              {isTrialExpired && role !== "super_admin" && (
+                <div className="bg-destructive/15 border border-destructive/30 rounded-xl p-4 text-destructive flex items-center justify-between gap-4 mb-6 select-none">
+                  <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-lg bg-destructive/20 grid place-items-center text-destructive shrink-0 font-bold">
+                      <ShieldAlert className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm flex items-center gap-2">
+                        <span>7-Day Free Trial Expired</span>
+                        <span className="text-[10px] bg-destructive/30 text-destructive-foreground px-2 py-0.5 rounded-full font-bold">Limit Reached</span>
+                      </div>
+                      <div className="text-xs opacity-90 mt-0.5">
+                        Your 7-day free trial period has ended. Please contact your system administrator to grant full access for your account.
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-xs font-semibold bg-destructive/20 px-3 py-1.5 rounded-lg border border-destructive/40 shrink-0">
+                    Contact Admin to Unlock
+                  </div>
+                </div>
+              )}
               {children}
             </main>
           </div>
