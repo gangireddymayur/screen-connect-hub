@@ -27,7 +27,7 @@ function requireRole(...roles) {
 }
 
 async function requireTrialNotExpired(req, res, next) {
-  if (!req.user || req.user.role === 'super_admin') return next();
+  if (!req.user || req.user.role === 'super_admin' || req.user.role === 'super') return next();
   
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
     try {

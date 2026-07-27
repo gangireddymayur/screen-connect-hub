@@ -205,12 +205,12 @@ try {
   app.use('/api/player', playerRoutes);
   app.use('/api/tv', tvRoutes);
   app.use('/api/auth', authRoutes);
-  app.use('/api/functions', authRequired, requireTrialNotExpired, functionRoutes);
+  app.use('/api/functions', authRequired, functionRoutes);
   app.use('/api/storage', authRequired, requireTrialNotExpired, storageRoutes.router);
-  app.use('/api/companies',  authRequired, requireTrialNotExpired, crud('companies'));
-  app.use('/api/users',      authRequired, requireTrialNotExpired, crud('users',      { tenantScoped: false, superAdminOnly: true }));
-  app.use('/api/profiles',   authRequired, requireTrialNotExpired, crud('users')); // alias; admins see users in their own company
-  app.use('/api/user_roles', authRequired, requireTrialNotExpired, crud('user_roles', { tenantScoped: false }));
+  app.use('/api/companies',  authRequired, crud('companies'));
+  app.use('/api/users',      authRequired, crud('users',      { tenantScoped: false, superAdminOnly: true }));
+  app.use('/api/profiles',   authRequired, crud('users')); // alias; admins see users in their own company
+  app.use('/api/user_roles', authRequired, crud('user_roles', { tenantScoped: false }));
   app.use('/api/devices',    authRequired, requireTrialNotExpired, crud('devices'));
   app.use('/api/layouts',    authRequired, requireTrialNotExpired, crud('layouts'));
   app.use('/api/content',    authRequired, requireTrialNotExpired, crud('content'));
@@ -218,7 +218,7 @@ try {
   
   const backupRoutes = require('./src/routes/backup');
   app.use('/api/backup', authRequired, backupRoutes.download);
-  app.use('/api/restore', authRequired, requireTrialNotExpired, backupRoutes.restore);
+  app.use('/api/restore', authRequired, backupRoutes.restore);
 } catch (err) {
   console.error('ROUTE_LOAD_ERROR:', err.stack || err);
   global.routeLoadError = {
