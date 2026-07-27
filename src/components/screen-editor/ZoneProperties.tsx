@@ -542,17 +542,6 @@ export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZoneProp
       {/* ── IMAGE / VIDEO ── */}
       {(widget.type === 'image' || widget.type === 'video') && (
         <>
-          {/* Playlist toggle FIRST so it's always visible */}
-          <PlaylistEditor
-            widget={widget}
-            onUpdate={onUpdate}
-            imageLibrary={images}
-            videoLibrary={videos}
-          />
-
-          {!widget.playlistEnabled && (
-            <>
-              <Separator />
               {/* Single-media Library Picker */}
               {(widget.type === 'image' ? images : videos).length > 0 && (
                 <div className="space-y-2">
@@ -605,8 +594,6 @@ export function ZoneProperties({ widget, onUpdate, contentItems = [] }: ZoneProp
                   </SelectContent>
                 </Select>
               </div>
-            </>
-          )}
         </>
       )}
 

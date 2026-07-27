@@ -222,17 +222,6 @@ export function PlaylistEditor({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between rounded-md bg-muted/40 border border-border p-2">
-        <div>
-          <Label className="text-xs font-semibold">Playlist Mode</Label>
-          <p className="text-[10px] text-muted-foreground">Cycle through multiple {mediaType}s with optional time/day scheduling.</p>
-        </div>
-        <Switch
-          checked={!!widget.playlistEnabled}
-          onCheckedChange={(v) => onUpdate({ ...widget, playlistEnabled: v })}
-        />
-      </div>
-
       {widget.playlistEnabled && (
         <>
           <div className="flex items-center justify-between">
