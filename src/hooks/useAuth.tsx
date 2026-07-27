@@ -29,10 +29,19 @@ export function getTrialInfo(company: any) {
   if (company.subscription_status === "active") return { isExpired: false, text: "Active", variant: "default" };
   if (company.subscription_status === "expired") return { isExpired: true, text: "Trial Expired", variant: "destructive" };
 
+  const parseDate = (dateStr: string) => {
+    if (!dateStr || dateStr === "null") return null;
+    const formatted = dateStr.includes("T") ? dateStr : dateStr.replace(" ", "T");
+    return new Date(formatted);
+  };
+
   const trialEnd = company.trial_ends_at
-    ? new Date(company.trial_ends_at)
+    ? parseDate(company.trial_ends_at)
     : company.created_at
-      ? new Date(new Date(company.created_at).getTime() + 7 * 24 * 60 * 60 * 1000)
+      ? (() => {
+          const parsed = parseDate(company.created_at);
+          return parsed ? new Date(parsed.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+        })()
       : null;
 
   if (!trialEnd || isNaN(trialEnd.getTime())) {
@@ -68,17 +77,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       const userRole = (roleData?.role as AppRole) ?? null;
+      console.log("[fetchRoleAndCompany] userRole:", userRole);
       setRole(userRole);
 
       const companyId = userObj.user_metadata?.company_id;
+      console.log("[fetchRoleAndCompany] companyId:", companyId);
       if (companyId) {
         const { data: compData } = await supabase
           .from("companies")
           .select("*")
           .eq("id", companyId)
           .single();
+        console.log("[fetchRoleAndCompany] compData:", JSON.stringify(compData));
         setCompany(compData ?? null);
         const trialInfo = getTrialInfo(compData);
+        console.log("[fetchRoleAndCompany] trialInfo:", JSON.stringify(trialInfo));
         setIsTrialExpired(trialInfo.isExpired);
       } else {
         setCompany(null);

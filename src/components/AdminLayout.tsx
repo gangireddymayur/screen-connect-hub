@@ -15,6 +15,7 @@ export const AdminLayout = forwardRef<HTMLDivElement, { children: React.ReactNod
     const navigate = useNavigate();
 
     useEffect(() => {
+      console.log("[AdminLayout] useEffect - isTrialExpired:", isTrialExpired, "role:", role, "pathname:", location.pathname);
       if (isTrialExpired && role !== "super_admin" && location.pathname !== "/admin/settings") {
         navigate("/admin/settings", { replace: true });
       }

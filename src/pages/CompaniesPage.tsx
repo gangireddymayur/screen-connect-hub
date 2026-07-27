@@ -65,10 +65,19 @@ export const getTrialInfo = (company: Company) => {
   if (company.subscription_status === "active") return { isExpired: false, text: "Active", variant: "default" };
   if (company.subscription_status === "expired") return { isExpired: true, text: "Trial Expired", variant: "destructive" };
   
+  const parseDate = (dateStr: string) => {
+    if (!dateStr || dateStr === "null") return null;
+    const formatted = dateStr.includes("T") ? dateStr : dateStr.replace(" ", "T");
+    return new Date(formatted);
+  };
+
   const trialEnd = company.trial_ends_at
-    ? new Date(company.trial_ends_at)
+    ? parseDate(company.trial_ends_at)
     : company.created_at
-      ? new Date(new Date(company.created_at).getTime() + 7 * 24 * 60 * 60 * 1000)
+      ? (() => {
+          const parsed = parseDate(company.created_at);
+          return parsed ? new Date(parsed.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+        })()
       : null;
 
   if (!trialEnd || isNaN(trialEnd.getTime())) {

@@ -8,7 +8,7 @@ async function download(req, res) {
 
   try {
     const [company] = await db.query(
-      "SELECT id, name, contact_email, plan, max_screens, status, timezone, logo_url, show_brand_header, brand_header_placement, local_mode, max_devices, subscription_status, trial_ends_at FROM companies WHERE id = ? LIMIT 1",
+      "SELECT id, name, contact_email, plan, max_screens, status, timezone, logo_url, show_brand_header, brand_header_placement, local_mode, max_devices, subscription_status, trial_ends_at, created_at FROM companies WHERE id = ? LIMIT 1",
       [companyId]
     );
 
