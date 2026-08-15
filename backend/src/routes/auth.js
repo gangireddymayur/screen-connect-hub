@@ -4,6 +4,29 @@ const db = require('../lib/db');
 const { sign, authRequired } = require('../lib/auth');
 const { rememberLocalLoginPassword } = require('../lib/cloud-session-cache');
 
+function parseExpirationDate(val) {
+  if (!val) return null;
+  if (val instanceof Date) {
+    return new Date(Date.UTC(
+      val.getFullYear(),
+      val.getMonth(),
+      val.getDate(),
+      val.getHours(),
+      val.getMinutes(),
+      val.getSeconds(),
+      val.getMilliseconds()
+    ));
+  }
+  if (typeof val === 'string') {
+    if (val.includes('Z') || val.includes('+') || val.includes('-')) {
+      return new Date(val);
+    }
+    const normalized = val.replace(' ', 'T') + 'Z';
+    return new Date(normalized);
+  }
+  return new Date(val);
+}
+
 // POST /api/auth/login  { email, password }
 router.post('/login', async (req, res) => {
   try {
@@ -178,7 +201,7 @@ router.post('/login', async (req, res) => {
     // Enforce 2-step verification for local admin logins on cloud backend
     const isLocal = req.body?.is_local || req.headers['x-local-request'];
     if (user.role === 'admin' && isLocal && !isOffline) {
-      const codeExpiresAt = user.login_code_expires_at ? new Date(user.login_code_expires_at) : null;
+      const codeExpiresAt = parseExpirationDate(user.login_code_expires_at);
       const isCodeValid = user.login_code && codeExpiresAt && codeExpiresAt.getTime() > Date.now();
       
       if (!isCodeValid) {
@@ -338,7 +361,7 @@ router.post('/verify-code', async (req, res) => {
     const ok = await bcrypt.compare(password, u.password_hash);
     if (!ok) return res.status(401).json({ error: 'invalid credentials' });
 
-    const codeExpiresAt = u.login_code_expires_at ? new Date(u.login_code_expires_at) : null;
+    const codeExpiresAt = parseExpirationDate(u.login_code_expires_at);
     const isCodeValid = u.login_code && u.login_code === String(code).trim() && codeExpiresAt && codeExpiresAt.getTime() > Date.now();
 
     if (!isCodeValid) {
