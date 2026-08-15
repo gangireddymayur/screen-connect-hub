@@ -44,7 +44,7 @@ export default function AdminDashboardPage() {
     const fetchData = async () => {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("company_id")
+        .select("company_id, local_mode, max_devices")
         .eq("id", user.id)
         .single();
 
@@ -60,7 +60,15 @@ export default function AdminDashboardPage() {
       ]);
 
       setCompanyName(companyRes.data?.name ?? "");
-      setMaxScreens(companyRes.data?.max_screens ?? 0);
+      
+      let limit = companyRes.data?.max_screens ?? 0;
+      if (profile?.local_mode === "single") {
+        limit = 1;
+      } else if (profile?.local_mode === "multi") {
+        limit = profile?.max_devices || 5;
+      }
+      setMaxScreens(limit);
+
       setDevices(devicesRes.data ?? []);
       setContentCount(contentRes.data?.length ?? 0);
       setStorageBytes((contentRes.data ?? []).reduce((sum, c: any) => sum + (c.file_size || 0), 0));

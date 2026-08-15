@@ -61,6 +61,8 @@ interface Layout {
 export default function AdminDevicesPage() {
   const { user } = useAuth();
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [localMode, setLocalMode] = useState<string | null>(null);
+  const [maxDevices, setMaxDevices] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [devices, setDevices] = useState<Device[]>([]);
   const [layouts, setLayouts] = useState<Layout[]>([]);
@@ -106,11 +108,13 @@ export default function AdminDevicesPage() {
   useEffect(() => {
     if (!user) return;
     console.log("[useEffect] active user object:", user);
-    supabase.from("profiles").select("company_id").eq("id", user.id).single()
+    supabase.from("profiles").select("company_id, local_mode, max_devices").eq("id", user.id).single()
       .then(({ data, error }) => {
         console.log("[useEffect] profiles single response:", { data, error });
         if (data?.company_id) {
           setCompanyId(data.company_id);
+          setLocalMode(data.local_mode || null);
+          setMaxDevices(data.max_devices || null);
           fetchDevices(data.company_id);
           fetchLayouts(data.company_id);
           fetchActiveSchedules(data.company_id);
@@ -289,18 +293,19 @@ export default function AdminDevicesPage() {
             <p className="text-sm text-muted-foreground mt-1">Pair, configure, and monitor your Android TV screens.</p>
           </div>
           <div className="flex items-center gap-2">
-            {isLocalServer && (
+            {isLocalServer && localMode !== "single" && (
               <Button size="sm" variant="outline" onClick={handleCloudSync} disabled={syncing}>
                 <RefreshCw className={cn("h-4 w-4 mr-2", syncing && "animate-spin")} />
                 {syncing ? "Syncing..." : "Sync from Cloud"}
               </Button>
             )}
-            <Dialog open={addOpen} onOpenChange={setAddOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm"><Plus className="h-4 w-4 mr-2" /> Pair Device</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Pair Android TV Device</DialogTitle></DialogHeader>
+            {localMode !== "single" && (
+              <Dialog open={addOpen} onOpenChange={setAddOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm"><Plus className="h-4 w-4 mr-2" /> Pair Device</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Pair Android TV Device</DialogTitle></DialogHeader>
                 <form onSubmit={handleAdd} className="space-y-4">
                   <p className="text-xs text-muted-foreground leading-normal">
                     Open the SignageHub app on your Android TV and enter the 6-character code displayed on the screen.
@@ -320,6 +325,7 @@ export default function AdminDevicesPage() {
                 </form>
               </DialogContent>
             </Dialog>
+          )}
           </div>
         </div>
 
