@@ -4,6 +4,32 @@ const { getIndiaDateTime } = require('../lib/india-time');
 
 const todayInIndia = () => getIndiaDateTime().date;
 
+// Helper to format date and time into a valid MySQL datetime string
+function formatDateTimeString(dateStr, timeStr) {
+  if (!timeStr) return '';
+  const dateParts = String(dateStr).split('-');
+  const y = parseInt(dateParts[0], 10);
+  const m = parseInt(dateParts[1], 10) - 1; // 0-indexed
+  const d = parseInt(dateParts[2], 10);
+
+  const timeParts = String(timeStr).split(':');
+  const hours = parseInt(timeParts[0], 10) || 0;
+  const minutes = parseInt(timeParts[1], 10) || 0;
+  const seconds = parseInt(timeParts[2], 10) || 0;
+
+  // Create Date using UTC to avoid local timezone/DST shifts
+  const dateObj = new Date(Date.UTC(y, m, d, hours, minutes, seconds));
+
+  const resY = dateObj.getUTCFullYear();
+  const resM = String(dateObj.getUTCMonth() + 1).padStart(2, "0");
+  const resD = String(dateObj.getUTCDate()).padStart(2, "0");
+  const resHH = String(dateObj.getUTCHours()).padStart(2, "0");
+  const resMM = String(dateObj.getUTCMinutes()).padStart(2, "0");
+  const resSS = String(dateObj.getUTCSeconds()).padStart(2, "0");
+
+  return `${resY}-${resM}-${resD} ${resHH}:${resMM}:${resSS}`;
+}
+
 // Helper to generate instances for a schedule
 function generateInstances(scheduleId, deviceId, layoutId, startTime, endTime, startDate, repeatMode, repeatInterval = 1, daysCount = 1) {
   const instances = [];
@@ -37,8 +63,8 @@ function generateInstances(scheduleId, deviceId, layoutId, startTime, endTime, s
     const m = String(curDate.getMonth() + 1).padStart(2, "0");
     const d = String(curDate.getDate()).padStart(2, "0");
     const dateStr = `${y}-${m}-${d}`;
-    const startDatetimeStr = `${dateStr} ${startTime}`;
-    const endDatetimeStr = `${dateStr} ${endTime}`;
+    const startDatetimeStr = formatDateTimeString(dateStr, startTime);
+    const endDatetimeStr = formatDateTimeString(dateStr, endTime);
 
     instances.push({
       schedule_id: scheduleId,
@@ -436,7 +462,7 @@ router.post('/exception', async (req, res) => {
       await conn.query(
         `INSERT INTO schedule_instances (schedule_id, device_id, layout_id, date, start_time, end_time, start_datetime, end_datetime)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [newS.insertId, s.device_id, inst.layout_id, date, inst.start_time, inst.end_time, `${date} ${inst.start_time}`, `${date} ${inst.end_time}`]
+        [newS.insertId, s.device_id, inst.layout_id, date, inst.start_time, inst.end_time, formatDateTimeString(date, inst.start_time), formatDateTimeString(date, inst.end_time)]
       );
     }
 
@@ -448,8 +474,8 @@ router.post('/exception', async (req, res) => {
       date: date,
       start_time: formattedStartTime,
       end_time: formattedEndTime,
-      start_datetime: `${date} ${formattedStartTime}`,
-      end_datetime: `${date} ${formattedEndTime}`
+      start_datetime: formatDateTimeString(date, formattedStartTime),
+      end_datetime: formatDateTimeString(date, formattedEndTime)
     }];
 
     // Temporarily delete old instance to avoid overlap check self-conflict
@@ -481,7 +507,7 @@ router.post('/exception', async (req, res) => {
     await conn.query(
       `INSERT INTO schedule_instances (schedule_id, device_id, layout_id, date, start_time, end_time, start_datetime, end_datetime)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [newScheduleId, s.device_id, layout_id, date, formattedStartTime, formattedEndTime, `${date} ${formattedStartTime}`, `${date} ${formattedEndTime}`]
+      [newScheduleId, s.device_id, layout_id, date, formattedStartTime, formattedEndTime, formatDateTimeString(date, formattedStartTime), formatDateTimeString(date, formattedEndTime)]
     );
 
     await conn.commit();
@@ -723,8 +749,8 @@ router.post('/copy-day', async (req, res) => {
           );
 
           // Save instance
-          const startDatetime = `${targetDate} ${row.start_time}`;
-          const endDatetime = `${targetDate} ${row.end_time}`;
+          const startDatetime = formatDateTimeString(targetDate, row.start_time);
+          const endDatetime = formatDateTimeString(targetDate, row.end_time);
           await conn.query(
             `INSERT INTO schedule_instances (schedule_id, device_id, layout_id, date, start_time, end_time, start_datetime, end_datetime)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
