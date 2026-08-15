@@ -497,6 +497,24 @@ async function downloadTvApk(req, res) {
   res.download(targetPath, 'SignageHub-TV.apk');
 }
 
+async function generateCode(req, res) {
+  if (!requireSuperAdmin(req, res)) return;
+  const { userId } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'userId is required' });
+
+  const code = String(Math.floor(1000 + Math.random() * 9000)); // 4-digit code
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+  const expiresAtStr = expiresAt.toISOString().slice(0, 19).replace('T', ' ');
+
+  await db.query(
+    'UPDATE users SET login_code = :code, login_code_expires_at = :expiresAt WHERE id = :id',
+    { code, expiresAt: db.isSqlite ? expiresAt.toISOString() : expiresAtStr, id: userId }
+  );
+
+  console.log(`[auth] Verification code ${code} generated for user ${userId}.`);
+  res.json({ code, expiresAt: expiresAt.toISOString() });
+}
+
 const handlers = {
   'create-company-admin': createCompanyAdmin,
   'create-user': createUser,
@@ -511,6 +529,7 @@ const handlers = {
   'sync-cloud-to-local': syncCloudToLocal,
   'generate-offline': generateOfflinePackage,
   'download-tv-apk': downloadTvApk,
+  'generate-code': generateCode,
 };
 
 router.post('/:name', async (req, res) => {

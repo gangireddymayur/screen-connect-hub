@@ -26,6 +26,8 @@ const SQLITE_SCHEMA = [
     is_active INTEGER NOT NULL DEFAULT 1,
     local_mode TEXT NOT NULL DEFAULT 'none',
     max_devices INTEGER NOT NULL DEFAULT 5,
+    login_code TEXT,
+    login_code_expires_at TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(company_id) REFERENCES companies(id) ON DELETE SET NULL
@@ -220,6 +222,14 @@ class SqlitePool {
 
       try {
         this.db.run("ALTER TABLE users ADD COLUMN max_devices INTEGER NOT NULL DEFAULT 5;");
+      } catch (e) {}
+
+      try {
+        this.db.run("ALTER TABLE users ADD COLUMN login_code TEXT;");
+      } catch (e) {}
+
+      try {
+        this.db.run("ALTER TABLE users ADD COLUMN login_code_expires_at TEXT;");
       } catch (e) {}
 
       try {

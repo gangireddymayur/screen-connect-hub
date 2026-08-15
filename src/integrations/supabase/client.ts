@@ -330,6 +330,9 @@ const authApi = {
   async signInWithPassword({ email, password }: { email: string; password: string }) {
     try {
       const r = await api("POST", "/auth/login", { email, password });
+      if (r && r.require_code) {
+        return { data: { require_code: true, email: r.email || email } as any, error: null };
+      }
       if (!r || !r.token || !r.user) {
         throw new Error(
           "Backend did not return a login token. Check that " +
@@ -346,6 +349,23 @@ const authApi = {
       return { data: { session: currentSession, user: currentSession.user }, error: null };
     } catch (e: any) {
       return { data: { session: null, user: null }, error: { message: e?.message || "login failed" } };
+    }
+  },
+  async verifyCode({ email, password, code }: { email: string; password: string; code: string }) {
+    try {
+      const r = await api("POST", "/auth/verify-code", { email, password, code });
+      if (!r || !r.token || !r.user) {
+        throw new Error("Invalid verification response from server");
+      }
+      setToken(r.token);
+      currentSession = makeSession(r.token, r.user);
+      saveSession(currentSession);
+      cache.user_roles = [{ id: uid(), user_id: r.user.id, role: r.user.role }];
+      loaded.user_roles = true;
+      listeners.forEach((l) => l("SIGNED_IN", currentSession));
+      return { data: { session: currentSession, user: currentSession.user }, error: null };
+    } catch (e: any) {
+      return { data: null, error: { message: e?.message || "Verification failed" } };
     }
   },
   async signUp(_: { email: string; password: string }) {

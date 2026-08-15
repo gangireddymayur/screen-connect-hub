@@ -84,6 +84,18 @@ app.get('/api/local-status', (_req, res) => res.json({
       console.log("[db] Added max_devices column to users table.");
     }
 
+    const [loginCodeCols] = await db.query("SHOW COLUMNS FROM users LIKE 'login_code'");
+    if (loginCodeCols.length === 0) {
+      await db.query("ALTER TABLE users ADD COLUMN login_code VARCHAR(4) DEFAULT NULL");
+      console.log("[db] Added login_code column to users table.");
+    }
+
+    const [loginCodeExpCols] = await db.query("SHOW COLUMNS FROM users LIKE 'login_code_expires_at'");
+    if (loginCodeExpCols.length === 0) {
+      await db.query("ALTER TABLE users ADD COLUMN login_code_expires_at DATETIME DEFAULT NULL");
+      console.log("[db] Added login_code_expires_at column to users table.");
+    }
+
     const [compLocalModeCols] = await db.query("SHOW COLUMNS FROM companies LIKE 'local_mode'");
     if (compLocalModeCols.length === 0) {
       await db.query("ALTER TABLE companies ADD COLUMN local_mode VARCHAR(32) DEFAULT 'none'");

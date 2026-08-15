@@ -42,6 +42,8 @@ interface UserProfile {
   is_banned: boolean;
   last_sign_in_at: string | null;
   email_confirmed: boolean;
+  login_code?: string | null;
+  login_code_expires_at?: string | null;
 }
 
 export default function UsersPage() {
@@ -50,6 +52,38 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [toggling, setToggling] = useState(false);
   const { user: currentUser } = useAuth();
+
+  const [activeCodes, setActiveCodes] = useState<Record<string, { code: string; expiresAt: number }>>({});
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleGenerateCode = async (user: UserProfile) => {
+    setGeneratingCode(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-code", {
+        body: { userId: user.id }
+      });
+      if (error || data?.error) {
+        toast.error(data?.error || error?.message || "Failed to generate code");
+      } else {
+        const expiresAtMs = new Date(data.expiresAt).getTime();
+        setActiveCodes((prev) => ({
+          ...prev,
+          [user.id]: { code: data.code, expiresAt: expiresAtMs },
+        }));
+        toast.success(`Verification code generated: ${data.code}`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate code");
+    } finally {
+      setGeneratingCode(false);
+    }
+  };
 
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -444,6 +478,35 @@ export default function UsersPage() {
                   </div>
                 </div>
               </div>
+
+              <Separator />
+
+              {/* Generate Verification Code (2-Step Verification) */}
+              {selectedUser.role === "admin" && (
+                <div className="p-4 rounded-lg border border-border bg-primary/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">2-Step Verification</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Required for local server login authorization
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleGenerateCode(selectedUser)}
+                      disabled={generatingCode}
+                    >
+                      {generatingCode ? "Generating..." : "Generate Code"}
+                    </Button>
+                  </div>
+
+                  {activeCodes[selectedUser.id] && activeCodes[selectedUser.id].expiresAt > Date.now() && (
+                    <div className="rounded-md bg-primary/10 border border-primary/20 p-2 text-center text-xs font-semibold text-primary animate-pulse">
+                      Login Code: <span className="text-lg font-mono font-bold tracking-wider mx-1">{activeCodes[selectedUser.id].code}</span> (expires in {Math.max(0, Math.round((activeCodes[selectedUser.id].expiresAt - Date.now()) / 1000))}s)
+                    </div>
+                  )}
+                </div>
+              )}
 
               <Separator />
 
