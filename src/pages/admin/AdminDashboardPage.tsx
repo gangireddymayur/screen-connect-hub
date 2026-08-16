@@ -62,9 +62,10 @@ export default function AdminDashboardPage() {
       setCompanyName(companyRes.data?.name ?? "");
       
       let limit = companyRes.data?.max_screens ?? 0;
-      if (profile?.local_mode === "single") {
+      const mode = profile?.local_mode;
+      if (mode === "single" || mode === "solo") {
         limit = 1;
-      } else if (profile?.local_mode === "multi") {
+      } else if (mode === "multi" || mode === "network") {
         limit = profile?.max_devices || 5;
       }
       setMaxScreens(limit);

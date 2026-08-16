@@ -282,6 +282,7 @@ export default function AdminDevicesPage() {
     });
   };
 
+  const isSolo = localMode === "single" || localMode === "solo";
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   return (
@@ -293,13 +294,13 @@ export default function AdminDevicesPage() {
             <p className="text-sm text-muted-foreground mt-1">Pair, configure, and monitor your Android TV screens.</p>
           </div>
           <div className="flex items-center gap-2">
-            {isLocalServer && localMode !== "single" && (
+            {isLocalServer && !isSolo && (
               <Button size="sm" variant="outline" onClick={handleCloudSync} disabled={syncing}>
                 <RefreshCw className={cn("h-4 w-4 mr-2", syncing && "animate-spin")} />
                 {syncing ? "Syncing..." : "Sync from Cloud"}
               </Button>
             )}
-            {localMode !== "single" && (
+            {!isSolo && (
               <Dialog open={addOpen} onOpenChange={setAddOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm"><Plus className="h-4 w-4 mr-2" /> Pair Device</Button>
