@@ -231,6 +231,32 @@ try {
   const backupRoutes = require('./src/routes/backup');
   app.use('/api/backup', authRequired, backupRoutes.download);
   app.use('/api/restore', authRequired, backupRoutes.restore);
+
+  app.post('/api/cloud-sync/entitlements', authRequired, async (req, res) => {
+    try {
+      const db = require('./src/lib/db');
+      const companyId = req.user.company_id;
+      if (!companyId) {
+        return res.status(400).json({ error: 'No company attached to user' });
+      }
+      const [comps] = await db.query('SELECT * FROM companies WHERE id = :cid LIMIT 1', { cid: companyId });
+      if (!comps || !comps[0]) {
+        return res.status(404).json({ error: 'Company not found' });
+      }
+      const comp = comps[0];
+      return res.json({
+        ok: true,
+        company: comp,
+        subscription_status: comp.subscription_status,
+        trial_ends_at: comp.trial_ends_at,
+        max_devices: comp.max_devices,
+        local_mode: comp.local_mode
+      });
+    } catch (err) {
+      console.error('[cloud-sync] Error:', err);
+      res.status(500).json({ error: err.message || 'Sync failed' });
+    }
+  });
 } catch (err) {
   console.error('ROUTE_LOAD_ERROR:', err.stack || err);
   global.routeLoadError = {

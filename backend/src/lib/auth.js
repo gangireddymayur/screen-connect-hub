@@ -42,9 +42,18 @@ async function requireTrialNotExpired(req, res, next) {
           const comp = rows[0];
           if (comp.subscription_status === 'expired') {
             return res.status(403).json({
-              error: 'Trial Expired',
-              message: 'Your 7-day free trial has expired. Contact your administrator to upgrade your plan.'
+              error: 'License Expired',
+              message: 'Your license access has expired. Contact your administrator to renew your plan.'
             });
+          }
+          if (comp.subscription_status === 'active' && comp.trial_ends_at) {
+            const expDate = new Date(comp.trial_ends_at);
+            if (new Date() > expDate) {
+              return res.status(403).json({
+                error: 'License Expired',
+                message: 'Your subscription period has ended. Contact your administrator to renew your plan.'
+              });
+            }
           }
           if (comp.subscription_status !== 'active') {
             const trialEnd = comp.trial_ends_at

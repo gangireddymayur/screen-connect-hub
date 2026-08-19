@@ -25,37 +25,65 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function getTrialInfo(company: any) {
-  if (!company) return { isExpired: false, text: "Active", variant: "default" };
-  if (company.subscription_status === "active") return { isExpired: false, text: "Active", variant: "default" };
-  if (company.subscription_status === "expired") return { isExpired: true, text: "Trial Expired", variant: "destructive" };
+  if (!company) return { isExpired: false, text: "Active", variant: "default", trialEndsAt: null, isTrial: false };
 
   const parseDate = (dateStr: string) => {
     if (!dateStr || dateStr === "null") return null;
     const formatted = dateStr.includes("T") ? dateStr : dateStr.replace(" ", "T");
-    return new Date(formatted);
+    const d = new Date(formatted);
+    return isNaN(d.getTime()) ? null : d;
   };
 
-  const trialEnd = company.trial_ends_at
-    ? parseDate(company.trial_ends_at)
-    : company.created_at
-      ? (() => {
-          const parsed = parseDate(company.created_at);
-          return parsed ? new Date(parsed.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
-        })()
-      : null;
+  const trialEnd = parseDate(company.trial_ends_at);
+  const createdAt = parseDate(company.created_at);
 
-  if (!trialEnd || isNaN(trialEnd.getTime())) {
-    return { isExpired: false, text: "Trial (7d left)", variant: "warning" };
+  if (company.subscription_status === "active") {
+    if (trialEnd) {
+      const isPast = Date.now() > trialEnd.getTime();
+      return {
+        isExpired: isPast,
+        text: isPast ? "Access Expired" : `Full Access until ${trialEnd.toLocaleDateString()}`,
+        variant: isPast ? "destructive" : "default",
+        trialEndsAt: trialEnd.toISOString(),
+        isTrial: false,
+      };
+    }
+    return {
+      isExpired: false,
+      text: "Active (Lifetime)",
+      variant: "default",
+      trialEndsAt: null,
+      isTrial: false,
+    };
   }
 
-  const diff = trialEnd.getTime() - new Date().getTime();
+  if (company.subscription_status === "expired") {
+    return {
+      isExpired: true,
+      text: "Access Expired",
+      variant: "destructive",
+      trialEndsAt: trialEnd ? trialEnd.toISOString() : null,
+      isTrial: false,
+    };
+  }
+
+  // Trial calculation
+  const calculatedEnd =
+    trialEnd ||
+    (createdAt
+      ? new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  const diff = calculatedEnd.getTime() - Date.now();
   const days = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   const isExpired = diff <= 0;
 
   return {
     isExpired,
-    text: isExpired ? "Trial Expired" : `Trial (${days}d left)`,
-    variant: isExpired ? "destructive" : "warning"
+    text: isExpired ? "Trial Expired" : `Trial expires: ${calculatedEnd.toLocaleDateString()}`,
+    variant: isExpired ? "destructive" : "warning",
+    trialEndsAt: calculatedEnd.toISOString(),
+    daysLeft: days,
+    isTrial: true,
   };
 }
 

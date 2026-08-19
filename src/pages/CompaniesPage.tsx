@@ -62,36 +62,60 @@ type SortDir = "asc" | "desc";
 const PAGE_SIZE = 10;
 
 export const getTrialInfo = (company: Company) => {
-  if (company.subscription_status === "active") return { isExpired: false, text: "Active", variant: "default" };
-  if (company.subscription_status === "expired") return { isExpired: true, text: "Trial Expired", variant: "destructive" };
-  
+  if (!company) return { isExpired: false, text: "Active", variant: "default", trialEndsAt: null };
+
   const parseDate = (dateStr: string) => {
     if (!dateStr || dateStr === "null") return null;
     const formatted = dateStr.includes("T") ? dateStr : dateStr.replace(" ", "T");
-    return new Date(formatted);
+    const d = new Date(formatted);
+    return isNaN(d.getTime()) ? null : d;
   };
 
-  const trialEnd = company.trial_ends_at
-    ? parseDate(company.trial_ends_at)
-    : company.created_at
-      ? (() => {
-          const parsed = parseDate(company.created_at);
-          return parsed ? new Date(parsed.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
-        })()
-      : null;
+  const trialEnd = parseDate(company.trial_ends_at || "");
+  const createdAt = parseDate(company.created_at);
 
-  if (!trialEnd || isNaN(trialEnd.getTime())) {
-    return { isExpired: false, text: "Trial (7d left)", variant: "warning" };
+  if (company.subscription_status === "active") {
+    if (trialEnd) {
+      const isPast = Date.now() > trialEnd.getTime();
+      return {
+        isExpired: isPast,
+        text: isPast ? "Access Expired" : `Full Access until ${trialEnd.toLocaleDateString()}`,
+        variant: isPast ? "destructive" : "default",
+        trialEndsAt: trialEnd.toISOString(),
+      };
+    }
+    return {
+      isExpired: false,
+      text: "Active (Lifetime)",
+      variant: "default",
+      trialEndsAt: null,
+    };
   }
 
-  const diff = trialEnd.getTime() - new Date().getTime();
+  if (company.subscription_status === "expired") {
+    return {
+      isExpired: true,
+      text: "Access Expired",
+      variant: "destructive",
+      trialEndsAt: trialEnd ? trialEnd.toISOString() : null,
+    };
+  }
+
+  const calculatedEnd =
+    trialEnd ||
+    (createdAt
+      ? new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  const diff = calculatedEnd.getTime() - Date.now();
   const days = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   const isExpired = diff <= 0;
 
   return {
     isExpired,
-    text: isExpired ? "Trial Expired" : `Trial (${days}d left)`,
-    variant: isExpired ? "destructive" : "warning"
+    text: isExpired ? "Trial Expired" : `Trial expires: ${calculatedEnd.toLocaleDateString()}`,
+    variant: isExpired ? "destructive" : "warning",
+    trialEndsAt: calculatedEnd.toISOString(),
+    daysLeft: days,
   };
 };
 
@@ -692,35 +716,135 @@ export default function CompaniesPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Subscription Status</Label>
+              <Label>Subscription Status & License</Label>
               <Select value={editSubscriptionStatus} onValueChange={setEditSubscriptionStatus}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="trial">Free Trial</SelectItem>
-                  <SelectItem value="active">Active (Paid)</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="active">Active (Paid Access)</SelectItem>
+                  <SelectItem value="expired">Expired / Locked</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {editSubscriptionStatus === "active" && (
+              <div className="space-y-3 p-3.5 rounded-xl border border-border/60 bg-muted/20">
+                <Label className="text-xs font-semibold text-foreground">Grant Access Duration</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setMonth(d.getMonth() + 1);
+                      setEditTrialEndsAt(d.toISOString());
+                    }}
+                  >
+                    1 Month
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setMonth(d.getMonth() + 3);
+                      setEditTrialEndsAt(d.toISOString());
+                    }}
+                  >
+                    3 Months
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setMonth(d.getMonth() + 6);
+                      setEditTrialEndsAt(d.toISOString());
+                    }}
+                  >
+                    6 Months
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setFullYear(d.getFullYear() + 1);
+                      setEditTrialEndsAt(d.toISOString());
+                    }}
+                  >
+                    1 Year
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setFullYear(d.getFullYear() + 3);
+                      setEditTrialEndsAt(d.toISOString());
+                    }}
+                  >
+                    3 Years
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      setEditTrialEndsAt(null);
+                    }}
+                  >
+                    Lifetime
+                  </Button>
+                </div>
+                <div className="space-y-1.5 pt-1">
+                  <Label className="text-[11px] text-muted-foreground">Custom Expiration Date & Time</Label>
+                  <Input
+                    type="datetime-local"
+                    value={editTrialEndsAt ? editTrialEndsAt.slice(0, 16) : ""}
+                    onChange={(e) => setEditTrialEndsAt(e.target.value ? new Date(e.target.value).toISOString() : null)}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    {editTrialEndsAt
+                      ? `Access will expire on: ${new Date(editTrialEndsAt).toLocaleString()}`
+                      : "No expiration set (Unlimited lifetime access)."}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {editSubscriptionStatus === "trial" && (
-              <div className="space-y-2">
-                <Label>Trial Expiry Date</Label>
+              <div className="space-y-2 p-3 rounded-xl border border-border/60 bg-muted/20">
+                <Label className="text-xs font-semibold">Trial Expiry Date</Label>
                 <div className="flex gap-2">
                   <Input 
                     type="datetime-local" 
                     value={editTrialEndsAt ? editTrialEndsAt.slice(0, 16) : ""} 
-                    onChange={(e) => setEditTrialEndsAt(e.target.value)} 
+                    onChange={(e) => setEditTrialEndsAt(e.target.value ? new Date(e.target.value).toISOString() : null)} 
                   />
                   <Button 
                     type="button" 
                     variant="outline" 
+                    size="sm"
+                    className="text-xs shrink-0"
                     onClick={() => {
                       const future = new Date();
                       future.setDate(future.getDate() + 7);
                       setEditTrialEndsAt(future.toISOString());
                     }}
                   >
-                    Reset Trial (7 Days)
+                    Reset (7 Days)
                   </Button>
                 </div>
               </div>

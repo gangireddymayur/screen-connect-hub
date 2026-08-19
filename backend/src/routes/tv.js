@@ -113,13 +113,36 @@ router.post('/generate-code', async (req, res) => {
 
 function computeTrialInfo(company) {
   if (!company) return { isExpired: false, status: "active", daysLeft: 999, trialEndsAt: null };
+  const now = new Date();
+
   if (company.subscription_status === "active") {
-    return { isExpired: false, status: "active", daysLeft: 999, trialEndsAt: null };
+    if (company.trial_ends_at) {
+      const trialEnds = new Date(company.trial_ends_at);
+      const isExpired = now > trialEnds;
+      const diffMs = trialEnds.getTime() - now.getTime();
+      const daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+      return {
+        isExpired,
+        status: isExpired ? "expired" : "active",
+        daysLeft: isExpired ? 0 : daysLeft,
+        trialEndsAt: trialEnds.toISOString(),
+      };
+    }
+    return { isExpired: false, status: "active", daysLeft: 9999, trialEndsAt: null };
   }
+
+  if (company.subscription_status === "expired") {
+    return {
+      isExpired: true,
+      status: "expired",
+      daysLeft: 0,
+      trialEndsAt: company.trial_ends_at ? new Date(company.trial_ends_at).toISOString() : null,
+    };
+  }
+
   if (!company.trial_ends_at) {
     const created = company.created_at ? new Date(company.created_at) : new Date();
     const fallbackEnds = new Date(created.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const now = new Date();
     const isExpired = now > fallbackEnds;
     const diffMs = fallbackEnds.getTime() - now.getTime();
     const daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
@@ -131,7 +154,6 @@ function computeTrialInfo(company) {
     };
   }
 
-  const now = new Date();
   const trialEnds = new Date(company.trial_ends_at);
   const diffMs = trialEnds.getTime() - now.getTime();
   const isExpired = now > trialEnds || company.subscription_status === "expired";
