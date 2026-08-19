@@ -72,17 +72,19 @@ export const AdminLayout = forwardRef<HTMLDivElement, { children: React.ReactNod
                   )}
                 </div>
 
-                {/* Manual Sync Refresh Button */}
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={handleSync}
-                  disabled={syncing}
-                  className="size-8 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
-                  title="Sync subscription status from cloud"
-                >
-                  <RefreshCw className={`size-3.5 ${syncing ? "animate-spin text-primary" : ""}`} />
-                </Button>
+                {/* Manual Sync Refresh Button (Local Solo/Multi Modes only) */}
+                {company?.local_mode && company.local_mode !== "none" && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={handleSync}
+                    disabled={syncing}
+                    className="size-8 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+                    title="Sync subscription status from cloud"
+                  >
+                    <RefreshCw className={`size-3.5 ${syncing ? "animate-spin text-primary" : ""}`} />
+                  </Button>
+                )}
 
                 <ThemeToggle />
                 <Button variant="ghost" size="icon" className="relative">
