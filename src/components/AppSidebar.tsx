@@ -26,8 +26,7 @@ import { Button } from "@/components/ui/button";
 
 const superAdminNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Companies", url: "/companies", icon: Building2 },
-  { title: "Users", url: "/users", icon: Users },
+  { title: "Sub Admins", url: "/companies", icon: Users },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
