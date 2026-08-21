@@ -393,17 +393,14 @@ router.post('/users/:id/generate-code', authRequired, async (req, res) => {
     const { id } = req.params;
     const { companyId, email } = req.body || {};
     const code = String(Math.floor(1000 + Math.random() * 9000)); // 4-digit code
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-    const expiresAtStr = expiresAt.toISOString().slice(0, 19).replace('T', ' ');
-
+    const expSql = db.isSqlite ? "datetime('now', '+15 minutes')" : "DATE_ADD(NOW(), INTERVAL 15 MINUTE)";
     const [updateResult] = await db.query(
-      'UPDATE users SET login_code = :code, login_code_expires_at = :expiresAt ' +
+      `UPDATE users SET login_code = :code, login_code_expires_at = ${expSql} ` +
       'WHERE id = :id OR company_id = :id OR email = :id ' +
       (companyId ? 'OR company_id = :companyId ' : '') +
       (email ? 'OR email = :email ' : ''),
       { 
         code, 
-        expiresAt: db.isSqlite ? expiresAt.toISOString() : expiresAtStr, 
         id,
         ...(companyId ? { companyId } : {}),
         ...(email ? { email } : {})
@@ -411,7 +408,7 @@ router.post('/users/:id/generate-code', authRequired, async (req, res) => {
     );
 
     console.log(`[auth] Verification code ${code} generated for user/company ${id}. Result:`, updateResult);
-    res.json({ code, expiresAt: expiresAt.toISOString() });
+    res.json({ code, expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() });
   } catch (err) {
     console.error('GENERATE_CODE_ERROR:', err.stack || err);
     res.status(500).json({ error: 'Failed to generate verification code' });
