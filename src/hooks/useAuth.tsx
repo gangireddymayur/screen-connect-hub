@@ -108,23 +108,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("[fetchRoleAndCompany] userRole:", userRole);
       setRole(userRole);
 
+      let compData: any = null;
       const companyId = userObj.user_metadata?.company_id;
-      console.log("[fetchRoleAndCompany] companyId:", companyId);
       if (companyId) {
-        const { data: compData } = await supabase
+        const { data } = await supabase
           .from("companies")
           .select("*")
           .eq("id", companyId)
           .single();
-        console.log("[fetchRoleAndCompany] compData:", JSON.stringify(compData));
-        setCompany(compData ?? null);
-        const trialInfo = getTrialInfo(compData);
-        console.log("[fetchRoleAndCompany] trialInfo:", JSON.stringify(trialInfo));
-        setIsTrialExpired(trialInfo.isExpired);
-      } else {
-        setCompany(null);
-        setIsTrialExpired(false);
+        compData = data;
       }
+      
+      // Fallback for local servers / single company setups
+      if (!compData) {
+        const { data: allComps } = await supabase
+          .from("companies")
+          .select("*")
+          .limit(1);
+        compData = Array.isArray(allComps) && allComps.length > 0 ? allComps[0] : null;
+      }
+
+      setCompany(compData ?? null);
+      const trialInfo = getTrialInfo(compData);
+      setIsTrialExpired(trialInfo.isExpired);
     } catch {
       setRole(null);
       setCompany(null);
