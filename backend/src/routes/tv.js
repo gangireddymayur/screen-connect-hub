@@ -167,6 +167,43 @@ function computeTrialInfo(company) {
   };
 }
 
+router.post('/device-status', async (req, res) => {
+  try {
+    const { company_id, email } = req.body || {};
+    if (!company_id && !email) {
+      return res.status(400).json({ error: 'company_id or email required' });
+    }
+    const [comps] = await db.query(
+      'SELECT id, name, status, subscription_status, trial_ends_at, max_screens, max_devices, local_mode ' +
+      'FROM companies WHERE id = :cid OR contact_email = :email LIMIT 1',
+      { cid: company_id || '', email: email || '' }
+    );
+    if (!comps || !comps[0]) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+    const c = comps[0];
+    let trialEndsIso = null;
+    if (c.trial_ends_at) {
+      const d = new Date(c.trial_ends_at);
+      if (!isNaN(d.getTime())) {
+        trialEndsIso = d.toISOString();
+      }
+    }
+    res.json({
+      ok: true,
+      subscription_status: c.subscription_status || 'active',
+      trial_ends_at: trialEndsIso,
+      max_screens: c.max_screens,
+      max_devices: c.max_devices,
+      local_mode: c.local_mode,
+      company: c
+    });
+  } catch (err) {
+    console.error('DEVICE_STATUS_ERROR:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/poll-status', async (req, res) => {
   try {
     const { device_id } = req.body || {};
