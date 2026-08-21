@@ -489,33 +489,29 @@ export default function CompaniesPage() {
     e?.stopPropagation();
     const toastId = toast.loading("Generating login verification code...");
     try {
-      const res = await fetch(`/api/auth/users/${company.id}/generate-code`, {
+      const targetId = (company as any).admin_id || company.id;
+      const token = localStorage.getItem("sh_token") || localStorage.getItem("auth_token");
+      const res = await fetch(`/api/auth/users/${targetId}/generate-code`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("sh_token") || localStorage.getItem("auth_token")}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+        body: JSON.stringify({ companyId: company.id, email: company.contact_email }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Failed to generate code");
       }
       setGeneratedCodeData({
-        code: data.code || String(Math.floor(1000 + Math.random() * 9000)),
-        expiresAt: Date.now() + 10 * 60 * 1000,
+        code: data.code,
+        expiresAt: data.expiresAt ? new Date(data.expiresAt).getTime() : Date.now() + 10 * 60 * 1000,
         companyName: company.name,
       });
       setCodeOpen(true);
       toast.success("Verification code generated!", { id: toastId });
     } catch (err: any) {
-      const fallbackCode = String(Math.floor(1000 + Math.random() * 9000));
-      setGeneratedCodeData({
-        code: fallbackCode,
-        expiresAt: Date.now() + 10 * 60 * 1000,
-        companyName: company.name,
-      });
-      setCodeOpen(true);
-      toast.success("Verification code generated!", { id: toastId });
+      toast.error(err.message || "Failed to generate code", { id: toastId });
     }
   };
 

@@ -499,19 +499,29 @@ async function downloadTvApk(req, res) {
 
 async function generateCode(req, res) {
   if (!requireSuperAdmin(req, res)) return;
-  const { userId } = req.body || {};
-  if (!userId) return res.status(400).json({ error: 'userId is required' });
+  const { userId, companyId, email } = req.body || {};
+  const targetId = userId || companyId || email || req.params?.name;
+  if (!targetId) return res.status(400).json({ error: 'userId or companyId is required' });
 
   const code = String(Math.floor(1000 + Math.random() * 9000)); // 4-digit code
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
   const expiresAtStr = expiresAt.toISOString().slice(0, 19).replace('T', ' ');
 
-  await db.query(
-    'UPDATE users SET login_code = :code, login_code_expires_at = :expiresAt WHERE id = :id',
-    { code, expiresAt: db.isSqlite ? expiresAt.toISOString() : expiresAtStr, id: userId }
+  const [updateResult] = await db.query(
+    'UPDATE users SET login_code = :code, login_code_expires_at = :expiresAt ' +
+    'WHERE id = :id OR company_id = :id OR email = :id ' +
+    (companyId ? 'OR company_id = :companyId ' : '') +
+    (email ? 'OR email = :email ' : ''),
+    { 
+      code, 
+      expiresAt: db.isSqlite ? expiresAt.toISOString() : expiresAtStr, 
+      id: targetId,
+      ...(companyId ? { companyId } : {}),
+      ...(email ? { email } : {})
+    }
   );
 
-  console.log(`[auth] Verification code ${code} generated for user ${userId}.`);
+  console.log(`[auth] Verification code ${code} generated for ${targetId}. Result:`, updateResult);
   res.json({ code, expiresAt: expiresAt.toISOString() });
 }
 

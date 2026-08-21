@@ -7,24 +7,25 @@ const { rememberLocalLoginPassword } = require('../lib/cloud-session-cache');
 function parseExpirationDate(val) {
   if (!val) return null;
   if (val instanceof Date) {
-    return new Date(Date.UTC(
-      val.getFullYear(),
-      val.getMonth(),
-      val.getDate(),
-      val.getHours(),
-      val.getMinutes(),
-      val.getSeconds(),
-      val.getMilliseconds()
-    ));
+    return isNaN(val.getTime()) ? null : val;
+  }
+  if (typeof val === 'number') {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
   }
   if (typeof val === 'string') {
-    if (val.includes('Z') || val.includes('+') || val.includes('-')) {
-      return new Date(val);
+    let s = val.trim();
+    if (!s) return null;
+    // If no timezone offset (Z or +/-HH:MM) is present, treat as UTC
+    const hasTimezone = /Z$/i.test(s) || /[+-]\d{2}(:?\d{2})?$/.test(s);
+    if (!hasTimezone) {
+      s = s.replace(' ', 'T') + 'Z';
     }
-    const normalized = val.replace(' ', 'T') + 'Z';
-    return new Date(normalized);
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
   }
-  return new Date(val);
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 // POST /api/auth/login  { email, password }
@@ -213,9 +214,9 @@ router.post('/login', async (req, res) => {
       return res.json({ require_code: true, email: user.email });
     }
 
-    // Local server login restrictions: Only local network admins (role === 'admin', local_mode === 'multi') are permitted to log in.
+    // Local server login restrictions: Only local network admins (role === 'admin', local_mode === 'multi' or 'single') are permitted to log in.
     if (isOffline) {
-      if (user.role !== 'admin' || user.local_mode !== 'multi') {
+      if (user.role !== 'admin' || (user.local_mode !== 'multi' && user.local_mode !== 'single')) {
         return res.status(403).json({ error: 'Only local network admins are permitted to log in on this local server.' });
       }
       // Keep the current sign-in password in process memory only so the
@@ -390,16 +391,26 @@ router.post('/users/:id/generate-code', authRequired, async (req, res) => {
     }
 
     const { id } = req.params;
+    const { companyId, email } = req.body || {};
     const code = String(Math.floor(1000 + Math.random() * 9000)); // 4-digit code
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
     const expiresAtStr = expiresAt.toISOString().slice(0, 19).replace('T', ' ');
 
-    await db.query(
-      'UPDATE users SET login_code = :code, login_code_expires_at = :expiresAt WHERE id = :id',
-      { code, expiresAt: db.isSqlite ? expiresAt.toISOString() : expiresAtStr, id }
+    const [updateResult] = await db.query(
+      'UPDATE users SET login_code = :code, login_code_expires_at = :expiresAt ' +
+      'WHERE id = :id OR company_id = :id OR email = :id ' +
+      (companyId ? 'OR company_id = :companyId ' : '') +
+      (email ? 'OR email = :email ' : ''),
+      { 
+        code, 
+        expiresAt: db.isSqlite ? expiresAt.toISOString() : expiresAtStr, 
+        id,
+        ...(companyId ? { companyId } : {}),
+        ...(email ? { email } : {})
+      }
     );
 
-    console.log(`[auth] Verification code ${code} generated for user ${id}.`);
+    console.log(`[auth] Verification code ${code} generated for user/company ${id}. Result:`, updateResult);
     res.json({ code, expiresAt: expiresAt.toISOString() });
   } catch (err) {
     console.error('GENERATE_CODE_ERROR:', err.stack || err);
