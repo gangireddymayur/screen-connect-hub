@@ -169,7 +169,7 @@ export default function AdminDevicesPage() {
       const errMsg = (data as any)?.error || error?.message || "Pairing failed";
       if (/not found|expired/i.test(errMsg)) {
         toast.error("Code not found or expired", {
-          description: "Refresh or reopen the SignageHub app on your TV to generate a new code.",
+          description: "Refresh or reopen the PixBow app on your TV to generate a new code.",
         });
       } else {
         toast.error(errMsg);
@@ -309,7 +309,7 @@ export default function AdminDevicesPage() {
                   <DialogHeader><DialogTitle>Pair Android TV Device</DialogTitle></DialogHeader>
                 <form onSubmit={handleAdd} className="space-y-4">
                   <p className="text-xs text-muted-foreground leading-normal">
-                    Open the SignageHub app on your Android TV and enter the 6-character code displayed on the screen.
+                    Open the PixBow app on your Android TV and enter the 6-character code displayed on the screen.
                   </p>
                   <div className="space-y-2"><Label>Pairing Code</Label><Input value={pairCode} onChange={(e) => setPairCode(e.target.value)} placeholder="ABC123" required /></div>
                   <div className="space-y-2"><Label>Device Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Reception Screen" required /></div>

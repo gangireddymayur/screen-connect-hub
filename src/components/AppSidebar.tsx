@@ -43,13 +43,15 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary">
-            <Tv className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img
+            src="/pixbow-logo.png"
+            alt="PixBow"
+            className="size-9 shrink-0 rounded-xl object-contain shadow-md shadow-primary/10"
+          />
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="text-sm font-bold text-sidebar-accent-foreground tracking-tight">
-                SignageHub
+              <span className="text-sm font-extrabold text-sidebar-accent-foreground tracking-tight">
+                PixBow
               </span>
               <span className="text-[10px] text-sidebar-foreground/50 uppercase tracking-widest">
                 Super Admin

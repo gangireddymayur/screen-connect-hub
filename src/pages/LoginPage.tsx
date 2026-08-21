@@ -133,10 +133,12 @@ export default function LoginPage() {
 
       <Card className="w-full max-w-md border-border/60 bg-card/70 backdrop-blur-xl shadow-2xl relative z-10">
         <CardHeader className="text-center space-y-2 pb-4">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary to-emerald-500 shadow-lg shadow-primary/20">
-            <Tv className="h-6 w-6 text-primary-foreground" />
-          </div>
-          <CardTitle className="text-2xl font-black tracking-tight">SignageHub</CardTitle>
+          <img
+            src="/pixbow-logo.png"
+            alt="PixBow"
+            className="h-16 w-auto object-contain mx-auto rounded-2xl shadow-xl shadow-primary/20"
+          />
+          <CardTitle className="text-2xl font-black tracking-tight">PixBow</CardTitle>
           <CardDescription className="text-xs">
             {mode === "signup"
               ? "Create your cloud account with a 7-day free trial"
