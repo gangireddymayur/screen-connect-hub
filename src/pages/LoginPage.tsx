@@ -27,6 +27,13 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { session, role, loading: authLoading } = useAuth();
 
+  const isCloud = typeof window !== "undefined" && !(
+    window.location.port === "8080" ||
+    window.location.port === "3000" ||
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+  );
+
   // Auto-redirect if already logged in
   useEffect(() => {
     if (!authLoading && session) {
@@ -140,30 +147,38 @@ export default function LoginPage() {
               : "Sign in to manage your digital displays"}
           </CardDescription>
 
-          {/* Mode Switcher Tabs */}
-          {!requireCode && !codeUnavailable && (
-            <div className="flex p-1 bg-muted/60 rounded-xl max-w-xs mx-auto mt-2 border border-border/40">
+          {/* Mode Switcher Tabs (Cloud Only) */}
+          {isCloud && !requireCode && !codeUnavailable && (
+            <div className="relative flex items-center p-1 bg-muted/60 rounded-2xl w-full max-w-[280px] mx-auto mt-3 border border-border/40 shadow-inner">
+              {/* Smooth sliding pill indicator */}
+              <div
+                className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl bg-background border border-border/60 shadow-md transition-all duration-300 ease-out ${
+                  mode === "login" ? "left-1" : "left-[calc(50%+2px)]"
+                }`}
+              />
+
               <button
                 type="button"
                 onClick={() => setMode("login")}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                className={`relative z-10 flex-1 py-2 text-xs font-bold rounded-xl transition-colors duration-200 text-center whitespace-nowrap cursor-pointer select-none ${
                   mode === "login"
-                    ? "bg-background text-foreground shadow-sm"
+                    ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 Sign In
               </button>
+
               <button
                 type="button"
                 onClick={() => setMode("signup")}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                className={`relative z-10 flex-1 py-2 text-xs font-bold rounded-xl transition-colors duration-200 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer select-none ${
                   mode === "signup"
-                    ? "bg-background text-emerald-400 shadow-sm"
+                    ? "text-emerald-400 font-extrabold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Sparkles className="size-3 text-emerald-400" />
+                <Sparkles className={`size-3.5 transition-transform duration-300 ${mode === "signup" ? "text-emerald-400 scale-110" : "text-muted-foreground"}`} />
                 <span>Sign Up</span>
               </button>
             </div>
