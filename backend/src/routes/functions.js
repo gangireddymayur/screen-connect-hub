@@ -342,7 +342,9 @@ async function syncCloudToLocal(req, res) {
     max_screens: cloudScreenLimit,
     max_devices: cloudScreenLimit,
     plan: payload.company?.plan || 'pro',
-    status: payload.company?.status || 'active'
+    status: payload.company?.status || 'active',
+    subscription_status: payload.company?.subscription_status || 'active',
+    trial_ends_at: payload.company?.trial_ends_at || null
   };
   if (company.local_mode === 'single') {
     company.max_devices = 1;
@@ -353,11 +355,14 @@ async function syncCloudToLocal(req, res) {
   // schedules, uploads, and password hashes are deliberately never imported
   // from or replaced by the cloud.
   await db.query(
-    'UPDATE companies SET plan = :plan, status = :status, local_mode = :local_mode, ' +
+    'UPDATE companies SET plan = :plan, status = :status, subscription_status = :subscription_status, ' +
+    'trial_ends_at = :trial_ends_at, local_mode = :local_mode, ' +
     'max_devices = :max_devices, max_screens = :max_screens WHERE id = :company_id',
     {
       plan: company.plan,
       status: company.status,
+      subscription_status: company.subscription_status,
+      trial_ends_at: company.trial_ends_at,
       local_mode: company.local_mode,
       max_devices: company.max_devices,
       max_screens: company.max_screens,

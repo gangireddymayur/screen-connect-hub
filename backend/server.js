@@ -243,13 +243,50 @@ try {
       if (!comps || !comps[0]) {
         return res.status(404).json({ error: 'Company not found' });
       }
-      const comp = comps[0];
+      let comp = comps[0];
+
+      // Fetch latest entitlements from Cloud server if reachable
+      const cloudUrl = String(
+        process.env.CLOUD_URL || 'https://agitated-satoshi.103-69-196-157.plesk.page'
+      ).replace(/\/+$/, '');
+
+      try {
+        const cloudRes = await fetch(`${cloudUrl}/api/tv/device-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company_id: comp.id, email: comp.contact_email || req.user.email })
+        });
+        if (cloudRes.ok) {
+          const cloudData = await cloudRes.json();
+          const subStatus = cloudData.subscription_status || 'active';
+          const trialEnds = cloudData.trial_ends_at || null;
+          const maxScreens = Number(cloudData.max_screens || comp.max_screens || 5);
+          const maxDevices = Number(cloudData.max_devices || comp.max_devices || 5);
+          const localMode = cloudData.local_mode || comp.local_mode || 'multi';
+
+          await db.query(
+            'UPDATE companies SET subscription_status = :subStatus, trial_ends_at = :trialEnds, ' +
+            'max_screens = :maxScreens, max_devices = :maxDevices, local_mode = :localMode WHERE id = :cid',
+            { subStatus, trialEnds, maxScreens, maxDevices, localMode, cid: comp.id }
+          );
+
+          comp.subscription_status = subStatus;
+          comp.trial_ends_at = trialEnds;
+          comp.max_screens = maxScreens;
+          comp.max_devices = maxDevices;
+          comp.local_mode = localMode;
+        }
+      } catch (e) {
+        console.warn('[cloud-sync] Cloud unreachable during sync, using saved local SQLite record:', e.message);
+      }
+
       return res.json({
         ok: true,
         company: comp,
         subscription_status: comp.subscription_status,
         trial_ends_at: comp.trial_ends_at,
         max_devices: comp.max_devices,
+        max_screens: comp.max_screens,
         local_mode: comp.local_mode
       });
     } catch (err) {
