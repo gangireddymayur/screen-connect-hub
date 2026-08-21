@@ -21,8 +21,22 @@ function normalizePayload(table, input = {}) {
     if (typeof payload.is_paused === 'boolean') payload.is_paused = payload.is_paused ? 1 : 0;
   }
 
-  if (table === 'companies' && typeof payload.max_screens === 'string') {
-    payload.max_screens = Number(payload.max_screens);
+  if (table === 'companies') {
+    if (typeof payload.max_screens === 'string') {
+      payload.max_screens = Number(payload.max_screens);
+    }
+    if (payload.trial_ends_at !== undefined) {
+      if (payload.trial_ends_at === null || payload.trial_ends_at === '' || payload.trial_ends_at === 'null') {
+        payload.trial_ends_at = null;
+      } else if (typeof payload.trial_ends_at === 'string') {
+        const d = new Date(payload.trial_ends_at);
+        if (!isNaN(d.getTime())) {
+          payload.trial_ends_at = d.toISOString().slice(0, 19).replace('T', ' ');
+        } else {
+          payload.trial_ends_at = null;
+        }
+      }
+    }
   }
 
   return payload;

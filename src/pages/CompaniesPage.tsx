@@ -219,8 +219,9 @@ export default function CompaniesPage() {
   const [accessCompany, setAccessCompany] = useState<Company | null>(null);
   const [accessSubmitting, setAccessSubmitting] = useState(false);
 
-  // Generate Code Dialog
+  // Generate Code Dialog & In-Card Display
   const [codeOpen, setCodeOpen] = useState(false);
+  const [activeCodes, setActiveCodes] = useState<Record<string, { code: string; expiresAt: number }>>({});
   const [generatedCodeData, setGeneratedCodeData] = useState<{
     code: string;
     expiresAt: number;
@@ -458,9 +459,10 @@ export default function CompaniesPage() {
     } else if (typeof durationDays === "number") {
       const d = new Date();
       d.setDate(d.getDate() + durationDays);
-      calculatedEndsAt = d.toISOString();
+      calculatedEndsAt = d.toISOString().slice(0, 19).replace("T", " ");
     } else if (editTrialEndsAt) {
-      calculatedEndsAt = new Date(editTrialEndsAt).toISOString();
+      const d = new Date(editTrialEndsAt);
+      calculatedEndsAt = isNaN(d.getTime()) ? null : d.toISOString().slice(0, 19).replace("T", " ");
     }
 
     const { error } = await supabase
@@ -503,11 +505,16 @@ export default function CompaniesPage() {
       if (!res.ok) {
         throw new Error(data.error || "Failed to generate code");
       }
+      const expMs = data.expiresAt ? new Date(data.expiresAt).getTime() : Date.now() + 15 * 60 * 1000;
       setGeneratedCodeData({
         code: data.code,
-        expiresAt: data.expiresAt ? new Date(data.expiresAt).getTime() : Date.now() + 10 * 60 * 1000,
+        expiresAt: expMs,
         companyName: company.name,
       });
+      setActiveCodes((prev) => ({
+        ...prev,
+        [company.id]: { code: data.code, expiresAt: expMs },
+      }));
       setCodeOpen(true);
       toast.success("Verification code generated!", { id: toastId });
     } catch (err: any) {
@@ -985,16 +992,35 @@ export default function CompaniesPage() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5">
-                      {company.local_mode && company.local_mode !== "none" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => handleGenerateCode(company, e)}
-                          className="h-7 text-[10px] font-bold border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 cursor-pointer px-2"
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {activeCodes[company.id] && activeCodes[company.id].expiresAt > Date.now() ? (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(activeCodes[company.id].code);
+                            toast.success(`Copied code ${activeCodes[company.id].code} to clipboard!`);
+                          }}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 text-[11px] font-mono font-bold cursor-pointer hover:bg-cyan-500/25 transition-all shadow-sm group"
+                          title="Click to copy authorization code"
                         >
-                          <Key className="size-3 mr-1" /> Generate Code
-                        </Button>
+                          <Key className="size-3 text-cyan-400 shrink-0" />
+                          <span>Code: <strong className="text-cyan-200 text-xs tracking-wider">{activeCodes[company.id].code}</strong></span>
+                          <span className="text-[10px] text-cyan-400/80 font-normal">
+                            ({Math.max(0, Math.floor((activeCodes[company.id].expiresAt - Date.now()) / 1000))}s)
+                          </span>
+                          <Copy className="size-2.5 text-cyan-400 opacity-60 group-hover:opacity-100 ml-0.5" />
+                        </div>
+                      ) : (
+                        company.local_mode && company.local_mode !== "none" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => handleGenerateCode(company, e)}
+                            className="h-7 text-[10px] font-bold border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 cursor-pointer px-2"
+                          >
+                            <Key className="size-3 mr-1" /> Generate Code
+                          </Button>
+                        )
                       )}
                       <Button
                         size="sm"

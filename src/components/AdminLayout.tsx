@@ -56,18 +56,18 @@ export const AdminLayout = forwardRef<HTMLDivElement, { children: React.ReactNod
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-medium select-none">
                   {company?.subscription_status === "active" && !trialInfo.isExpired ? (
                     <>
-                      <ShieldCheck className="size-3.5 text-emerald-400" />
-                      <span className="text-muted-foreground">{trialInfo.text}</span>
+                      <ShieldCheck className="size-3.5 text-emerald-400 shrink-0" />
+                      <span className="text-emerald-300 font-semibold">{trialInfo.text}</span>
                     </>
                   ) : trialInfo.isExpired ? (
                     <>
-                      <AlertTriangle className="size-3.5 text-rose-400" />
-                      <span className="text-rose-400">Access Expired</span>
+                      <AlertTriangle className="size-3.5 text-rose-400 shrink-0" />
+                      <span className="text-rose-400 font-semibold">Access Expired</span>
                     </>
                   ) : (
                     <>
-                      <Clock className="size-3.5 text-amber-400" />
-                      <span className="text-amber-300">{trialInfo.text}</span>
+                      <Clock className="size-3.5 text-amber-400 shrink-0" />
+                      <span className="text-amber-300 font-semibold">{trialInfo.text}</span>
                     </>
                   )}
                 </div>
