@@ -13,13 +13,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Building2, Upload, X, LogOut, Edit2, Save, Loader2, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { Building2, Upload, X, LogOut, Edit2, Save, Loader2, RefreshCw, SlidersHorizontal, MapPin, Mail, Phone, MessageSquare, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function AdminSettingsPage() {
   const { user, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"general" | "developer">("general");
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -283,241 +284,435 @@ export default function AdminSettingsPage() {
         description="Profile, branding preferences, and security options."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Profile and Branding Settings Card */}
-        <GlassCard className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between border-b border-white/5 pb-3">
-            <div>
-              <h3 className="font-semibold text-lg">Profile & Branding</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Manage organization info and logo asset settings.</p>
-            </div>
-            {!isEditing ? (
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8 border-white/10 text-xs">
-                <Edit2 className="size-3.5 mr-1.5" /> Edit Info
-              </Button>
-            ) : (
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={handleCancelEdit} className="h-8 text-xs text-muted-foreground">
-                  <X className="size-3.5 mr-1.5" /> Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleSaveSettings}
-                  disabled={!hasChanges || savingSettings}
-                  className="h-8 text-xs font-semibold bg-primary hover:bg-primary/90"
-                >
-                  <Save className="size-3.5 mr-1.5" /> Save Changes
-                </Button>
-              </div>
-            )}
-          </div>
+      <div className="flex items-center gap-2 mb-6">
+        <Button
+          variant={activeTab === "general" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveTab("general")}
+          className="rounded-full text-xs h-8 px-4"
+        >
+          General Settings
+        </Button>
+        <Button
+          variant={activeTab === "developer" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveTab("developer")}
+          className="rounded-full text-xs h-8 px-4"
+        >
+          Developer Info
+        </Button>
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field
-              label="Full Name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              disabled={!isEditing}
-              className={!isEditing ? "bg-white/[0.02] border-white/5 opacity-80" : ""}
-            />
-            <Field
-              label="Email Address"
-              value={email}
-              disabled
-              className="bg-white/5 border-white/5 opacity-70 cursor-not-allowed"
-            />
-            <Field
-              label="Company Name"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              disabled={!isEditing}
-              placeholder="Your company/org name"
-              className={cn("md:col-span-2", !isEditing ? "bg-white/[0.02] border-white/5 opacity-80" : "")}
-            />
-          </div>
-
-          {/* Logo upload and preview */}
-          <div className="space-y-3 pt-3 border-t border-white/5">
-            <Label className="text-xs font-semibold text-muted-foreground">Company Logo</Label>
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <div className="size-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 relative">
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt="Company logo preview"
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <Building2 className="size-8 text-muted-foreground" />
-                )}
-                {uploadingLogo && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <Loader2 className="size-5 animate-spin text-primary" />
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2 text-center sm:text-left">
-                <p className="text-[11px] text-muted-foreground">
-                  Recommended size: 250x250 pixels. PNG or JPG format.
-                </p>
-                <div className="flex gap-2">
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      disabled={!isEditing || uploadingLogo}
-                      className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                      id="logo-file-input"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs border-white/10"
-                      disabled={!isEditing || uploadingLogo}
-                    >
-                      Choose Image
-                    </Button>
-                  </div>
-                  {logoUrl && isEditing && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setLogoUrl(null)}
-                      className="h-8 text-xs text-destructive hover:bg-destructive/10"
-                    >
-                      <X className="h-4 w-4 mr-1" /> Remove
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Brand Header Toggle */}
-          <div className="space-y-3 border-t border-white/5 pt-4">
-            <div className="flex items-center justify-between">
+      {activeTab === "general" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Profile and Branding Settings Card */}
+          <GlassCard className="lg:col-span-2 space-y-6">
+            <div className="flex items-center justify-between border-b border-white/5 pb-3">
               <div>
-                <Label className="text-sm font-semibold text-foreground">Show Brand Header on Devices</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">Display logo, organization name, and local clock on signage screens.</p>
+                <h3 className="font-semibold text-lg">Profile & Branding</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Manage organization info and logo asset settings.</p>
               </div>
-              <div className="flex items-center gap-2">
-                {showBrandHeader === 1 && (
+              {!isEditing ? (
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8 border-white/10 text-xs">
+                  <Edit2 className="size-3.5 mr-1.5" /> Edit Info
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={handleCancelEdit} className="h-8 text-xs text-muted-foreground">
+                    <X className="size-3.5 mr-1.5" /> Cancel
+                  </Button>
                   <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    disabled={!isEditing}
-                    onClick={() => setShowPlacementSettings(!showPlacementSettings)}
-                    className={cn(
-                      "h-8 w-8 rounded-full border border-white/5 transition-colors",
-                      showPlacementSettings ? "bg-white/10 text-primary" : "text-muted-foreground hover:text-foreground"
-                    )}
+                    size="sm"
+                    onClick={handleSaveSettings}
+                    disabled={!hasChanges || savingSettings}
+                    className="h-8 text-xs font-semibold bg-primary hover:bg-primary/90"
                   >
-                    <SlidersHorizontal className="h-4 w-4" />
+                    <Save className="size-3.5 mr-1.5" /> Save Changes
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Profile Inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field
+                label="Organization / Company Name"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                disabled={!isEditing}
+                placeholder="e.g. Acme Corp"
+              />
+              <Field
+                label="Full Name (Account Admin)"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                disabled={!isEditing}
+                placeholder="e.g. Jane Doe"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Field
+                label="Email Address (Login Identifier)"
+                value={email}
+                disabled
+                className="opacity-70 cursor-not-allowed"
+              />
+              <p className="text-[10px] text-muted-foreground">Email cannot be modified directly. Contact your system admin if changes are required.</p>
+            </div>
+
+            {/* Logo Settings Section */}
+            <div className="border-t border-white/5 pt-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold">Branding Logo Asset</h4>
+                  <p className="text-xs text-muted-foreground">Upload your organization logo to appear on screen headers and top navigation.</p>
+                </div>
+                {logoUrl && isEditing && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setLogoUrl(null)}
+                    className="h-7 text-xs text-destructive hover:bg-destructive/10"
+                  >
+                    Remove Logo
                   </Button>
                 )}
+              </div>
+
+              <div className="flex items-center gap-6">
+                <div className="size-20 rounded-2xl bg-white/5 border border-dashed border-white/20 flex items-center justify-center overflow-hidden shrink-0 relative group">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+                  ) : (
+                    <Building2 className="size-8 text-muted-foreground/40" />
+                  )}
+                </div>
+
+                {isEditing && (
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      id="logo-upload"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      disabled={uploadingLogo}
+                    />
+                    <Label
+                      htmlFor="logo-upload"
+                      className={cn(
+                        "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-white/10 hover:bg-white/15 border border-white/10 cursor-pointer transition-all",
+                        uploadingLogo && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      {uploadingLogo ? (
+                        <>
+                          <Loader2 className="size-3.5 animate-spin" /> Uploading Logo…
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="size-3.5" /> Select Image File
+                        </>
+                      )}
+                    </Label>
+                    <p className="text-[10px] text-muted-foreground">PNG, JPG, SVG, WebP up to 5MB. Transparent PNG recommended.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Toggle Brand Header Switch */}
+            <div className="border-t border-white/5 pt-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">Display Brand Header on TV Screens</Label>
+                  <p className="text-xs text-muted-foreground">
+                    When enabled, your organization logo or company name is permanently rendered across paired signage displays.
+                  </p>
+                </div>
                 <Switch
-                  disabled={!isEditing}
                   checked={showBrandHeader === 1}
                   onCheckedChange={(checked) => {
                     setShowBrandHeader(checked ? 1 : 0);
                     if (!checked) setShowPlacementSettings(false);
                   }}
+                  disabled={!isEditing}
                 />
               </div>
-            </div>
 
-            {showBrandHeader === 1 && showPlacementSettings && (
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground">Header Placement</Label>
-                  <select
-                    disabled={!isEditing}
-                    value={brandHeaderPlacement}
-                    onChange={(e) => setBrandHeaderPlacement(e.target.value)}
-                    className="w-full bg-background border border-white/10 rounded-xl h-9 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+              {/* Placement Settings Accordion / Toggle */}
+              {showBrandHeader === 1 && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPlacementSettings(!showPlacementSettings)}
+                    className="flex items-center gap-1.5 text-xs text-primary font-medium hover:underline focus:outline-none cursor-pointer"
                   >
-                    <option value="top">Top (Default)</option>
-                    <option value="bottom">Bottom</option>
-                    <option value="left">Left Sidebar</option>
-                    <option value="right">Right Sidebar</option>
-                  </select>
-                  <p className="text-[10px] text-muted-foreground leading-normal">
-                    Adjusts the position of the branding bar on all active playback displays.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </GlassCard>
+                    <SlidersHorizontal className="size-3.5" />
+                    <span>{showPlacementSettings ? "Hide Header Layout Options" : "Customize Header Layout & Position"}</span>
+                  </button>
 
-        {/* Security Password Card */}
-        <div className="space-y-6">
-          <GlassCard>
-            <h3 className="font-semibold text-lg mb-1">Security</h3>
-            <p className="text-xs text-muted-foreground mb-4">Update your account password.</p>
-            <div className="space-y-4">
-              <Field
-                label="New Password"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="At least 6 characters"
-              />
-              <Field
-                label="Confirm New Password"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-enter new password"
-              />
-              <Button
-                className="w-full mt-2 h-9 text-xs"
-                onClick={handleChangePassword}
-                disabled={changingPassword || !newPassword}
-              >
-                {changingPassword ? "Updating…" : "Update Password"}
-              </Button>
+                  {showPlacementSettings && (
+                    <div className="mt-3 p-4 rounded-xl bg-white/[0.03] border border-white/5 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div>
+                        <Label className="text-xs font-semibold text-muted-foreground">Header Placement on TV Displays</Label>
+                        <p className="text-[11px] text-muted-foreground/80 mb-3">
+                          Select which area of the TV screen should reserve space for your brand banner.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { id: "top", label: "Top Bar", desc: "Classic horizontal banner at the top" },
+                          { id: "bottom", label: "Bottom Bar", desc: "Footer banner with ticker support" },
+                          { id: "left", label: "Left Sidebar", desc: "Vertical branding strip on the left" },
+                          { id: "right", label: "Right Sidebar", desc: "Vertical branding strip on the right" },
+                        ].map((pos) => {
+                          const isSelected = brandHeaderPlacement === pos.id;
+                          return (
+                            <button
+                              key={pos.id}
+                              type="button"
+                              disabled={!isEditing}
+                              onClick={() => setBrandHeaderPlacement(pos.id)}
+                              className={cn(
+                                "flex flex-col items-start p-3 rounded-xl border text-left transition-all relative",
+                                isSelected
+                                  ? "bg-primary/10 border-primary/40 text-primary shadow-sm"
+                                  : "bg-white/[0.02] border-white/10 hover:bg-white/[0.05] text-foreground/70",
+                                !isEditing && "opacity-60 cursor-not-allowed"
+                              )}
+                            >
+                              <div className="flex items-center justify-between w-full mb-1">
+                                <span className="text-xs font-bold">{pos.label}</span>
+                                {isSelected && <span className="size-2 rounded-full bg-primary animate-pulse-glow" />}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground leading-tight">{pos.desc}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </GlassCard>
 
-          {/* Backup & Restore Card */}
-          <GlassCard>
-            <h3 className="font-semibold text-lg mb-1">Backup & Restore</h3>
-            <p className="text-xs text-muted-foreground mb-4">Export or import your complete account data (layouts, content, devices, and schedules).</p>
-            <div className="space-y-3">
-              <Button variant="outline" className="w-full h-9 text-xs border-border" onClick={handleDownloadBackup}>
-                Download Backup
-              </Button>
-              <div className="relative">
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleRestoreBackup}
-                  disabled={restoring}
-                  className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                  id="backup-file-input"
+          {/* Security Password Card */}
+          <div className="space-y-6">
+            <GlassCard>
+              <h3 className="font-semibold text-lg mb-1">Security</h3>
+              <p className="text-xs text-muted-foreground mb-4">Update your account password.</p>
+              <div className="space-y-4">
+                <Field
+                  label="New Password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 6 characters"
                 />
-                <Button variant="outline" className="w-full h-9 text-xs border-border" disabled={restoring}>
-                  {restoring ? "Restoring Data…" : "Upload Backup File"}
+                <Field
+                  label="Confirm New Password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                />
+                <Button
+                  className="w-full mt-2 h-9 text-xs"
+                  onClick={handleChangePassword}
+                  disabled={changingPassword || !newPassword}
+                >
+                  {changingPassword ? "Updating…" : "Update Password"}
                 </Button>
               </div>
+            </GlassCard>
+
+            {/* Backup & Restore Card */}
+            <GlassCard>
+              <h3 className="font-semibold text-lg mb-1">Backup & Restore</h3>
+              <p className="text-xs text-muted-foreground mb-4">Export or import your complete account data (layouts, content, devices, and schedules).</p>
+              <div className="space-y-3">
+                <Button variant="outline" className="w-full h-9 text-xs border-border" onClick={handleDownloadBackup}>
+                  Download Backup
+                </Button>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleRestoreBackup}
+                    disabled={restoring}
+                    className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                    id="backup-file-input"
+                  />
+                  <Button variant="outline" className="w-full h-9 text-xs border-border" disabled={restoring}>
+                    {restoring ? "Restoring Data…" : "Upload Backup File"}
+                  </Button>
+                </div>
+              </div>
+            </GlassCard>
+
+            {/* Session Management / Log Out Card */}
+            <GlassCard className="border-red-500/20 bg-red-500/[0.01]">
+              <h3 className="font-semibold text-red-400 text-lg mb-1">Session</h3>
+              <p className="text-xs text-muted-foreground mb-4">Log out of your current session on this device.</p>
+              <Button variant="destructive" className="w-full h-9 text-xs" onClick={() => setLogoutOpen(true)}>
+                <LogOut className="size-4 mr-2" /> Log Out
+              </Button>
+            </GlassCard>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-4xl">
+          <GlassCard className="p-8 border border-border relative overflow-hidden bg-card/60 backdrop-blur-xl">
+            {/* Background gradient elements */}
+            <div className="absolute -top-24 -right-24 size-48 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 size-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+
+            {/* Advaitha Profile Banner Image */}
+            <div className="w-full rounded-2xl border border-border/40 overflow-hidden bg-muted/40 mb-6 shadow-xl">
+              <img
+                src="/advaitha.png"
+                alt="Advaitha Automations Showcase"
+                className="w-full h-auto object-contain"
+              />
+            </div>
+
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-6 border-b border-border/50">
+              <div className="space-y-2">
+                <div className="inline-flex px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold text-primary tracking-wider uppercase">
+                  System Developer Profile
+                </div>
+                <h2 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-teal-400 via-emerald-400 to-indigo-400 bg-clip-text text-transparent">
+                  ADVAITHA Automations
+                </h2>
+                <p className="text-sm font-semibold text-foreground/80">
+                  ADVAITHA Designers N Networks
+                </p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
+                  <MapPin className="size-4 text-primary shrink-0" />
+                  <span>Road No.12, Banjara Hills, Mithali Nagar, Hyderabad - 500034</span>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex flex-wrap gap-3 shrink-0">
+                <a
+                  href="mailto:sree@advaitha.co.in"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 border border-border text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+                >
+                  <Mail className="size-3.5" />
+                  <span>sree@advaitha.co.in</span>
+                </a>
+                <a
+                  href="tel:9490468368"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 border border-border text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+                >
+                  <Phone className="size-3.5" />
+                  <span>+91 9490468368</span>
+                </a>
+              </div>
+            </div>
+
+            {/* WhatsApp Integration CTA */}
+            <div className="mt-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="space-y-1 text-center sm:text-left">
+                <h4 className="text-sm font-bold text-emerald-400 flex items-center justify-center sm:justify-start gap-1.5">
+                  <MessageSquare className="size-4 shrink-0" /> Instant Technical Support
+                </h4>
+                <p className="text-xs text-emerald-300/80 leading-normal max-w-md">
+                  Have questions, feature requests, or need technical assistance? Chat directly with our engineering team on WhatsApp.
+                </p>
+              </div>
+              <a
+                href="https://wa.me/9490468368"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 text-zinc-950 text-xs font-extrabold hover:bg-emerald-400 hover:shadow-lg hover:shadow-emerald-500/20 active:scale-95 transition-all shrink-0 cursor-pointer"
+              >
+                Chat on WhatsApp
+                <ExternalLink className="size-3.5" />
+              </a>
+            </div>
+
+            {/* Services Showcase Grid */}
+            <div className="mt-8 space-y-4">
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                Our Solutions & Services
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2.5 p-4 rounded-2xl bg-muted/20 border border-border/50">
+                  <h4 className="text-xs font-extrabold text-primary uppercase tracking-wider">Enterprise & Operations</h4>
+                  <ul className="space-y-1.5 text-xs text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <span className="size-1.5 rounded-full bg-primary" />
+                      <span>High-Performance Servers</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="size-1.5 rounded-full bg-primary" />
+                      <span>IT Infrastructure & Managed Services</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="size-1.5 rounded-full bg-primary" />
+                      <span>Custom Software & Apps Development</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="size-1.5 rounded-full bg-primary" />
+                      <span>Evolis ID Card Printers & Consumables</span>
+                    </li>
+                  </ul>
+                </div>
+                <div className="space-y-2.5 p-4 rounded-2xl bg-muted/20 border border-border/50">
+                  <h4 className="text-xs font-extrabold text-indigo-400 uppercase tracking-wider">Security & Digital Signage</h4>
+                  <ul className="space-y-1.5 text-xs text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <span className="size-1.5 rounded-full bg-indigo-400" />
+                      <span>SDWAN / Enterprise Firewalls</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="size-1.5 rounded-full bg-indigo-400" />
+                      <span>CCTV Surveillance Systems</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="size-1.5 rounded-full bg-indigo-400" />
+                      <span>Queue Management & Digital Kiosks</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="size-1.5 rounded-full bg-indigo-400" />
+                      <span>Digital Signage & Biometric Attendance</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Strategic Partnerships Section */}
+            <div className="mt-8 pt-6 border-t border-border/50 space-y-4">
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest text-center">
+                Strategic Technology Partnerships
+              </h3>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <span className="px-3 py-1.5 rounded-lg bg-muted/40 border border-border text-[10px] font-semibold text-muted-foreground">
+                  Google Partner
+                </span>
+                <span className="px-3 py-1.5 rounded-lg bg-muted/40 border border-border text-[10px] font-semibold text-muted-foreground">
+                  Cisco Partner
+                </span>
+                <span className="px-3 py-1.5 rounded-lg bg-muted/40 border border-border text-[10px] font-semibold text-muted-foreground">
+                  Honeywell Partner
+                </span>
+                <span className="px-3 py-1.5 rounded-lg bg-muted/40 border border-border text-[10px] font-semibold text-muted-foreground">
+                  Microsoft Silver Partner
+                </span>
+                <span className="px-3 py-1.5 rounded-lg bg-muted/40 border border-border text-[10px] font-semibold text-muted-foreground">
+                  Evolis Partner
+                </span>
+              </div>
             </div>
           </GlassCard>
-
-          {/* Session Management / Log Out Card */}
-          <GlassCard className="border-red-500/20 bg-red-500/[0.01]">
-            <h3 className="font-semibold text-red-400 text-lg mb-1">Session</h3>
-            <p className="text-xs text-muted-foreground mb-4">Log out of your current session on this device.</p>
-            <Button variant="destructive" className="w-full h-9 text-xs" onClick={() => setLogoutOpen(true)}>
-              <LogOut className="size-4 mr-2" /> Log Out
-            </Button>
-          </GlassCard>
         </div>
-      </div>
+      )}
 
       {/* Logout Confirmation Dialog */}
       <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
