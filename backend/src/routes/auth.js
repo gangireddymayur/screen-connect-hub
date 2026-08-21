@@ -28,6 +28,95 @@ function parseExpirationDate(val) {
   return isNaN(d.getTime()) ? null : d;
 }
 
+// POST /api/auth/signup { email, password, company_name, full_name }
+router.post('/signup', async (req, res) => {
+  try {
+    const { email, password, company_name, full_name } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const cName = company_name ? String(company_name).trim() : `${normalizedEmail.split('@')[0]} Org`;
+    const fName = full_name ? String(full_name).trim() : `${cName} Admin`;
+
+    // Check if user already exists
+    const [existing] = await db.query('SELECT id FROM users WHERE email = :email LIMIT 1', { email: normalizedEmail });
+    if (existing && existing.length > 0) {
+      return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
+    }
+
+    const { v4: uuid } = require('uuid');
+    const companyId = uuid();
+    const userId = uuid();
+    const roleId = uuid();
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // 7-day free trial for Cloud (compatible with both SQLite & MariaDB):
+    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+    const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+    await db.query(
+      `INSERT INTO companies 
+       (id, name, contact_email, plan, max_screens, status, timezone, show_brand_header, brand_header_placement, local_mode, max_devices, subscription_status, trial_ends_at, created_at, updated_at) 
+       VALUES 
+       (:id, :name, :contact_email, 'starter', 1, 'active', 'UTC', 0, 'top', 'none', 1, 'trial', :trial_ends_at, :now_str, :now_str)`,
+      {
+        id: companyId,
+        name: cName,
+        contact_email: normalizedEmail,
+        trial_ends_at: trialEndsAt,
+        now_str: nowStr
+      }
+    );
+
+    await db.query(
+      `INSERT INTO users 
+       (id, email, password_hash, full_name, company_id, is_active, local_mode, max_devices, created_at, updated_at) 
+       VALUES 
+       (:id, :email, :password_hash, :full_name, :company_id, 1, 'none', 1, :now_str, :now_str)`,
+      {
+        id: userId,
+        email: normalizedEmail,
+        password_hash: passwordHash,
+        full_name: fName,
+        company_id: companyId,
+        now_str: nowStr
+      }
+    );
+
+    await db.query(
+      `INSERT INTO user_roles (id, user_id, role) VALUES (:id, :user_id, 'admin')`,
+      { id: roleId, user_id: userId }
+    );
+
+    const token = sign({
+      id: userId,
+      email: normalizedEmail,
+      role: 'admin',
+      company_id: companyId
+    });
+
+    res.json({
+      token,
+      user: {
+        id: userId,
+        email: normalizedEmail,
+        full_name: fName,
+        role: 'admin',
+        company_id: companyId,
+        local_mode: 'none',
+        max_devices: 1
+      }
+    });
+  } catch (err) {
+    console.error('SIGNUP_ERROR:', err);
+    res.status(500).json({ error: err.message || 'Sign up failed' });
+  }
+});
+
 // POST /api/auth/login  { email, password }
 router.post('/login', async (req, res) => {
   try {

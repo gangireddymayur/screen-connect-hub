@@ -6,12 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tv, Key, AlertTriangle } from "lucide-react";
+import { Tv, AlertTriangle, Eye, EyeOff, Sparkles, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 export default function LoginPage() {
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [fullName, setFullName] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [requireCode, setRequireCode] = useState(false);
   const [codeUnavailable, setCodeUnavailable] = useState(false);
   const [code, setCode] = useState("");
@@ -36,7 +44,7 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      const { data, error } = await (supabase.auth as any).verifyCode({ email, password, code });
+      const { error } = await (supabase.auth as any).verifyCode({ email, password, code });
       setLoading(false);
       if (error) {
         toast.error(error.message || "Verification failed");
@@ -46,7 +54,7 @@ export default function LoginPage() {
 
     const res = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    
+
     if (res?.error) {
       const errorMsg = res.error.message;
       if (errorMsg.includes("verification code must be generated") || errorMsg.includes("code_required")) {
@@ -62,6 +70,46 @@ export default function LoginPage() {
     }
   };
 
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!email.trim() || !password.trim()) {
+      toast.error("Email and password are required.");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters long.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match. Please verify.");
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          company_name: companyName.trim() || undefined,
+          full_name: fullName.trim() || undefined,
+        },
+      },
+    });
+
+    setLoading(false);
+
+    if (error) {
+      toast.error(error.message || "Sign up failed");
+    } else {
+      toast.success("Account created successfully! Enjoy your 7-day free trial.");
+      navigate("/admin", { replace: true });
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -71,29 +119,65 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+      {/* Dynamic background ambient glows */}
+      <div className="absolute -top-32 -left-32 size-96 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 size-96 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+
+      <Card className="w-full max-w-md border-border/60 bg-card/70 backdrop-blur-xl shadow-2xl relative z-10">
+        <CardHeader className="text-center space-y-2 pb-4">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary to-emerald-500 shadow-lg shadow-primary/20">
             <Tv className="h-6 w-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-xl">SignageHub</CardTitle>
-          <CardDescription>
-            {codeUnavailable
+          <CardTitle className="text-2xl font-black tracking-tight">SignageHub</CardTitle>
+          <CardDescription className="text-xs">
+            {mode === "signup"
+              ? "Create your cloud account with a 7-day free trial"
+              : codeUnavailable
               ? "Verification Required"
               : requireCode
               ? "Enter Authorization Code"
-              : "Sign in to your account"}
+              : "Sign in to manage your digital displays"}
           </CardDescription>
+
+          {/* Mode Switcher Tabs */}
+          {!requireCode && !codeUnavailable && (
+            <div className="flex p-1 bg-muted/60 rounded-xl max-w-xs mx-auto mt-2 border border-border/40">
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  mode === "login"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("signup")}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  mode === "signup"
+                    ? "bg-background text-emerald-400 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Sparkles className="size-3 text-emerald-400" />
+                <span>Sign Up</span>
+              </button>
+            </div>
+          )}
         </CardHeader>
-        <CardContent>
+
+        <CardContent className="pt-2">
           {codeUnavailable ? (
             <div className="space-y-4">
-              <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-500 flex gap-2">
-                <AlertTriangle className="h-5 w-5 shrink-0" />
-                <div className="space-y-1">
-                  <p className="font-semibold">Code Generation Required</p>
-                  <p className="text-xs opacity-90">
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-400 flex gap-3">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-400" />
+                <div className="space-y-1 text-xs">
+                  <p className="font-bold text-amber-300">Code Generation Required</p>
+                  <p className="opacity-90 leading-relaxed">
                     A local login requires a verification code. Please ask a Super Admin to
                     generate a login code for your account from the cloud console.
                   </p>
@@ -102,43 +186,62 @@ export default function LoginPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
+                className="w-full h-10 text-xs"
                 onClick={() => setCodeUnavailable(false)}
               >
                 Back to Sign In
               </Button>
             </div>
-          ) : (
+          ) : mode === "login" ? (
+            /* Login Form */
             <form onSubmit={handleLogin} className="space-y-4">
               {!requireCode ? (
                 <>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email" className="text-xs font-semibold text-muted-foreground">
+                      Email Address
+                    </Label>
                     <Input
                       id="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="admin@example.com"
+                      className="h-10 text-xs bg-muted/30"
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      required
-                    />
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="password" className="text-xs font-semibold text-muted-foreground">
+                      Password
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="h-10 text-xs pr-10 bg-muted/30"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none"
+                      >
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
                   </div>
                 </>
               ) : (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="code">Verification Code</Label>
+                    <Label htmlFor="code" className="text-xs font-semibold text-muted-foreground">
+                      Verification Code
+                    </Label>
                     <Input
                       id="code"
                       type="text"
@@ -146,7 +249,7 @@ export default function LoginPage() {
                       placeholder="_ _ _ _"
                       value={code}
                       onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                      className="text-center text-xl font-semibold tracking-widest font-mono h-11"
+                      className="text-center text-2xl font-bold tracking-widest font-mono h-12 bg-muted/40 border-primary/40 focus-visible:ring-primary"
                       required
                       autoFocus
                     />
@@ -166,7 +269,8 @@ export default function LoginPage() {
                   </button>
                 </div>
               )}
-              <Button type="submit" className="w-full" disabled={loading}>
+
+              <Button type="submit" className="w-full h-10 text-xs font-bold" disabled={loading}>
                 {loading
                   ? requireCode
                     ? "Verifying..."
@@ -175,12 +279,144 @@ export default function LoginPage() {
                   ? "Verify Code"
                   : "Sign In"}
               </Button>
+
+              <div className="text-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => setMode("signup")}
+                  className="text-xs text-muted-foreground hover:text-emerald-400 transition-colors cursor-pointer"
+                >
+                  Don't have an account? <span className="font-semibold text-emerald-400 underline">Sign Up (7-Day Trial)</span>
+                </button>
+              </div>
+            </form>
+          ) : (
+            /* Sign Up Form */
+            <form onSubmit={handleSignup} className="space-y-3.5">
+              {/* Free Trial Banner */}
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2.5 text-xs text-emerald-300">
+                <ShieldCheck className="size-4 shrink-0 text-emerald-400" />
+                <span className="leading-snug">
+                  Includes <strong>7-Day Free Cloud Trial</strong> with full dashboard features.
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="cname" className="text-xs font-semibold text-muted-foreground">
+                    Organization Name
+                  </Label>
+                  <Input
+                    id="cname"
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="Acme Retail"
+                    className="h-9 text-xs bg-muted/30"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="fname" className="text-xs font-semibold text-muted-foreground">
+                    Admin Full Name
+                  </Label>
+                  <Input
+                    id="fname"
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Jane Doe"
+                    className="h-9 text-xs bg-muted/30"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="signup-email" className="text-xs font-semibold text-muted-foreground">
+                  Email Address
+                </Label>
+                <Input
+                  id="signup-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                  className="h-9 text-xs bg-muted/30"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="signup-password" className="text-xs font-semibold text-muted-foreground">
+                  Password
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="signup-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="At least 6 characters"
+                    className="h-9 text-xs pr-10 bg-muted/30"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm-password" className="text-xs font-semibold text-muted-foreground">
+                  Confirm Password
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="confirm-password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter password"
+                    className="h-9 text-xs pr-10 bg-muted/30"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none"
+                  >
+                    {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-10 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20"
+                disabled={loading}
+              >
+                {loading ? "Creating Account..." : "Start 7-Day Free Trial"}
+              </Button>
+
+              <div className="text-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => setMode("login")}
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                >
+                  Already have an account? <span className="font-semibold text-primary underline">Sign In</span>
+                </button>
+              </div>
             </form>
           )}
 
-          <div className="mt-6 pt-4 border-t">
-            <p className="text-[11px] uppercase tracking-widest text-red-600 text-center">
-              Connected to Plesk backend
+          <div className="mt-5 pt-3 border-t border-border/40 text-center">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              Cloud Digital Signage Network
             </p>
           </div>
         </CardContent>

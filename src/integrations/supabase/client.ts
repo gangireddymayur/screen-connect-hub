@@ -368,8 +368,24 @@ const authApi = {
       return { data: null, error: { message: e?.message || "Verification failed" } };
     }
   },
-  async signUp(_: { email: string; password: string }) {
-    return { data: { session: null, user: null }, error: { message: "Self sign-up disabled. Ask an admin to create your account." } };
+  async signUp({ email, password, options }: { email: string; password: string; options?: { data?: { company_name?: string; full_name?: string } } }) {
+    try {
+      const company_name = options?.data?.company_name;
+      const full_name = options?.data?.full_name;
+      const r = await api("POST", "/auth/signup", { email, password, company_name, full_name });
+      if (!r || !r.token || !r.user) {
+        throw new Error("Invalid signup response from server");
+      }
+      setToken(r.token);
+      currentSession = makeSession(r.token, r.user);
+      saveSession(currentSession);
+      cache.user_roles = [{ id: uid(), user_id: r.user.id, role: r.user.role }];
+      loaded.user_roles = true;
+      listeners.forEach((l) => l("SIGNED_IN", currentSession));
+      return { data: { session: currentSession, user: currentSession.user }, error: null };
+    } catch (e: any) {
+      return { data: { session: null, user: null }, error: { message: e?.message || "Sign up failed" } };
+    }
   },
   async signOut() {
     setToken(null);
