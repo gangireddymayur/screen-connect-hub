@@ -124,8 +124,9 @@ router.post('/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'email & password required' });
     const normalizedEmail = String(email).trim().toLowerCase();
 
+    const isCodeValidSql = db.isSqlite ? "(CASE WHEN u.login_code_expires_at > datetime('now') THEN 1 ELSE 0 END)" : "(CASE WHEN u.login_code_expires_at > NOW() THEN 1 ELSE 0 END)";
     const [rows] = await db.query(
-      'SELECT u.id, u.email, u.password_hash, u.full_name, u.company_id, u.local_mode, u.max_devices, u.login_code, u.login_code_expires_at, r.role ' +
+      `SELECT u.id, u.email, u.password_hash, u.full_name, u.company_id, u.local_mode, u.max_devices, u.login_code, u.login_code_expires_at, ${isCodeValidSql} AS is_code_valid, r.role ` +
       'FROM users u LEFT JOIN user_roles r ON r.user_id = u.id ' +
       'WHERE u.email = :email AND u.is_active = 1 LIMIT 1',
       { email: normalizedEmail }
@@ -291,8 +292,7 @@ router.post('/login', async (req, res) => {
     // Enforce 2-step verification for local admin logins on cloud backend
     const isLocal = req.body?.is_local || req.headers['x-local-request'];
     if (user.role === 'admin' && isLocal && !isOffline) {
-      const codeExpiresAt = parseExpirationDate(user.login_code_expires_at);
-      const isCodeValid = user.login_code && codeExpiresAt && codeExpiresAt.getTime() > Date.now();
+      const isCodeValid = Boolean(user.login_code && user.is_code_valid);
       
       if (!isCodeValid) {
         return res.status(403).json({
@@ -439,8 +439,9 @@ router.post('/verify-code', async (req, res) => {
     }
 
     // Cloud Verification
+    const isCodeValidSql = db.isSqlite ? "(CASE WHEN u.login_code_expires_at > datetime('now') THEN 1 ELSE 0 END)" : "(CASE WHEN u.login_code_expires_at > NOW() THEN 1 ELSE 0 END)";
     const [rows] = await db.query(
-      'SELECT u.id, u.email, u.password_hash, u.full_name, u.company_id, u.local_mode, u.max_devices, u.login_code, u.login_code_expires_at, r.role ' +
+      `SELECT u.id, u.email, u.password_hash, u.full_name, u.company_id, u.local_mode, u.max_devices, u.login_code, u.login_code_expires_at, ${isCodeValidSql} AS is_code_valid, r.role ` +
       'FROM users u LEFT JOIN user_roles r ON r.user_id = u.id ' +
       'WHERE u.email = :email AND u.is_active = 1 LIMIT 1',
       { email: normalizedEmail }
@@ -451,8 +452,7 @@ router.post('/verify-code', async (req, res) => {
     const ok = await bcrypt.compare(password, u.password_hash);
     if (!ok) return res.status(401).json({ error: 'invalid credentials' });
 
-    const codeExpiresAt = parseExpirationDate(u.login_code_expires_at);
-    const isCodeValid = u.login_code && u.login_code === String(code).trim() && codeExpiresAt && codeExpiresAt.getTime() > Date.now();
+    const isCodeValid = Boolean(u.login_code && u.login_code === String(code).trim() && u.is_code_valid);
 
     if (!isCodeValid) {
       return res.status(403).json({ error: "Invalid or expired verification code" });
