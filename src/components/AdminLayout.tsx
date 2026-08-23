@@ -18,9 +18,12 @@ export const AdminLayout = forwardRef<HTMLDivElement, { children: React.ReactNod
       setSyncing(true);
       const toastId = toast.loading("Syncing subscription status from cloud...");
       try {
+        const token = localStorage.getItem("sh_token");
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
         const res = await fetch("/api/cloud-sync/entitlements", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
         });
         const data = await res.json();
         if (!res.ok) {
