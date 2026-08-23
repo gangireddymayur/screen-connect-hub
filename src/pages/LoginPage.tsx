@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [codeUnavailable, setCodeUnavailable] = useState(false);
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isLocalServer, setIsLocalServer] = useState(false);
   const navigate = useNavigate();
   const { session, role, loading: authLoading } = useAuth();
 
@@ -33,6 +34,13 @@ export default function LoginPage() {
     window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1"
   );
+
+  useEffect(() => {
+    fetch("/api/local-status", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => { if (d?.isLocalServer) setIsLocalServer(true); })
+      .catch(() => {});
+  }, []);
 
   // Auto-redirect if already logged in
   useEffect(() => {
@@ -297,15 +305,17 @@ export default function LoginPage() {
                   : "Sign In"}
               </Button>
 
-              <div className="text-center pt-1">
-                <button
-                  type="button"
-                  onClick={() => setMode("signup")}
-                  className="text-xs text-muted-foreground hover:text-emerald-400 transition-colors cursor-pointer"
-                >
-                  Don't have an account? <span className="font-semibold text-emerald-400 underline">Sign Up (7-Day Trial)</span>
-                </button>
-              </div>
+              {isCloud && !isLocalServer && (
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setMode("signup")}
+                    className="text-xs text-muted-foreground hover:text-emerald-400 transition-colors cursor-pointer"
+                  >
+                    Don't have an account? <span className="font-semibold text-emerald-400 underline">Sign Up (7-Day Trial)</span>
+                  </button>
+                </div>
+              )}
             </form>
           ) : (
             /* Sign Up Form */

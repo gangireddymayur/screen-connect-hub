@@ -1,1 +1,1 @@
-2026-08-23 21:25:00 - Force Plesk restart for SQL OTP validation
+2026-08-23 21:42:00 - Reload for reset-company-password alias

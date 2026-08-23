@@ -533,6 +533,7 @@ const handlers = {
   'create-user': createUser,
   'delete-company': deleteCompany,
   'reset-company-admin-password': resetCompanyAdminPassword,
+  'reset-company-password': resetCompanyAdminPassword,
   'bulk-company-action': bulkCompanyAction,
   'toggle-user-status': toggleUserStatus,
   'get-company-stats': getCompanyStats,
