@@ -427,7 +427,22 @@ router.post('/verify-code', async (req, res) => {
           }
 
           rememberLocalLoginPassword(remoteUserId, password);
-          return res.json(verifyData);
+          const localToken = sign({
+            id: remoteUserId,
+            email: normalizedEmail,
+            role: remoteUser.role || 'admin',
+            company_id: remoteCompanyId,
+          });
+          const localUser = {
+            id: remoteUserId,
+            email: normalizedEmail,
+            full_name: remoteUser.full_name || remoteUser.name || '',
+            role: remoteUser.role || 'admin',
+            company_id: remoteCompanyId,
+            local_mode: remoteUser.local_mode || 'none',
+            max_devices: localDeviceLimit,
+          };
+          return res.json({ token: localToken, user: localUser });
         } else {
           const verifyErrText = await cloudVerifyRes.text().catch(() => "");
           return res.status(cloudVerifyRes.status).send(verifyErrText);
