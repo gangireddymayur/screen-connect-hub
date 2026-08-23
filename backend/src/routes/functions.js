@@ -530,6 +530,7 @@ async function generateCode(req, res) {
 
 const handlers = {
   'create-company-admin': createCompanyAdmin,
+  'create-company': createCompanyAdmin,
   'create-user': createUser,
   'delete-company': deleteCompany,
   'reset-company-admin-password': resetCompanyAdminPassword,
