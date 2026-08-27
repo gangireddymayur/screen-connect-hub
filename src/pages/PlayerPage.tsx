@@ -146,6 +146,14 @@ export default function PlayerPage() {
 
   const rootZone = layout.layout_data || createZone("root");
 
+  const shouldShowBrand = Boolean(
+    company &&
+    (company.show_brand_header === true ||
+      (company.show_brand_header as any) === 1 ||
+      (company.show_brand_header as any) === "1" ||
+      (company.show_brand_header as any) === "true")
+  );
+
   const placement = company?.brand_header_placement || "top";
   const isVertical = placement === "left" || placement === "right";
 
@@ -154,35 +162,41 @@ export default function PlayerPage() {
   else if (placement === "left") layoutFlexClass = "flex flex-row";
   else if (placement === "right") layoutFlexClass = "flex flex-row-reverse";
 
+  const resolvedLogoUrl = company?.logo_url
+    ? (company.logo_url.startsWith("http://") || company.logo_url.startsWith("https://") || company.logo_url.startsWith("data:")
+        ? company.logo_url
+        : (company.logo_url.startsWith("/") ? company.logo_url : `/${company.logo_url}`))
+    : null;
+
   return (
     <div className={`fixed inset-0 overflow-hidden ${layoutFlexClass}`} style={{ backgroundColor: layout.background_color || "#000000" }}>
       {/* Brand Header */}
-      {company?.show_brand_header && (
+      {shouldShowBrand && (
         isVertical ? (
           <header className={`w-44 bg-zinc-950/90 text-white flex flex-col items-center justify-between py-6 px-4 shrink-0 z-50 select-none ${placement === "left" ? "border-r border-zinc-800" : "border-l border-zinc-800"}`}>
             <div className="flex flex-col items-center gap-4 text-center">
-              {company.logo_url && (
+              {resolvedLogoUrl && (
                 <img
-                  src={company.logo_url}
+                  src={resolvedLogoUrl}
                   alt="Logo"
                   className="h-12 w-12 object-contain rounded shadow"
                 />
               )}
-              <span className="font-semibold text-sm tracking-wide leading-snug">{company.name}</span>
+              <span className="font-semibold text-sm tracking-wide leading-snug">{company?.name}</span>
             </div>
             <div className="text-lg font-bold font-mono tabular-nums opacity-90 bg-white/5 px-3 py-1 rounded-full border border-white/5">{timeString}</div>
           </header>
         ) : (
           <header className={`h-16 bg-zinc-950/90 text-white flex items-center justify-between px-6 shrink-0 z-50 select-none ${placement === "top" ? "border-b border-zinc-800" : "border-t border-zinc-800"}`}>
             <div className="flex items-center gap-3">
-              {company.logo_url && (
+              {resolvedLogoUrl && (
                 <img
-                  src={company.logo_url}
+                  src={resolvedLogoUrl}
                   alt="Logo"
                   className="h-8 w-8 object-contain rounded"
                 />
               )}
-              <span className="font-semibold text-base tracking-wide">{company.name}</span>
+              <span className="font-semibold text-base tracking-wide">{company?.name}</span>
             </div>
             <div className="text-base font-semibold font-mono tabular-nums opacity-90">{timeString}</div>
           </header>
