@@ -27,9 +27,9 @@ const isOnline = (lastSeen: string | null) => {
 };
 
 export default function AdminDashboardPage() {
-  const { user } = useAuth();
-  const [companyName, setCompanyName] = useState("");
-  const [maxScreens, setMaxScreens] = useState(0);
+  const { user, company } = useAuth();
+  const [companyName, setCompanyName] = useState(company?.name ?? "");
+  const [maxScreens, setMaxScreens] = useState(1);
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [contentCount, setContentCount] = useState(0);
   const [storageBytes, setStorageBytes] = useState(0);
@@ -42,35 +42,56 @@ export default function AdminDashboardPage() {
     if (!user) return;
 
     const fetchData = async () => {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("company_id, local_mode, max_devices")
-        .eq("id", user.id)
-        .single();
+      let companyId = company?.id || user.user_metadata?.company_id || (user as any)?.company_id;
+      let compObj = company;
 
-      if (!profile?.company_id) { setLoading(false); return; }
-      const companyId = profile.company_id;
+      if (!companyId) {
+        const { data: compRows } = await supabase.from("companies").select("*").limit(1);
+        compObj = Array.isArray(compRows) && compRows.length > 0 ? compRows[0] : null;
+        companyId = compObj?.id;
+      }
+
+      if (!companyId) {
+        setLoading(false);
+        return;
+      }
+
+      const lMode = compObj?.local_mode || user.user_metadata?.local_mode || (user as any)?.local_mode || "single";
+      const isSolo = lMode === "single" || lMode === "solo";
 
       const [companyRes, devicesRes, contentRes, layoutsRes, schedulesRes] = await Promise.all([
-        supabase.from("companies").select("name, max_screens").eq("id", companyId).single(),
-        supabase.from("devices").select("id, name, location, is_paired, last_seen_at").eq("company_id", companyId),
-        supabase.from("content").select("id, file_size").eq("company_id", companyId),
-        supabase.from("layouts").select("id", { count: "exact", head: true }).eq("company_id", companyId),
+        supabase.from("companies").select("name, max_screens, max_devices").eq("id", companyId).single(),
+        supabase.from("devices").select("id, name, location, is_paired, last_seen_at"),
+        supabase.from("content").select("id, file_size"),
+        supabase.from("layouts").select("id", { count: "exact", head: true }),
         supabase.from("schedules").select("id"),
       ]);
 
-      setCompanyName(companyRes.data?.name ?? "");
+      const activeComp = companyRes.data || compObj;
+      setCompanyName(activeComp?.name ?? "My Organization");
       
-      let limit = companyRes.data?.max_screens ?? 0;
-      const mode = profile?.local_mode;
-      if (mode === "single" || mode === "solo") {
+      let limit = 1;
+      if (isSolo) {
         limit = 1;
-      } else if (mode === "multi" || mode === "network") {
-        limit = profile?.max_devices || 5;
+      } else if (lMode === "multi" || lMode === "network") {
+        limit = activeComp?.max_devices || activeComp?.max_screens || 5;
+      } else {
+        limit = activeComp?.max_screens || activeComp?.max_devices || 1;
       }
       setMaxScreens(limit);
 
-      setDevices(devicesRes.data ?? []);
+      let devList: DeviceRow[] = (devicesRes.data ?? []).filter((d: any) => !d.company_id || d.company_id === companyId || isSolo);
+      if (isSolo && devList.length === 0) {
+        devList = [{
+          id: "solo-tv-device-id",
+          name: "Built-in TV Display",
+          location: "Local TV Screen",
+          is_paired: true,
+          last_seen_at: new Date().toISOString(),
+        }];
+      }
+
+      setDevices(devList);
       setContentCount(contentRes.data?.length ?? 0);
       setStorageBytes((contentRes.data ?? []).reduce((sum, c: any) => sum + (c.file_size || 0), 0));
       setLayoutCount(layoutsRes.count ?? 0);
@@ -80,7 +101,7 @@ export default function AdminDashboardPage() {
     };
 
     fetchData();
-  }, [user]);
+  }, [user, company]);
 
   const onlineDevices = devices.filter((d) => d.is_paired && isOnline(d.last_seen_at)).length;
   const totalDevices = devices.length;

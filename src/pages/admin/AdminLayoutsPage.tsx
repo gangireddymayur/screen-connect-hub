@@ -28,9 +28,9 @@ interface Layout {
 export default function AdminLayoutsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [companyId, setCompanyId] = useState<string | null>(company?.id ?? null);
   const [layouts, setLayouts] = useState<Layout[]>([]);
   const [loading, setLoading] = useState(true);
-  const [companyId, setCompanyId] = useState<string | null>(null);
 
   // Add dialog
   const [addOpen, setAddOpen] = useState(false);
@@ -56,14 +56,20 @@ export default function AdminLayoutsPage() {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("company_id").eq("id", user.id).single()
-      .then(({ data }) => {
-        if (data?.company_id) {
-          setCompanyId(data.company_id);
-          fetchLayouts(data.company_id);
+    const cId = company?.id || user.user_metadata?.company_id || (user as any)?.company_id;
+    if (cId) {
+      setCompanyId(cId);
+      fetchLayouts(cId);
+    } else {
+      supabase.from("companies").select("id").limit(1).then(({ data }) => {
+        const id = Array.isArray(data) && data.length > 0 ? data[0].id : null;
+        if (id) {
+          setCompanyId(id);
+          fetchLayouts(id);
         } else setLoading(false);
       });
-  }, [user]);
+    }
+  }, [user, company]);
 
   const fetchLayouts = async (cId: string) => {
     const { data, error } = await supabase

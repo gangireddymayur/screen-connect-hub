@@ -187,20 +187,23 @@ const SchedulesApi = {
 };
 
 export default function AdminSchedulePage() {
-  const { user } = useAuth();
+  const { user, company } = useAuth();
   const qc = useQueryClient();
 
-  const [companyId, setCompanyId] = React.useState<string | null>(null);
+  const [companyId, setCompanyId] = React.useState<string | null>(company?.id ?? null);
 
   React.useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("company_id").eq("id", user.id).single()
-      .then(({ data }) => {
-        if (data?.company_id) {
-          setCompanyId(data.company_id);
-        }
+    const cId = company?.id || user.user_metadata?.company_id || (user as any)?.company_id;
+    if (cId) {
+      setCompanyId(cId);
+    } else {
+      supabase.from("companies").select("id").limit(1).then(({ data }) => {
+        const id = Array.isArray(data) && data.length > 0 ? data[0].id : null;
+        if (id) setCompanyId(id);
       });
-  }, [user]);
+    }
+  }, [user, company]);
 
   const devicesQ = useQuery({
     queryKey: ["devices", companyId],

@@ -43,6 +43,7 @@ export default function AdminContentPage() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteItem, setDeleteItem] = useState<ContentItem | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -63,14 +64,20 @@ export default function AdminContentPage() {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("company_id").eq("id", user.id).single()
-      .then(async ({ data }) => {
-        if (data?.company_id) {
-          setCompanyId(data.company_id);
-          fetchContent(data.company_id);
+    const cId = company?.id || user.user_metadata?.company_id || (user as any)?.company_id;
+    if (cId) {
+      setCompanyId(cId);
+      fetchContent(cId);
+    } else {
+      supabase.from("companies").select("id").limit(1).then(({ data }) => {
+        const id = Array.isArray(data) && data.length > 0 ? data[0].id : null;
+        if (id) {
+          setCompanyId(id);
+          fetchContent(id);
         } else setLoading(false);
       });
-  }, [user]);
+    }
+  }, [user, company]);
 
   const fetchContent = async (cId: string) => {
     const { data, error } = await supabase.from("content").select("*").eq("company_id", cId).order("created_at", { ascending: false });
