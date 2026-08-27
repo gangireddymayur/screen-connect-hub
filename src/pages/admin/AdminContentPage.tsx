@@ -36,10 +36,10 @@ const generateUUID = () => {
 };
 
 export default function AdminContentPage() {
-  const { user } = useAuth();
+  const { user, company } = useAuth();
   const [content, setContent] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(company?.id ?? null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);

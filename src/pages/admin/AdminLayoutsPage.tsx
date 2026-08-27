@@ -26,7 +26,7 @@ interface Layout {
 }
 
 export default function AdminLayoutsPage() {
-  const { user } = useAuth();
+  const { user, company } = useAuth();
   const navigate = useNavigate();
   const [companyId, setCompanyId] = useState<string | null>(company?.id ?? null);
   const [layouts, setLayouts] = useState<Layout[]>([]);

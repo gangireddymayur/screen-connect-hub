@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function AdminSettingsPage() {
-  const { user, signOut } = useAuth();
+  const { user, company, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"general" | "developer">("general");
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -29,12 +29,12 @@ export default function AdminSettingsPage() {
   const [email, setEmail] = useState("");
 
   // Company settings fields
-  const [companyId, setCompanyId] = useState<string | null>(null);
-  const [companyName, setCompanyName] = useState("");
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [showBrandHeader, setShowBrandHeader] = useState(0);
+  const [companyId, setCompanyId] = useState<string | null>(company?.id ?? null);
+  const [companyName, setCompanyName] = useState(company?.name ?? "");
+  const [logoUrl, setLogoUrl] = useState<string | null>((company as any)?.logo_url ?? null);
+  const [showBrandHeader, setShowBrandHeader] = useState<number>((company as any)?.show_brand_header ?? 0);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [brandHeaderPlacement, setBrandHeaderPlacement] = useState<string>("top");
+  const [brandHeaderPlacement, setBrandHeaderPlacement] = useState<string>((company as any)?.brand_header_placement ?? "top");
   const [showPlacementSettings, setShowPlacementSettings] = useState(false);
 
   const [savingSettings, setSavingSettings] = useState(false);
@@ -58,28 +58,34 @@ export default function AdminSettingsPage() {
     if (!user) return;
     const load = async () => {
       try {
-        const { data: profile } = await supabase.from("profiles").select("full_name, email, company_id").eq("id", user.id).single();
-        if (profile) {
-          setFullName(profile.full_name ?? "");
-          setEmail(profile.email ?? "");
-          if (profile.company_id) {
-            setCompanyId(profile.company_id);
-            const { data: company } = await supabase.from("companies").select("name, logo_url, show_brand_header, brand_header_placement").eq("id", profile.company_id).single();
-            if (company) {
-              setCompanyName(company.name ?? "");
-              setLogoUrl((company as any).logo_url ?? null);
-              setShowBrandHeader((company as any).show_brand_header ?? 0);
-              setBrandHeaderPlacement((company as any).brand_header_placement ?? "top");
+        const uEmail = user.email || "";
+        const uName = user.user_metadata?.full_name || (user as any)?.full_name || "";
+        setEmail(uEmail);
+        setFullName(uName);
 
-              setOriginalData({
-                fullName: profile.full_name ?? "",
-                companyName: company.name ?? "",
-                logoUrl: (company as any).logo_url ?? null,
-                showBrandHeader: (company as any).show_brand_header ?? 0,
-                brandHeaderPlacement: (company as any).brand_header_placement ?? "top",
-              });
-            }
-          }
+        let activeCId = company?.id || user.user_metadata?.company_id || (user as any)?.company_id;
+        let activeComp = company;
+
+        if (!activeCId) {
+          const { data: compRows } = await supabase.from("companies").select("*").limit(1);
+          activeComp = Array.isArray(compRows) && compRows.length > 0 ? compRows[0] : null;
+          activeCId = activeComp?.id;
+        }
+
+        if (activeCId && activeComp) {
+          setCompanyId(activeCId);
+          setCompanyName(activeComp.name ?? "");
+          setLogoUrl((activeComp as any).logo_url ?? null);
+          setShowBrandHeader((activeComp as any).show_brand_header ?? 0);
+          setBrandHeaderPlacement((activeComp as any).brand_header_placement ?? "top");
+
+          setOriginalData({
+            fullName: uName,
+            companyName: activeComp.name ?? "",
+            logoUrl: (activeComp as any).logo_url ?? null,
+            showBrandHeader: (activeComp as any).show_brand_header ?? 0,
+            brandHeaderPlacement: (activeComp as any).brand_header_placement ?? "top",
+          });
         }
       } catch (err) {
         console.error("Failed to load settings:", err);
@@ -88,7 +94,7 @@ export default function AdminSettingsPage() {
       }
     };
     load();
-  }, [user]);
+  }, [user, company]);
 
   const hasChanges = useMemo(() => {
     if (!originalData) return false;
