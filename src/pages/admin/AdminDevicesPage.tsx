@@ -59,10 +59,10 @@ interface Layout {
 }
 
 export default function AdminDevicesPage() {
-  const { user } = useAuth();
-  const [companyId, setCompanyId] = useState<string | null>(null);
-  const [localMode, setLocalMode] = useState<string | null>(null);
-  const [maxDevices, setMaxDevices] = useState<number | null>(null);
+  const { user, company } = useAuth();
+  const [companyId, setCompanyId] = useState<string | null>(company?.id ?? null);
+  const [localMode, setLocalMode] = useState<string | null>(company?.local_mode ?? null);
+  const [maxDevices, setMaxDevices] = useState<number | null>(company?.max_devices ?? null);
   const [loading, setLoading] = useState(true);
   const [devices, setDevices] = useState<Device[]>([]);
   const [layouts, setLayouts] = useState<Layout[]>([]);
@@ -107,22 +107,33 @@ export default function AdminDevicesPage() {
 
   useEffect(() => {
     if (!user) return;
-    console.log("[useEffect] active user object:", user);
-    supabase.from("profiles").select("company_id, local_mode, max_devices").eq("id", user.id).single()
-      .then(({ data, error }) => {
-        console.log("[useEffect] profiles single response:", { data, error });
-        if (data?.company_id) {
-          setCompanyId(data.company_id);
-          setLocalMode(data.local_mode || null);
-          setMaxDevices(data.max_devices || null);
-          fetchDevices(data.company_id);
-          fetchLayouts(data.company_id);
-          fetchActiveSchedules(data.company_id);
+    const cId = company?.id || user.user_metadata?.company_id || (user as any)?.company_id;
+    const lMode = company?.local_mode || user.user_metadata?.local_mode || (user as any)?.local_mode || null;
+    const mDev = company?.max_devices ?? user.user_metadata?.max_devices ?? (user as any)?.max_devices ?? null;
+
+    if (cId) {
+      setCompanyId(cId);
+      setLocalMode(lMode);
+      setMaxDevices(mDev);
+      fetchDevices(cId, lMode);
+      fetchLayouts(cId);
+      fetchActiveSchedules(cId);
+    } else {
+      supabase.from("companies").select("*").limit(1).then(({ data }) => {
+        const comp = Array.isArray(data) && data.length > 0 ? data[0] : null;
+        if (comp) {
+          setCompanyId(comp.id);
+          setLocalMode(comp.local_mode || null);
+          setMaxDevices(comp.max_devices || null);
+          fetchDevices(comp.id, comp.local_mode);
+          fetchLayouts(comp.id);
+          fetchActiveSchedules(comp.id);
         } else {
           setLoading(false);
         }
       });
-  }, [user]);
+    }
+  }, [user, company]);
 
   const fetchLayouts = async (cId: string) => {
     const { data } = await supabase.from("layouts").select("id, name").eq("company_id", cId).order("name");
@@ -130,19 +141,59 @@ export default function AdminDevicesPage() {
   };
 
   const fetchActiveSchedules = async (cId: string) => {
-    console.log("[fetchActiveSchedules] querying schedules...");
     const res = await supabase.from("schedules").select("device_id");
-    console.log("[fetchActiveSchedules] raw schedules payload received:", res);
     const list = res.data ?? [];
     const deviceIds = new Set(list.map((s: any) => s.device_id).filter(Boolean));
-    console.log("[fetchActiveSchedules] active schedule device ids Set:", Array.from(deviceIds));
     setActiveScheduleDeviceIds(deviceIds);
   };
 
-  const fetchDevices = async (cId: string) => {
-    const { data, error } = await supabase.from("devices").select("*").eq("company_id", cId).order("created_at", { ascending: false });
-    if (error) toast.error("Failed to load devices");
-    else setDevices(data ?? []);
+  const fetchDevices = async (cId: string, currentMode?: string | null) => {
+    const isSingle =
+      (currentMode || localMode) === "single" ||
+      (currentMode || localMode) === "solo" ||
+      company?.local_mode === "single" ||
+      company?.local_mode === "solo";
+
+    const { data, error } = await supabase.from("devices").select("*").order("created_at", { ascending: false });
+    
+    if (error) {
+      toast.error("Failed to load devices");
+      setLoading(false);
+      return;
+    }
+
+    let list = (data ?? []).filter((d: any) => !d.company_id || d.company_id === cId || isSingle);
+
+    if (isSingle && list.length === 0) {
+      // In Local Solo, guarantee that the 1 built-in screen exists and is displayed
+      const soloFallback: Device = {
+        id: "solo-tv-device-id",
+        name: "Built-in TV Display",
+        location: "Local TV Screen",
+        status: "online",
+        orientation: "landscape",
+        is_paired: true,
+        pairing_code: null,
+        layout_id: null,
+        schedules_enabled: 1,
+        is_paused: 0,
+        last_seen_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+      supabase.from("devices").insert({
+        id: "solo-tv-device-id",
+        company_id: cId,
+        name: "Built-in TV Display",
+        location: "Local TV Screen",
+        status: "online",
+        orientation: "landscape",
+        is_paired: 1,
+        resolution: "1920x1080"
+      }).then(() => {});
+      list = [soloFallback];
+    }
+
+    setDevices(list);
     setLoading(false);
   };
 
@@ -282,18 +333,39 @@ export default function AdminDevicesPage() {
     });
   };
 
-  const isSolo = localMode === "single" || localMode === "solo";
+  const isSolo =
+    localMode === "single" ||
+    localMode === "solo" ||
+    company?.local_mode === "single" ||
+    company?.local_mode === "solo";
   const formatDate = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Devices</h1>
-            <p className="text-sm text-muted-foreground mt-1">Pair, configure, and monitor your Android TV screens.</p>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl font-bold tracking-tight">Devices</h1>
+              {isSolo && (
+                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 px-2.5 py-0.5 text-[11px] font-semibold">
+                  Local Solo Mode
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isSolo
+                ? "Configure and manage your built-in local TV display."
+                : "Pair, configure, and monitor your Android TV screens."}
+            </p>
           </div>
           <div className="flex items-center gap-2">
+            {isSolo && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+                <Monitor className="size-4 text-emerald-400" />
+                <span>Built-in TV Screen (1 of 1)</span>
+              </div>
+            )}
             {isLocalServer && !isSolo && (
               <Button size="sm" variant="outline" onClick={handleCloudSync} disabled={syncing}>
                 <RefreshCw className={cn("h-4 w-4 mr-2", syncing && "animate-spin")} />
