@@ -212,7 +212,7 @@ router.post('/poll-status', async (req, res) => {
     await cleanupExpiredPendingDevices();
 
     const [rows] = await db.query(
-      'SELECT d.*, c.status AS company_status, c.subscription_status, c.trial_ends_at, c.created_at AS company_created_at ' +
+      'SELECT d.*, c.name AS company_name, c.logo_url, c.show_brand_header, c.brand_header_placement, c.status AS company_status, c.subscription_status, c.trial_ends_at, c.created_at AS company_created_at ' +
       'FROM devices d ' +
       'LEFT JOIN companies c ON c.id = d.company_id ' +
       'WHERE d.id = :id LIMIT 1',
@@ -287,6 +287,12 @@ router.post('/poll-status', async (req, res) => {
     );
     const isPaused = !!device.is_paused;
     const layout = isPaused ? null : await getActiveLayout(device);
+    const company = {
+      name: device.company_name || '',
+      logo_url: device.logo_url || null,
+      show_brand_header: Boolean(device.show_brand_header),
+      brand_header_placement: device.brand_header_placement || 'top',
+    };
     res.json({
       device: {
         id: device.id,
@@ -299,6 +305,7 @@ router.post('/poll-status', async (req, res) => {
         status: isPaused ? 'paused' : (layout ? 'playing' : 'waiting_for_layout'),
       },
       layout,
+      company,
     });
   } catch (err) {
     console.error('TV_POLL_STATUS_ERROR:', err.stack || err);

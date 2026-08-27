@@ -214,6 +214,7 @@ try {
   const tvRoutes = require('./src/routes/tv');
 
   app.use('/uploads', express.static(storageRoutes.uploadRoot));
+  app.use('/api/uploads', express.static(storageRoutes.uploadRoot));
   app.use('/api/player', playerRoutes);
   app.use('/api/tv', tvRoutes);
   app.use('/api/auth', authRoutes);
